@@ -1,4 +1,4 @@
-const BASE = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
+const BASE = "/api";
 
 async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem("philix_portal_token");
@@ -14,6 +14,85 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || data.error || `Request failed ${res.status}`);
   return data as T;
+}
+
+// ── Staff helper (uses staff JWT stored separately) ──────────────────────────
+async function staffRequest<T>(path: string, opts: RequestInit = {}): Promise<T> {
+  const token = localStorage.getItem("philix_staff_token");
+  const res = await fetch(`${BASE}${path}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(opts.headers as Record<string, string> ?? {}),
+    },
+    ...opts,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || data.error || `Request failed ${res.status}`);
+  return data as T;
+}
+
+// ── Staff auth ────────────────────────────────────────────────────────────────
+export interface StaffAuthResponse {
+  accessToken: string;
+  refreshToken: string;
+  user: {
+    id: string; employeeId: string; firstName: string; lastName: string;
+    email: string; phone: string; role: string; branch: null;
+    mfaEnabled: boolean; avatarUrl: string | null;
+  };
+}
+
+export const staffApi = {
+  login: (email: string, password: string) =>
+    staffRequest<StaffAuthResponse>("/auth/login", {
+      method: "POST", body: JSON.stringify({ email, password }),
+    }),
+
+  logout: (refreshToken: string) =>
+    staffRequest("/auth/logout", { method: "POST", body: JSON.stringify({ refreshToken }) }),
+
+  getAllPortalApplications: () =>
+    staffRequest<StaffPortalApplication[]>("/portal/applications/staff/all"),
+
+  updateApplicationStatus: (id: string, status: string, rejectedReason?: string) =>
+    staffRequest(`/portal/applications/staff/${id}`, {
+      method: "PATCH", body: JSON.stringify({ status, rejectedReason }),
+    }),
+};
+
+export function saveStaffTokens(accessToken: string, refreshToken: string) {
+  localStorage.setItem("philix_staff_token", accessToken);
+  localStorage.setItem("philix_staff_refresh", refreshToken);
+}
+
+export function clearStaffTokens() {
+  localStorage.removeItem("philix_staff_token");
+  localStorage.removeItem("philix_staff_refresh");
+}
+
+export interface StaffPortalApplication {
+  id: string;
+  reference: string;
+  accountId: string;
+  productType: string;
+  amountRequested: number;
+  termMonths: number;
+  purpose: string;
+  collateralType?: string;
+  collateralDesc?: string;
+  collateralValue?: number;
+  occupation?: string;
+  employer?: string;
+  monthlyIncome?: number;
+  status: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  rejectedReason?: string;
+  createdAt: string;
+  account?: {
+    firstName: string; lastName: string; email: string; phone: string; clientNumber: string;
+  };
 }
 
 // ── Portal auth ──────────────────────────────────────────────────────────────

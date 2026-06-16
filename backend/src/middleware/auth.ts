@@ -1,12 +1,13 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { prisma } from "../lib/prisma";
-import { UserRole } from "@prisma/client";
+
+export type UserRole = "SUPER_ADMIN" | "MANAGER" | "LOAN_OFFICER" | "COLLECTIONS_OFFICER" | "ACCOUNTANT";
 
 export interface AuthUser {
   id: string;
   email: string;
-  role: UserRole;
+  role: string;
   branchId?: string | null;
 }
 
@@ -48,7 +49,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
   }
 };
 
-export const authorize = (...roles: UserRole[]) => {
+export const authorize = (...roles: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
@@ -60,8 +61,6 @@ export const authorize = (...roles: UserRole[]) => {
   };
 };
 
-export const isSuperAdmin = authorize(UserRole.SUPER_ADMIN);
-export const isManagerOrAbove = authorize(UserRole.SUPER_ADMIN, UserRole.MANAGER);
-export const isLoanOfficerOrAbove = authorize(
-  UserRole.SUPER_ADMIN, UserRole.MANAGER, UserRole.LOAN_OFFICER
-);
+export const isSuperAdmin = authorize("SUPER_ADMIN");
+export const isManagerOrAbove = authorize("SUPER_ADMIN", "MANAGER");
+export const isLoanOfficerOrAbove = authorize("SUPER_ADMIN", "MANAGER", "LOAN_OFFICER");

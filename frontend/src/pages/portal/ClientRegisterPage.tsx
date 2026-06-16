@@ -2,18 +2,18 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CheckCircle, Eye, EyeOff, ArrowLeft, User, Phone, Briefcase, Lock } from "lucide-react";
 import PhilixLogo from "../../components/ui/PhilixLogo";
-import { useClientAuthStore, useRegisteredClientsStore } from "../../store/clientAuth";
+import { useClientAuthStore } from "../../store/clientAuth";
 
 const STEPS = ["Personal", "Identity", "Employment", "Security"];
 
 export default function ClientRegisterPage() {
   const navigate = useNavigate();
-  const login = useClientAuthStore(s => s.login);
-  const registerClient = useRegisteredClientsStore(s => s.register);
+  const registerWithApi = useClientAuthStore(s => s.registerWithApi);
   const [step, setStep] = useState(0);
   const [done, setDone] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [apiError, setApiError] = useState("");
 
   const [form, setForm] = useState({
     firstName: "", lastName: "", dateOfBirth: "", gender: "",
@@ -55,35 +55,31 @@ export default function ClientRegisterPage() {
     return Object.keys(e).length === 0;
   };
 
-  const next = () => {
+  const next = async () => {
     if (!validate()) return;
     if (step < 3) { setStep(step + 1); }
     else {
-      setTimeout(() => {
-        const newClient = {
-          id: `clt-new-${Date.now()}`,
-          clientNumber: `PHX-C-${String(Math.floor(Math.random() * 9000) + 1000)}`,
+      setApiError("");
+      try {
+        await registerWithApi({
           firstName: form.firstName,
           lastName: form.lastName,
           email: form.email,
           phone: form.phone,
-          nrcNumber: form.nrcNumber,
-          dateOfBirth: form.dateOfBirth,
-          gender: form.gender,
-          address: form.address,
-          city: form.city,
-          occupation: form.occupation,
-          employer: form.employer,
-          monthlyIncome: Number(form.monthlyIncome),
-          status: "ACTIVE" as const,
-          kycStatus: (form.nrcFront ? "SUBMITTED" : "NOT_STARTED") as "SUBMITTED" | "NOT_STARTED",
-          avatarInitials: `${form.firstName[0]}${form.lastName[0]}`.toUpperCase(),
-          joinedAt: new Date().toISOString(),
-        };
-        registerClient(newClient, form.password);
-        login(newClient);
+          password: form.password,
+          dateOfBirth: form.dateOfBirth || undefined,
+          gender: form.gender || undefined,
+          address: form.address || undefined,
+          city: form.city || undefined,
+          nrcNumber: form.nrcNumber || undefined,
+          occupation: form.occupation || undefined,
+          employer: form.employer || undefined,
+          monthlyIncome: form.monthlyIncome ? Number(form.monthlyIncome) : undefined,
+        });
         setDone(true);
-      }, 1000);
+      } catch (err: unknown) {
+        setApiError(err instanceof Error ? err.message : "Registration failed. Please try again.");
+      }
     }
   };
 
@@ -144,6 +140,12 @@ export default function ClientRegisterPage() {
               </div>
             ))}
           </div>
+
+          {apiError && (
+            <div className="mb-4 bg-red-900/20 border border-red-700/40 rounded-xl p-3 flex items-center gap-2 text-red-300 text-sm">
+              {apiError}
+            </div>
+          )}
 
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
             {/* Step 0 — Personal */}

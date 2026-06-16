@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ExternalLink, Eye, CheckCircle, XCircle, AlertCircle, Clock, Send } from "lucide-react";
 import { formatKwacha, formatDate, getStatusColor } from "../lib/mock-data";
 import { useLoanApplicationStore, type LoanApplication } from "../store/loanApplicationStore";
+import { staffApi } from "../lib/api";
 
 // Adapter: map store LoanApplication → display shape used by this page
 function toDisplayApp(a: LoanApplication) {
@@ -41,6 +42,7 @@ export default function OnlineApplicationsPage() {
   const handleAction = (id: string, newStatus: string) => {
     updateStatus(id, newStatus as LoanApplication["status"]);
     setSelected(prev => prev?.storeId === id ? { ...prev, status: newStatus } : prev);
+    staffApi.updateApplicationStatus(id, newStatus, note || undefined).catch(() => {/* non-critical */});
   };
 
   const counts: Record<string, number> = {};

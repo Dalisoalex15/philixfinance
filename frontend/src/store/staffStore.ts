@@ -1,14 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { demoStaff, type StaffUser } from "./clientAuth";
+import { type StaffUser } from "./clientAuth";
 
-const INITIAL_PASSWORDS: Record<string, string> = {
-  "staff-001": "philix@CEO2025",
-  "staff-002": "philix@Mgr2025",
-  "staff-003": "philix@LO2025",
-  "staff-004": "philix@Col2025",
-  "staff-005": "philix@Acc2025",
-};
+const INITIAL_PASSWORDS: Record<string, string> = {};
 
 interface StaffStoreState {
   staff: StaffUser[];
@@ -21,7 +15,7 @@ interface StaffStoreState {
 export const useStaffStore = create<StaffStoreState>()(
   persist(
     (set, get) => ({
-      staff: [...demoStaff],
+      staff: [],
       passwords: { ...INITIAL_PASSWORDS },
 
       addStaff: (data, password) => {

@@ -3,16 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, AlertCircle, ArrowRight, Shield, Zap, TrendingUp, Users } from "lucide-react";
 import PhilixLogo from "../components/ui/PhilixLogo";
 import { useAuthStore } from "../store/auth";
-import { useClientAuthStore, useRegisteredClientsStore, demoClients } from "../store/clientAuth";
-import { useStaffStore } from "../store/staffStore";
-
+import { useClientAuthStore } from "../store/clientAuth";
 
 export default function UnifiedLoginPage() {
   const navigate = useNavigate();
-  const setAuth = useAuthStore(s => s.setAuth);
-  const clientLogin = useClientAuthStore(s => s.login);
-  const { staff: allStaff, passwords: staffPasswords } = useStaffStore();
-  const { clients: registeredClients, passwords: clientPasswords } = useRegisteredClientsStore();
+  const staffLogin = useAuthStore(s => s.login);
+  const clientLoginWithApi = useClientAuthStore(s => s.loginWithApi);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,12 +16,8 @@ export default function UnifiedLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const allClients = [...demoClients, ...registeredClients];
-
   const detectedType = (() => {
     if (!email) return null;
-    if (allStaff.some(s => s.email.toLowerCase() === email.toLowerCase())) return "staff";
-    if (allClients.some(c => c.email.toLowerCase() === email.toLowerCase())) return "client";
     if (email.toLowerCase().endsWith("@philixfinance.com")) return "staff";
     return "client";
   })();
@@ -34,52 +26,20 @@ export default function UnifiedLoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    await new Promise(r => setTimeout(r, 700));
 
-    const staffMatch = allStaff.find(s => s.email.toLowerCase() === email.toLowerCase());
-    const clientMatch = allClients.find(c => c.email.toLowerCase() === email.toLowerCase());
-
-    if (staffMatch) {
-      const correctPass = staffPasswords[staffMatch.id];
-      if (password !== correctPass) {
-        setError("Incorrect password. Please check your credentials and try again.");
-        setLoading(false);
-        return;
+    try {
+      if (detectedType === "staff") {
+        await staffLogin(email, password);
+        navigate("/");
+      } else {
+        await clientLoginWithApi(email, password);
+        navigate("/portal/dashboard");
       }
-      setAuth({
-        id: staffMatch.id,
-        employeeId: staffMatch.employeeNumber,
-        firstName: staffMatch.firstName,
-        lastName: staffMatch.lastName,
-        email: staffMatch.email,
-        phone: staffMatch.phone,
-        role: staffMatch.role === "CEO" ? "SUPER_ADMIN"
-          : staffMatch.role === "MANAGER" ? "MANAGER"
-          : staffMatch.role === "LOAN_OFFICER" ? "LOAN_OFFICER"
-          : staffMatch.role === "COLLECTIONS_OFFICER" ? "COLLECTIONS_OFFICER"
-          : "ACCOUNTANT",
-        mfaEnabled: false,
-        avatarUrl: null,
-      }, "demo-token");
-      navigate("/");
-      return;
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Login failed. Please check your credentials.");
+    } finally {
+      setLoading(false);
     }
-
-    if (clientMatch) {
-      const isDemoClient = demoClients.some(c => c.id === clientMatch.id);
-      const correctPass = isDemoClient ? "client123" : clientPasswords[clientMatch.id];
-      if (password !== correctPass) {
-        setError("Incorrect password.");
-        setLoading(false);
-        return;
-      }
-      clientLogin(clientMatch);
-      navigate("/portal/dashboard");
-      return;
-    }
-
-    setError("No account found with this email. Click a demo account below to fill in credentials.");
-    setLoading(false);
   };
 
   return (

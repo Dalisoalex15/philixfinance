@@ -13,8 +13,8 @@ import {
   mockPAR, mockCapitalUtilization, mockAnnouncements,
   formatKwacha, formatDate,
 } from "../lib/mock-data";
+import { useEffect } from "react";
 import { useLoanApplicationStore } from "../store/loanApplicationStore";
-import { useRegisteredClientsStore, demoClients } from "../store/clientAuth";
 
 const COLORS = {
   ACTIVE: "#6366f1",
@@ -102,10 +102,13 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function DashboardPage() {
   const kpis = mockKPIs;
-  const { applications, updateStatus } = useLoanApplicationStore();
+  const { applications, updateStatus, syncFromApi } = useLoanApplicationStore();
   const pendingApps = applications.filter(a => a.status === "PENDING" || a.status === "UNDER_REVIEW");
-  const { clients: registeredClients } = useRegisteredClientsStore();
-  const totalClients = demoClients.length + registeredClients.length;
+  const totalClients = applications
+    .map(a => a.clientId)
+    .filter((id, i, arr) => arr.indexOf(id) === i).length;
+
+  useEffect(() => { syncFromApi(); }, []);
 
   return (
     <div className="space-y-6">
@@ -208,7 +211,7 @@ export default function DashboardPage() {
         <KPICard
           title="Registered Clients"
           value={totalClients.toString()}
-          sub={`${registeredClients.length} new self-registered`}
+          sub="Total portal accounts"
           icon={Users}
           color="blue"
         />

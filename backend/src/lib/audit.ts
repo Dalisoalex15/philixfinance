@@ -1,10 +1,9 @@
 import { prisma } from "./prisma";
-import { AuditAction } from "@prisma/client";
 import { Request } from "express";
 
 interface AuditParams {
   userId?: string;
-  action: AuditAction;
+  action: string;
   entity: string;
   entityId?: string;
   oldValue?: object;
@@ -21,8 +20,8 @@ export async function createAuditLog(params: AuditParams) {
         action: params.action,
         entity: params.entity,
         entityId: params.entityId,
-        oldValue: params.oldValue as any,
-        newValue: params.newValue as any,
+        oldValue: params.oldValue ? JSON.stringify(params.oldValue) : undefined,
+        newValue: params.newValue ? JSON.stringify(params.newValue) : undefined,
         description: params.description,
         ipAddress: params.req?.ip,
         userAgent: params.req?.headers["user-agent"],

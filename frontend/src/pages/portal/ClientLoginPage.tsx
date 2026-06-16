@@ -2,12 +2,11 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, AlertCircle, ArrowRight, Shield, Zap, TrendingUp } from "lucide-react";
 import { useClientAuthStore } from "../../store/clientAuth";
-import { demoClients } from "../../store/clientAuth";
 import PhilixLogo from "../../components/ui/PhilixLogo";
 
 export default function ClientLoginPage() {
   const navigate = useNavigate();
-  const login = useClientAuthStore(s => s.login);
+  const loginWithApi = useClientAuthStore(s => s.loginWithApi);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -18,14 +17,14 @@ export default function ClientLoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    await new Promise(r => setTimeout(r, 800));
-
-    const client = demoClients.find(c => c.email.toLowerCase() === email.toLowerCase());
-    if (!client) { setError("No account found with this email. Please register first."); setLoading(false); return; }
-    if (password !== "client123") { setError("Incorrect password. Demo password is: client123"); setLoading(false); return; }
-
-    login(client);
-    navigate("/portal/dashboard");
+    try {
+      await loginWithApi(email, password);
+      navigate("/portal/dashboard");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Login failed. Please check your credentials.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -118,24 +117,8 @@ export default function ClientLoginPage() {
             </button>
           </form>
 
-          {/* Demo accounts */}
-          <div className="mt-6 bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Demo Accounts — Click to Fill</p>
-            <div className="space-y-2">
-              {demoClients.map(c => (
-                <button key={c.id} onClick={() => { setEmail(c.email); setPassword("client123"); setError(""); }}
-                  className="w-full text-left flex items-center gap-3 hover:bg-slate-800/60 rounded-xl px-3 py-2.5 transition-all group border border-transparent hover:border-slate-700">
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center font-bold text-white text-xs flex-shrink-0">
-                    {c.avatarInitials}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-slate-300">{c.firstName} {c.lastName}</div>
-                    <div className="text-xs text-slate-600 truncate">{c.email}</div>
-                  </div>
-                  <span className="text-xs text-slate-700 group-hover:text-slate-500 font-mono flex-shrink-0">client123</span>
-                </button>
-              ))}
-            </div>
+          <div className="mt-5 bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 text-xs text-slate-500 text-center">
+            Don&apos;t have an account yet? Register to access your portal.
           </div>
 
           <div className="mt-5 space-y-2 text-center">

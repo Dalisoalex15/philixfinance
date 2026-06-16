@@ -2,9 +2,42 @@ import { Router, Request, Response } from "express";
 import { prisma } from "../../lib/prisma";
 import { AppError } from "../../middleware/errorHandler";
 import { authenticatePortal } from "../../middleware/portalAuth";
+import { authenticate } from "../../middleware/auth";
 import { Mailer } from "../../lib/mailer";
 
 const router = Router();
+
+// Staff-only: GET /api/portal/applications/staff/all — returns all portal loan applications
+router.get("/staff/all", authenticate, async (_req: Request, res: Response) => {
+  const apps = await prisma.portalLoanApplication.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      account: {
+        select: { firstName: true, lastName: true, email: true, phone: true, clientNumber: true },
+      },
+    },
+  });
+  res.json(apps);
+});
+
+// Staff-only: PATCH /api/portal/applications/staff/:id — update status of a portal loan application
+router.patch("/staff/:id", authenticate, async (req: Request, res: Response) => {
+  const { status, rejectedReason, reviewedBy } = req.body;
+  const app = await prisma.portalLoanApplication.findUnique({ where: { id: req.params.id } });
+  if (!app) throw new AppError("Application not found", 404);
+
+  const updated = await prisma.portalLoanApplication.update({
+    where: { id: req.params.id },
+    data: {
+      status,
+      rejectedReason: rejectedReason ?? app.rejectedReason,
+      reviewedBy: reviewedBy ?? req.user?.id,
+      reviewedAt: new Date(),
+    },
+  });
+  res.json(updated);
+});
+
 router.use(authenticatePortal);
 
 function genRef() {

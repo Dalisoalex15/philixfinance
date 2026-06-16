@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { mockUser } from "../lib/mock-data";
+import { staffApi, saveStaffTokens, clearStaffTokens } from "../lib/api";
 
-interface AuthUser {
+export interface AuthUser {
   id: string;
   employeeId: string;
   firstName: string;
@@ -18,24 +18,47 @@ interface AuthUser {
 interface AuthState {
   user: AuthUser | null;
   accessToken: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
   setAuth: (user: AuthUser, token: string) => void;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      // Demo: pre-authenticated as Daliso Phiri (CEO/Super Admin)
-      user: mockUser as AuthUser,
-      accessToken: "demo-token",
-      isAuthenticated: true,
+      user: null,
+      accessToken: null,
+      refreshToken: null,
+      isAuthenticated: false,
+
       setAuth: (user, accessToken) => set({ user, accessToken, isAuthenticated: true }),
-      logout: () => set({ user: null, accessToken: null, isAuthenticated: false }),
+
+      login: async (email, password) => {
+        const res = await staffApi.login(email, password);
+        saveStaffTokens(res.accessToken, res.refreshToken);
+        set({
+          user: res.user as AuthUser,
+          accessToken: res.accessToken,
+          refreshToken: res.refreshToken,
+          isAuthenticated: true,
+        });
+      },
+
+      logout: () => {
+        clearStaffTokens();
+        set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
+      },
     }),
     {
-      name: "philix-auth",
-      partialize: (state) => ({ user: state.user, accessToken: state.accessToken, isAuthenticated: state.isAuthenticated }),
+      name: "philix-auth-v2",
+      partialize: (state) => ({
+        user: state.user,
+        accessToken: state.accessToken,
+        refreshToken: state.refreshToken,
+        isAuthenticated: state.isAuthenticated,
+      }),
     }
   )
 );
