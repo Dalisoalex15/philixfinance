@@ -69,6 +69,17 @@ import ExportCenterPage from "./pages/ExportCenterPage";
 import GlobalSearchPage from "./pages/GlobalSearchPage";
 import PortfolioProfitabilityPage from "./pages/PortfolioProfitabilityPage";
 import InvestorStatementsPage from "./pages/InvestorStatementsPage";
+// Addendum v2.1 — 10 new feature pages
+import SMSNotificationsPage from "./pages/SMSNotificationsPage";
+import MobileMoneyPage from "./pages/MobileMoneyPage";
+import WhatsAppPage from "./pages/WhatsAppPage";
+import LoanAgreementPage from "./pages/LoanAgreementPage";
+import QRReceiptPage from "./pages/QRReceiptPage";
+import CreditScoringPage from "./pages/CreditScoringPage";
+import FraudAlertsPage from "./pages/FraudAlertsPage";
+import ReferralProgrammePage from "./pages/ReferralProgrammePage";
+import GroupLendingPage from "./pages/GroupLendingPage";
+import APIManagementPage from "./pages/APIManagementPage";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
@@ -160,6 +171,17 @@ export default function App() {
           <Route path="portfolio-profitability" element={<PortfolioProfitabilityPage />} />
           <Route path="investor-statements" element={<InvestorStatementsPage />} />
           <Route path="email-composer" element={<EmailComposerPage />} />
+          {/* Addendum v2.1 routes */}
+          <Route path="sms-notifications" element={<SMSNotificationsPage />} />
+          <Route path="mobile-money" element={<MobileMoneyPage />} />
+          <Route path="whatsapp" element={<WhatsAppPage />} />
+          <Route path="loan-agreement" element={<LoanAgreementPage />} />
+          <Route path="qr-receipts" element={<QRReceiptPage />} />
+          <Route path="credit-scoring" element={<CreditScoringPage />} />
+          <Route path="fraud-alerts" element={<FraudAlertsPage />} />
+          <Route path="referrals" element={<ReferralProgrammePage />} />
+          <Route path="group-lending" element={<GroupLendingPage />} />
+          <Route path="api-management" element={<APIManagementPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

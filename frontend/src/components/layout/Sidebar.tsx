@@ -9,6 +9,8 @@ import {
   ScanFace, Clock, FileWarning, PieChart, LineChart, MonitorDot,
   Calendar, Users2, FileText, ShoppingBag, Mail, Upload, Download,
   Search, Percent, Wallet, Scale,
+  MessageSquare, Smartphone, MessageCircle, FileSignature, QrCode,
+  Brain, ShieldAlert, Gift, UsersRound, Webhook,
 } from "lucide-react";
 import { useAuthStore } from "../../store/auth";
 import { useLoanApplicationStore } from "../../store/loanApplicationStore";
@@ -35,10 +37,12 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/clients",       icon: Users,       label: "Client CRM" },
       { href: "/loans",         icon: CreditCard,  label: "Loans" },
-      { href: "/loan-products", icon: Package,     label: "Loan Products" },
-      { href: "/calculator",    icon: Calculator,  label: "Loan Calculator" },
-      { href: "/collateral",    icon: Package,     label: "Collateral Vault" },
-      { href: "/repayments",    icon: Receipt,     label: "Repayments" },
+      { href: "/loan-products",  icon: Package,      label: "Loan Products" },
+      { href: "/calculator",     icon: Calculator,   label: "Loan Calculator" },
+      { href: "/collateral",     icon: Package,      label: "Collateral Vault" },
+      { href: "/repayments",     icon: Receipt,      label: "Repayments" },
+      { href: "/group-lending",  icon: UsersRound,   label: "Group Lending" },
+      { href: "/referrals",      icon: Gift,         label: "Referral Programme" },
     ],
   },
   {
@@ -59,6 +63,8 @@ const navGroups: NavGroup[] = [
       { href: "/write-offs",        icon: Slash,         label: "Write-offs & Penalties" },
       { href: "/collateral-auction",icon: Gavel,         label: "Collateral Auctions" },
       { href: "/provisioning",      icon: Percent,       label: "Provisioning (PAR)" },
+      { href: "/credit-scoring",    icon: Brain,         label: "AI Credit Scoring" },
+      { href: "/fraud-alerts",      icon: ShieldAlert,   label: "Fraud Detection" },
     ],
   },
   {
@@ -103,10 +109,20 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    label: "Communications",
+    items: [
+      { href: "/sms-notifications", icon: MessageSquare,  label: "SMS Notifications" },
+      { href: "/mobile-money",      icon: Smartphone,     label: "Mobile Money" },
+      { href: "/whatsapp",          icon: MessageCircle,  label: "WhatsApp Business" },
+    ],
+  },
+  {
     label: "Tools",
     items: [
-      { href: "/import", icon: Upload,   label: "Import Data" },
-      { href: "/export", icon: Download, label: "Export Center" },
+      { href: "/loan-agreement", icon: FileSignature, label: "Loan Agreements" },
+      { href: "/qr-receipts",    icon: QrCode,        label: "QR Receipts" },
+      { href: "/import",         icon: Upload,        label: "Import Data" },
+      { href: "/export",         icon: Download,      label: "Export Center" },
     ],
   },
   {
@@ -115,8 +131,9 @@ const navGroups: NavGroup[] = [
       { href: "/users",      icon: UserCog,   label: "Staff",      roles: ["SUPER_ADMIN", "MANAGER"] },
       { href: "/performance",icon: Activity,  label: "Performance",roles: ["SUPER_ADMIN", "MANAGER"] },
       { href: "/branches",   icon: Building2, label: "Branches",   roles: ["SUPER_ADMIN"] },
-      { href: "/audit",      icon: Shield,    label: "Audit Logs", roles: ["SUPER_ADMIN", "MANAGER"] },
-      { href: "/settings",   icon: Settings,  label: "Settings",   roles: ["SUPER_ADMIN"] },
+      { href: "/audit",          icon: Shield,    label: "Audit Logs",    roles: ["SUPER_ADMIN", "MANAGER"] },
+      { href: "/api-management", icon: Webhook,   label: "API Management", roles: ["SUPER_ADMIN"] },
+      { href: "/settings",       icon: Settings,  label: "Settings",       roles: ["SUPER_ADMIN"] },
     ],
   },
 ];
