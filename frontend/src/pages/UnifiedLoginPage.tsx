@@ -121,21 +121,24 @@ export default function UnifiedLoginPage() {
 
         <div className="relative">
           <PhilixLogo variant="full" size="lg" onDark />
-          <div className="mt-12 space-y-1">
-            <h1 className="text-3xl font-black text-white leading-tight">One Platform.</h1>
-            <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 leading-tight">Two Portals.</h1>
+          <div className="mt-10 space-y-2">
+            <h1 className="text-3xl font-black text-white leading-tight">Building Futures,</h1>
+            <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 leading-tight">Together.</h1>
           </div>
           <p className="text-slate-400 text-sm mt-4 leading-relaxed">
-            Staff and clients both sign in here. We detect your account type automatically from your email.
+            At Philix Finance, we believe every Zambian deserves access to fair, fast, and transparent credit — whether you're a student, a business owner, or a working professional.
+          </p>
+          <p className="text-slate-500 text-sm mt-3 leading-relaxed">
+            We're not just a lender. We're a partner in your growth — helping you bridge gaps, seize opportunities, and build the life you deserve.
           </p>
         </div>
 
         <div className="relative space-y-4">
           {[
-            { icon: Shield, label: "Staff Portal", desc: "Loan management, clients, collections, accounting" },
-            { icon: Users, label: "Client Portal", desc: "Apply for loans, track repayments, manage profile" },
-            { icon: Zap, label: "Fast Approvals", desc: "24–48 hour loan decisions" },
-            { icon: TrendingUp, label: "Trusted Lending", desc: "BoZ Licensed · Lusaka, Zambia" },
+            { icon: Zap, label: "Fast, Simple Loans", desc: "Apply in minutes. Decision in 24–48 hours." },
+            { icon: Shield, label: "Trusted & Licensed", desc: "Regulated by the Bank of Zambia (BoZ)." },
+            { icon: TrendingUp, label: "Grow With Us", desc: "Better rates as you build your repayment history." },
+            { icon: Users, label: "Community First", desc: "Serving students, workers & entrepreneurs in Lusaka." },
           ].map(f => (
             <div key={f.label} className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">
@@ -148,7 +151,8 @@ export default function UnifiedLoginPage() {
             </div>
           ))}
           <div className="pt-4 border-t border-slate-800/60">
-            <p className="text-slate-700 text-xs">© 2025 Philix Finance Ltd · Lusaka, Zambia</p>
+            <p className="text-slate-600 text-xs italic">"Your future is worth investing in."</p>
+            <p className="text-slate-700 text-xs mt-1">© 2025 Philix Finance Ltd · Lusaka, Zambia · BoZ Licensed</p>
           </div>
         </div>
       </div>
@@ -166,10 +170,10 @@ export default function UnifiedLoginPage() {
             <h2 className="text-2xl font-black text-white">Sign In</h2>
             <p className="text-slate-500 text-sm mt-1">
               {detectedType === "staff"
-                ? "Staff account detected — signing in to Operations Portal"
+                ? "Staff account recognised — you'll be taken to the Operations Portal"
                 : detectedType === "client"
-                ? "Client account detected — signing in to Client Portal"
-                : "Enter your email and we'll detect your account type"}
+                ? "Welcome back — you'll be taken to your Client Portal"
+                : "Sign in to access your Philix Finance account"}
             </p>
           </div>
 

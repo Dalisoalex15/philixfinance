@@ -100,8 +100,12 @@ export default function LoanApplicationPage() {
 
   const next = () => {
     if (!validate()) return;
-    if (step < 6) setStep(step + 1);
-    else setTimeout(() => setDone(true), 1200);
+    if (step < 5) {
+      setStep(step + 1);
+    } else if (step === 5) {
+      setStep(6);
+      setTimeout(() => setDone(true), 1600);
+    }
   };
 
   if (done) {
