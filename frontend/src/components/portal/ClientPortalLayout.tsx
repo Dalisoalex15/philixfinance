@@ -1,5 +1,6 @@
 import { Outlet, NavLink, Link, useNavigate, useLocation } from "react-router-dom";
 import { useClientAuthStore } from "../../store/clientAuth";
+import { useLoanApplicationStore } from "../../store/loanApplicationStore";
 import {
   LayoutDashboard, CreditCard, Package, FileText, User,
   LogOut, Bell, Menu, X, Shield, Phone, ChevronRight,
@@ -15,7 +16,7 @@ const navItems = [
   { href: "/portal/calculator", icon: Calculator, label: "Loan Calculator", color: "text-cyan-400" },
   { href: "/portal/collateral", icon: Package, label: "Submit Collateral", color: "text-amber-400" },
   { href: "/portal/kyc", icon: Shield, label: "Identity Verification", color: "text-purple-400" },
-  { href: "/portal/notifications", icon: Bell, label: "Notifications", color: "text-pink-400", badge: 2 },
+  { href: "/portal/notifications", icon: Bell, label: "Notifications", color: "text-pink-400" },
   { href: "/portal/profile", icon: User, label: "My Profile", color: "text-slate-400" },
 ];
 
@@ -23,7 +24,7 @@ const bottomNav = [
   { href: "/portal/dashboard", icon: Home, label: "Home" },
   { href: "/portal/loans", icon: CreditCard, label: "Loans" },
   { href: "/portal/apply", icon: Zap, label: "Apply", highlight: true },
-  { href: "/portal/notifications", icon: Bell, label: "Alerts", badge: 2 },
+  { href: "/portal/notifications", icon: Bell, label: "Alerts" },
   { href: "/portal/profile", icon: User, label: "Profile" },
 ];
 
@@ -33,6 +34,10 @@ export default function ClientPortalLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const allApplications = useLoanApplicationStore(s => s.applications);
+  const notifCount = client
+    ? allApplications.filter(a => a.clientId === client.id && a.status !== "PENDING").length
+    : 0;
 
   const handleLogout = () => {
     logout();
@@ -160,7 +165,11 @@ export default function ClientPortalLayout() {
             )}
             <Link to="/portal/notifications" className="relative text-slate-500 hover:text-slate-300 p-1.5 rounded-xl hover:bg-slate-800 transition-all">
               <Bell size={17} />
-              <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full text-[8px] text-white flex items-center justify-center font-bold">2</span>
+              {notifCount > 0 && (
+                <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full text-[8px] text-white flex items-center justify-center font-bold">
+                  {notifCount > 9 ? "9+" : notifCount}
+                </span>
+              )}
             </Link>
             <Link to="/portal/profile" className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white text-xs shadow-md">
               {initials}
@@ -187,8 +196,10 @@ export default function ClientPortalLayout() {
                 ) : (
                   <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${isActive ? "bg-indigo-600/20" : ""}`}>
                     <item.icon size={18} className={isActive ? "text-indigo-400" : "text-slate-600"} />
-                    {(item as { badge?: number }).badge && !isActive && (
-                      <span className="absolute -top-0.5 right-0 w-3.5 h-3.5 bg-red-500 rounded-full text-[8px] text-white flex items-center justify-center font-bold">{(item as { badge?: number }).badge}</span>
+                    {item.href === "/portal/notifications" && notifCount > 0 && !isActive && (
+                      <span className="absolute -top-0.5 right-0 w-3.5 h-3.5 bg-red-500 rounded-full text-[8px] text-white flex items-center justify-center font-bold">
+                        {notifCount > 9 ? "9+" : notifCount}
+                      </span>
                     )}
                   </div>
                 )}

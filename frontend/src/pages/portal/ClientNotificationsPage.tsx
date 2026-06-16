@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Mail, CheckCircle, Bell, X, ChevronRight } from "lucide-react";
 import { useClientAuthStore } from "../../store/clientAuth";
+import { useLoanApplicationStore } from "../../store/loanApplicationStore";
 
 interface Notification {
   id: string;
@@ -140,9 +141,54 @@ Philix Finance Ltd`,
   },
 ];
 
+const STATUS_MESSAGES: Record<string, { subject: string; body: (ref: string, name: string, amount: number, product: string) => string; category: Notification["category"] }> = {
+  UNDER_REVIEW: {
+    subject: "Your Loan Application Is Under Review",
+    category: "LOAN",
+    body: (ref, name, amount, product) => `Dear ${name},\n\nYour loan application has been received and is currently being reviewed by a Philix Finance Loan Officer.\n\nAPPLICATION DETAILS\n─────────────────────────────\nReference:   ${ref}\nProduct:     ${product}\nAmount:      K${amount.toLocaleString()}\nStatus:      Under Review\n─────────────────────────────\n\nWe aim to provide a decision within 24–48 hours. You will be notified of any updates.\n\nPhilix Finance Ltd`,
+  },
+  APPROVED: {
+    subject: "Your Loan Application Has Been Approved!",
+    category: "LOAN",
+    body: (ref, name, amount, product) => `Dear ${name},\n\nGreat news! Your loan application has been APPROVED.\n\nLOAN DETAILS\n─────────────────────────────\nReference:    ${ref}\nProduct:      ${product}\nAmount:       K${amount.toLocaleString()}\nStatus:       APPROVED ✓\n─────────────────────────────\n\nA Loan Officer will contact you to arrange disbursement. Please ensure you have your NRC and collateral ready.\n\nWarm regards,\nPhilix Finance Ltd`,
+  },
+  REJECTED: {
+    subject: "Update on Your Loan Application",
+    category: "LOAN",
+    body: (ref, name, amount, product) => `Dear ${name},\n\nThank you for applying with Philix Finance.\n\nAfter reviewing your application, we are unable to approve it at this time.\n\nAPPLICATION REFERENCE: ${ref}\nPRODUCT: ${product}\nAMOUNT REQUESTED: K${amount.toLocaleString()}\n\nYou are welcome to reapply after 30 days or contact us to discuss your options.\n\nPhilix Finance Ltd`,
+  },
+  DISBURSED: {
+    subject: "Loan Disbursement Confirmation",
+    category: "LOAN",
+    body: (ref, name, amount, product) => `Dear ${name},\n\nYour loan has been successfully DISBURSED.\n\nDISBURSEMENT DETAILS\n─────────────────────────────\nReference:  ${ref}\nProduct:    ${product}\nAmount:     K${amount.toLocaleString()}\nStatus:     Disbursed ✓\n─────────────────────────────\n\nPlease check your account. Your first repayment will be due according to your agreed schedule.\n\nThank you for choosing Philix Finance.\nPhilix Finance Ltd`,
+  },
+};
+
 export default function ClientNotificationsPage() {
   const client = useClientAuthStore(s => s.client)!;
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const allApplications = useLoanApplicationStore(s => s.applications);
+  const myApplications = allApplications.filter(a => a.clientId === client.id);
+
+  // Build real notifications from application status changes
+  const realNotifications: Notification[] = myApplications
+    .filter(a => a.status !== "PENDING")
+    .map(a => {
+      const msg = STATUS_MESSAGES[a.status];
+      if (!msg) return null;
+      return {
+        id: `app-notif-${a.id}-${a.status}`,
+        type: "EMAIL" as const,
+        category: msg.category,
+        read: false,
+        subject: msg.subject,
+        preview: msg.body(a.ref, client.firstName, a.amount, a.productName).split("\n")[2] ?? "",
+        date: a.submittedAt,
+        body: msg.body(a.ref, client.firstName, a.amount, a.productName),
+      };
+    })
+    .filter(Boolean) as Notification[];
+
+  const [notifications, setNotifications] = useState([...realNotifications, ...mockNotifications]);
   const [selected, setSelected] = useState<Notification | null>(null);
 
   const unread = notifications.filter(n => !n.read).length;

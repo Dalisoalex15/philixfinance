@@ -1,14 +1,50 @@
 import { useState } from "react";
 import { ExternalLink, Eye, CheckCircle, XCircle, AlertCircle, Clock, Send } from "lucide-react";
-import { mockOnlineApplications, formatKwacha, formatDate, getStatusColor } from "../lib/mock-data";
+import { formatKwacha, formatDate, getStatusColor } from "../lib/mock-data";
+import { useLoanApplicationStore, type LoanApplication } from "../store/loanApplicationStore";
+
+// Adapter: map store LoanApplication → display shape used by this page
+function toDisplayApp(a: LoanApplication) {
+  const parts = a.clientName.split(" ");
+  return {
+    id: a.id,
+    firstName: parts[0] ?? a.clientName,
+    lastName: parts.slice(1).join(" ") || "",
+    nrcNumber: "—",
+    phone: a.clientPhone,
+    email: a.clientEmail,
+    collateralType: a.collateralType || "—",
+    collateralBrand: a.collateralDescription || "—",
+    collateralModel: "",
+    loanAmount: a.amount,
+    loanPurpose: a.purpose,
+    status: a.status === "PENDING" ? "SUBMITTED" : a.status,
+    applicationRef: a.ref,
+    submittedAt: a.submittedAt,
+    clientType: a.occupation || "Individual",
+    reviewNotes: "",
+    // extra
+    productName: a.productName,
+    rateDuration: a.rateDuration,
+    totalRepayable: a.totalRepayable,
+    storeId: a.id,
+  };
+}
 
 export default function OnlineApplicationsPage() {
-  const [applications, setApplications] = useState(mockOnlineApplications);
-  const [selected, setSelected] = useState<typeof mockOnlineApplications[0] | null>(null);
+  const { applications: storeApps, updateStatus } = useLoanApplicationStore();
+  const displayApps = storeApps.map(toDisplayApp);
+  type DisplayApp = ReturnType<typeof toDisplayApp>;
+  const [selected, setSelected] = useState<DisplayApp | null>(null);
   const [note, setNote] = useState("");
 
+  const handleAction = (id: string, newStatus: string) => {
+    updateStatus(id, newStatus as LoanApplication["status"]);
+    setSelected(prev => prev?.storeId === id ? { ...prev, status: newStatus } : prev);
+  };
+
   const counts: Record<string, number> = {};
-  applications.forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1; });
+  displayApps.forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1; });
 
   const statusMeta: Record<string, { icon: React.ElementType; color: string; label: string }> = {
     DRAFT: { icon: Clock, color: "text-slate-400", label: "Draft" },
@@ -17,11 +53,6 @@ export default function OnlineApplicationsPage() {
     INFO_REQUIRED: { icon: AlertCircle, color: "text-orange-400", label: "Info Required" },
     APPROVED: { icon: CheckCircle, color: "text-emerald-400", label: "Approved" },
     REJECTED: { icon: XCircle, color: "text-red-400", label: "Rejected" },
-  };
-
-  const handleAction = (id: string, status: string) => {
-    setApplications(prev => prev.map(a => a.id === id ? { ...a, status } : a));
-    if (selected?.id === id) setSelected(a => a ? { ...a, status } : null);
   };
 
   return (
@@ -52,8 +83,13 @@ export default function OnlineApplicationsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Application List */}
         <div className="space-y-3">
-          {applications.map(app => {
-            const meta = statusMeta[app.status];
+          {displayApps.length === 0 && (
+            <div className="philix-card p-10 text-center text-slate-500 text-sm">
+              No client applications yet. They will appear here when clients submit loan applications through the portal.
+            </div>
+          )}
+          {displayApps.map(app => {
+            const meta = statusMeta[app.status] ?? statusMeta.SUBMITTED;
             return (
               <button key={app.id} onClick={() => setSelected(app)}
                 className={`w-full text-left philix-card p-4 transition-all hover:border-indigo-700 ${selected?.id === app.id ? "border-indigo-600 border" : ""}`}>
@@ -126,19 +162,21 @@ export default function OnlineApplicationsPage() {
 
             {(selected.status === "SUBMITTED" || selected.status === "UNDER_REVIEW") && (
               <div className="flex gap-2">
-                <button onClick={() => handleAction(selected.id, "APPROVED")} className="btn-success flex-1">
+                <button onClick={() => handleAction(selected.storeId, "APPROVED")} className="btn-success flex-1">
                   <CheckCircle size={13} /> Approve
                 </button>
-                <button onClick={() => handleAction(selected.id, "INFO_REQUIRED")} className="btn-secondary flex-1">
-                  <AlertCircle size={13} /> Request Info
+                <button onClick={() => handleAction(selected.storeId, "UNDER_REVIEW")} className="btn-secondary flex-1">
+                  <AlertCircle size={13} /> Under Review
                 </button>
-                <button onClick={() => handleAction(selected.id, "REJECTED")} className="btn-danger flex-1">
+                <button onClick={() => handleAction(selected.storeId, "REJECTED")} className="btn-danger flex-1">
                   <XCircle size={13} /> Reject
                 </button>
               </div>
             )}
             {selected.status === "APPROVED" && (
-              <button className="btn-primary w-full">Convert to Loan Application →</button>
+              <button onClick={() => handleAction(selected.storeId, "DISBURSED")} className="btn-primary w-full">
+                Mark as Disbursed →
+              </button>
             )}
           </div>
         ) : (

@@ -11,6 +11,7 @@ import {
   Search, Percent, Wallet, Scale,
 } from "lucide-react";
 import { useAuthStore } from "../../store/auth";
+import { useLoanApplicationStore } from "../../store/loanApplicationStore";
 import PhilixLogo from "../ui/PhilixLogo";
 
 interface SidebarProps { open: boolean; onToggle: () => void; }
@@ -123,6 +124,9 @@ const navGroups: NavGroup[] = [
 export default function Sidebar({ open, onToggle }: SidebarProps) {
   const location = useLocation();
   const user = useAuthStore((s) => s.user);
+  const pendingCount = useLoanApplicationStore(s =>
+    s.applications.filter(a => a.status === "PENDING" || a.status === "UNDER_REVIEW").length
+  );
 
   const isActive = (href: string) =>
     href === "/" ? location.pathname === "/" : location.pathname.startsWith(href);
@@ -169,31 +173,43 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
                   {group.label}
                 </div>
               )}
-              {visibleItems.map((item) => (
-                <NavLink key={item.href} to={item.href} end={item.href === "/"}>
-                  {() => (
-                    <div
-                      className={cn(
-                        "nav-item",
-                        isActive(item.href) && "active",
-                        !open && "justify-center px-0"
-                      )}
-                      title={!open ? item.label : undefined}
-                    >
-                      <item.icon size={16} className="flex-shrink-0" />
-                      {open && <span className="truncate">{item.label}</span>}
-                      {open && item.badge && (
-                        <span className={cn(
-                          "ml-auto text-xs px-1.5 py-0.5 rounded-full font-semibold",
-                          item.badgeColor || "bg-gold-500/20 text-gold-400"
-                        )}>
-                          {item.badge}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </NavLink>
-              ))}
+              {visibleItems.map((item) => {
+                const dynamicBadge = item.href === "/online-applications" && pendingCount > 0
+                  ? pendingCount.toString()
+                  : item.badge;
+                return (
+                  <NavLink key={item.href} to={item.href} end={item.href === "/"}>
+                    {() => (
+                      <div
+                        className={cn(
+                          "nav-item",
+                          isActive(item.href) && "active",
+                          !open && "justify-center px-0 relative"
+                        )}
+                        title={!open ? item.label : undefined}
+                      >
+                        <item.icon size={16} className="flex-shrink-0" />
+                        {!open && item.href === "/online-applications" && pendingCount > 0 && (
+                          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full text-[8px] text-white flex items-center justify-center font-bold">
+                            {pendingCount > 9 ? "9+" : pendingCount}
+                          </span>
+                        )}
+                        {open && <span className="truncate">{item.label}</span>}
+                        {open && dynamicBadge && (
+                          <span className={cn(
+                            "ml-auto text-xs px-1.5 py-0.5 rounded-full font-semibold",
+                            item.href === "/online-applications"
+                              ? "bg-red-500/20 text-red-400"
+                              : (item.badgeColor || "bg-gold-500/20 text-gold-400")
+                          )}>
+                            {dynamicBadge}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </NavLink>
+                );
+              })}
             </div>
           );
         })}

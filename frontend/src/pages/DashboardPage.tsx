@@ -5,7 +5,7 @@ import {
 import {
   TrendingUp, TrendingDown, DollarSign, CreditCard, AlertTriangle,
   Users, Package, CheckCircle, Clock, ArrowUpRight, ArrowDownRight,
-  Calendar, Zap,
+  Calendar, Zap, Download,
 } from "lucide-react";
 import {
   mockKPIs, mockLoanStatusChart, mockMonthlyDisbursements,
@@ -14,6 +14,7 @@ import {
   formatKwacha, formatDate,
 } from "../lib/mock-data";
 import { useLoanApplicationStore } from "../store/loanApplicationStore";
+import { useRegisteredClientsStore, demoClients } from "../store/clientAuth";
 
 const COLORS = {
   ACTIVE: "#6366f1",
@@ -74,6 +75,23 @@ function CustomTooltip({ active, payload, label, formatter }: any) {
 
 const K = (n: number) => `K${n.toLocaleString("en-ZM", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
+function exportCSV(applications: ReturnType<typeof useLoanApplicationStore.getState>["applications"]) {
+  const rows = [
+    ["Ref", "Client", "Email", "Phone", "Product", "Amount", "Total Repayable", "Duration", "Purpose", "Status", "Submitted"],
+    ...applications.map(a => [
+      a.ref, a.clientName, a.clientEmail, a.clientPhone,
+      a.productName, a.amount, a.totalRepayable, a.rateDuration,
+      a.purpose, a.status, new Date(a.submittedAt).toLocaleDateString("en-GB"),
+    ]),
+  ];
+  const csv = rows.map(r => r.map(v => `"${v}"`).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `philix-applications-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
 const STATUS_STYLES: Record<string, string> = {
   PENDING:      "bg-amber-900/30 text-amber-400 border-amber-800/40",
   UNDER_REVIEW: "bg-blue-900/30 text-blue-400 border-blue-800/40",
@@ -86,6 +104,8 @@ export default function DashboardPage() {
   const kpis = mockKPIs;
   const { applications, updateStatus } = useLoanApplicationStore();
   const pendingApps = applications.filter(a => a.status === "PENDING" || a.status === "UNDER_REVIEW");
+  const { clients: registeredClients } = useRegisteredClientsStore();
+  const totalClients = demoClients.length + registeredClients.length;
 
   return (
     <div className="space-y-6">
@@ -162,8 +182,8 @@ export default function DashboardPage() {
         />
         <KPICard
           title="Pending Approvals"
-          value={kpis.pendingApprovals.toString()}
-          sub="Awaiting review"
+          value={applications.filter(a => a.status === "PENDING" || a.status === "UNDER_REVIEW").length.toString()}
+          sub={`${applications.filter(a => a.status === "APPROVED").length} approved`}
           icon={Clock}
           color="amber"
         />
@@ -186,10 +206,10 @@ export default function DashboardPage() {
           color="emerald"
         />
         <KPICard
-          title="Collateral Held"
-          value={kpis.totalCollateral.toString()}
-          sub="Items in vault"
-          icon={Package}
+          title="Registered Clients"
+          value={totalClients.toString()}
+          sub={`${registeredClients.length} new self-registered`}
+          icon={Users}
           color="blue"
         />
         <KPICard
@@ -225,9 +245,17 @@ export default function DashboardPage() {
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">Submitted by clients — awaiting review</p>
           </div>
-          <span className="text-xs font-semibold bg-amber-900/30 text-amber-400 border border-amber-800/40 px-2.5 py-1 rounded-full">
-            {pendingApps.length} pending
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold bg-amber-900/30 text-amber-400 border border-amber-800/40 px-2.5 py-1 rounded-full">
+              {pendingApps.length} pending
+            </span>
+            {applications.length > 0 && (
+              <button onClick={() => exportCSV(applications)}
+                className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 border border-slate-700 hover:border-slate-600 px-2.5 py-1 rounded-full transition-colors">
+                <Download size={11} /> Export CSV
+              </button>
+            )}
+          </div>
         </div>
         {applications.length === 0 ? (
           <div className="text-center py-8 text-slate-600 text-sm">No applications submitted yet.</div>
