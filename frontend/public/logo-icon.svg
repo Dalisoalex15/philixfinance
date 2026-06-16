@@ -1,31 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
   <defs>
-    <clipPath id="circ">
-      <circle cx="40" cy="40" r="38"/>
-    </clipPath>
-    <radialGradient id="orangeGrad" cx="40%" cy="30%" r="70%">
-      <stop offset="0%" stop-color="#FBBC3B"/>
+    <linearGradient id="icon-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F5A623"/>
       <stop offset="100%" stop-color="#E8940A"/>
-    </radialGradient>
-    <radialGradient id="silverGrad" cx="60%" cy="70%" r="70%">
-      <stop offset="0%" stop-color="#D8DCDF"/>
-      <stop offset="100%" stop-color="#9BA3AB"/>
-    </radialGradient>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00000033"/>
+    </filter>
   </defs>
 
-  <!-- White base circle -->
-  <circle cx="40" cy="40" r="39" fill="white"/>
+  <!-- Badge background -->
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#icon-grad)" filter="url(#shadow)"/>
 
-  <g clip-path="url(#circ)">
-    <!-- Orange wave — upper shape -->
-    <path d="M2 2 L78 2 L78 46 C68 38 58 30 46 32 C34 34 26 44 18 50 C12 54 6 54 2 52 Z"
-          fill="url(#orangeGrad)"/>
+  <!-- Bar chart mark -->
+  <rect x="12" y="40" width="9" height="13" rx="2.5" fill="white" opacity="0.8"/>
+  <rect x="25" y="30" width="9" height="23" rx="2.5" fill="white" opacity="0.9"/>
+  <rect x="38" y="18" width="9" height="35" rx="2.5" fill="white" opacity="1"/>
 
-    <!-- Silver/gray wave — lower shape -->
-    <path d="M2 52 C6 54 12 54 18 50 C26 44 34 34 46 32 C58 30 68 38 78 46 L78 78 L2 78 Z"
-          fill="url(#silverGrad)"/>
-  </g>
-
-  <!-- Subtle border -->
-  <circle cx="40" cy="40" r="38" stroke="#e0e0e0" stroke-width="1" fill="none"/>
+  <!-- Subtle top highlight -->
+  <rect x="2" y="2" width="60" height="28" rx="16" fill="white" opacity="0.07"/>
 </svg>

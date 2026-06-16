@@ -1,34 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 64" fill="none">
   <defs>
-    <clipPath id="circ3">
-      <circle cx="40" cy="40" r="38"/>
-    </clipPath>
-    <radialGradient id="og3" cx="40%" cy="30%" r="70%">
-      <stop offset="0%" stop-color="#FBBC3B"/>
+    <linearGradient id="mark-grad-l" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F5A623"/>
       <stop offset="100%" stop-color="#E8940A"/>
-    </radialGradient>
-    <radialGradient id="sg3" cx="60%" cy="70%" r="70%">
-      <stop offset="0%" stop-color="#D8DCDF"/>
-      <stop offset="100%" stop-color="#9BA3AB"/>
-    </radialGradient>
+    </linearGradient>
   </defs>
 
-  <circle cx="40" cy="40" r="39" fill="white"/>
+  <!-- Icon mark: rounded square badge -->
+  <rect x="0" y="4" width="56" height="56" rx="14" fill="url(#mark-grad-l)"/>
 
-  <g clip-path="url(#circ3)">
-    <path d="M2 2 L78 2 L78 46 C68 38 58 30 46 32 C34 34 26 44 18 50 C12 54 6 54 2 52 Z"
-          fill="url(#og3)"/>
-    <path d="M2 52 C6 54 12 54 18 50 C26 44 34 34 46 32 C58 30 68 38 78 46 L78 78 L2 78 Z"
-          fill="url(#sg3)"/>
-  </g>
+  <!-- Stylised upward bar chart inside badge -->
+  <rect x="11" y="38" width="8" height="12" rx="2" fill="white" opacity="0.9"/>
+  <rect x="23" y="28" width="8" height="22" rx="2" fill="white" opacity="0.9"/>
+  <rect x="35" y="18" width="8" height="32" rx="2" fill="white" opacity="1"/>
 
-  <circle cx="40" cy="40" r="38" stroke="rgba(255,255,255,0.15)" stroke-width="1" fill="none"/>
-
-  <!-- White wordmark for dark backgrounds -->
-  <text x="92" y="48"
-        font-family="'Inter', 'Segoe UI', system-ui, sans-serif"
+  <!-- Wordmark -->
+  <text x="70" y="29"
+        font-family="'Inter','Segoe UI',system-ui,sans-serif"
         font-weight="800"
-        font-size="30"
+        font-size="22"
         fill="white"
-        letter-spacing="-0.5">Philix Finance</text>
+        letter-spacing="-0.3">PHILIX</text>
+  <text x="70" y="50"
+        font-family="'Inter','Segoe UI',system-ui,sans-serif"
+        font-weight="400"
+        font-size="14"
+        fill="rgba(255,255,255,0.6)"
+        letter-spacing="3">FINANCE</text>
 </svg>

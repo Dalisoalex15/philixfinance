@@ -1,34 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, AlertCircle, ArrowRight, Shield, Zap, TrendingUp, Users, ChevronDown, ChevronUp } from "lucide-react";
+import { Eye, EyeOff, AlertCircle, ArrowRight, Shield, Zap, TrendingUp, Users } from "lucide-react";
 import PhilixLogo from "../components/ui/PhilixLogo";
 import { useAuthStore } from "../store/auth";
 import { useClientAuthStore, useRegisteredClientsStore, demoClients } from "../store/clientAuth";
 import { useStaffStore } from "../store/staffStore";
 
-const STAFF_PASSWORDS: Record<string, string> = {
-  "staff-001": "philix@CEO2025",
-  "staff-002": "philix@Mgr2025",
-  "staff-003": "philix@LO2025",
-  "staff-004": "philix@Col2025",
-  "staff-005": "philix@Acc2025",
-};
-
-const ROLE_COLORS: Record<string, string> = {
-  CEO: "text-amber-400 bg-amber-900/30 border-amber-800/40",
-  MANAGER: "text-blue-400 bg-blue-900/30 border-blue-800/40",
-  LOAN_OFFICER: "text-emerald-400 bg-emerald-900/30 border-emerald-800/40",
-  COLLECTIONS_OFFICER: "text-orange-400 bg-orange-900/30 border-orange-800/40",
-  ACCOUNTANT: "text-purple-400 bg-purple-900/30 border-purple-800/40",
-};
-
-const ROLE_LABELS: Record<string, string> = {
-  CEO: "CEO",
-  MANAGER: "Manager",
-  LOAN_OFFICER: "Loan Officer",
-  COLLECTIONS_OFFICER: "Collections",
-  ACCOUNTANT: "Accountant",
-};
 
 export default function UnifiedLoginPage() {
   const navigate = useNavigate();
@@ -42,8 +19,6 @@ export default function UnifiedLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showStaffCreds, setShowStaffCreds] = useState(true);
-  const [showClientCreds, setShowClientCreds] = useState(true);
 
   const allClients = [...demoClients, ...registeredClients];
 
@@ -67,7 +42,7 @@ export default function UnifiedLoginPage() {
     if (staffMatch) {
       const correctPass = staffPasswords[staffMatch.id];
       if (password !== correctPass) {
-        setError("Incorrect password. Use the credentials shown below.");
+        setError("Incorrect password. Please check your credentials and try again.");
         setLoading(false);
         return;
       }
@@ -105,12 +80,6 @@ export default function UnifiedLoginPage() {
 
     setError("No account found with this email. Click a demo account below to fill in credentials.");
     setLoading(false);
-  };
-
-  const fill = (emailVal: string, passVal: string) => {
-    setEmail(emailVal);
-    setPassword(passVal);
-    setError("");
   };
 
   return (
@@ -232,77 +201,14 @@ export default function UnifiedLoginPage() {
             </button>
           </form>
 
-          {/* ── Staff Credentials ──────────────────────────────── */}
-          <div className="mt-5 border border-slate-800 rounded-2xl overflow-hidden">
-            <button
-              onClick={() => setShowStaffCreds(!showStaffCreds)}
-              className="w-full flex items-center justify-between px-4 py-3 bg-slate-900/80 hover:bg-slate-800/60 transition-all text-left">
-              <div className="flex items-center gap-2">
-                <Shield size={13} className="text-amber-400" />
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Staff / Admin Accounts</span>
-              </div>
-              {showStaffCreds ? <ChevronUp size={14} className="text-slate-600" /> : <ChevronDown size={14} className="text-slate-600" />}
-            </button>
-            {showStaffCreds && (
-              <div className="divide-y divide-slate-800/60">
-                {allStaff.map(s => (
-                  <button key={s.id}
-                    onClick={() => fill(s.email, staffPasswords[s.id] ?? "")}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-800/50 transition-all text-left group">
-                    <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-white text-xs flex-shrink-0">
-                      {s.avatarInitials}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-slate-300">{s.firstName} {s.lastName}</span>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${ROLE_COLORS[s.role]}`}>
-                          {ROLE_LABELS[s.role]}
-                        </span>
-                      </div>
-                      <div className="text-xs text-slate-600 truncate">{s.email}</div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-[10px] text-slate-600 group-hover:text-slate-500">password</div>
-                      <div className="text-xs font-mono text-slate-400 group-hover:text-slate-200">{staffPasswords[s.id] ?? "—"}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* ── Client Credentials ─────────────────────────────── */}
-          <div className="mt-3 border border-slate-800 rounded-2xl overflow-hidden">
-            <button
-              onClick={() => setShowClientCreds(!showClientCreds)}
-              className="w-full flex items-center justify-between px-4 py-3 bg-slate-900/80 hover:bg-slate-800/60 transition-all text-left">
-              <div className="flex items-center gap-2">
-                <Users size={13} className="text-indigo-400" />
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Client Accounts</span>
-              </div>
-              {showClientCreds ? <ChevronUp size={14} className="text-slate-600" /> : <ChevronDown size={14} className="text-slate-600" />}
-            </button>
-            {showClientCreds && (
-              <div className="divide-y divide-slate-800/60">
-                {demoClients.map(c => (
-                  <button key={c.id}
-                    onClick={() => fill(c.email, "client123")}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-800/50 transition-all text-left group">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center font-bold text-white text-xs flex-shrink-0">
-                      {c.avatarInitials}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold text-slate-300">{c.firstName} {c.lastName}</div>
-                      <div className="text-xs text-slate-600 truncate">{c.email}</div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-[10px] text-slate-600 group-hover:text-slate-500">password</div>
-                      <div className="text-xs font-mono text-slate-400 group-hover:text-slate-200">client123</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+          <div className="mt-5 text-center space-y-2">
+            <p className="text-sm text-slate-500">
+              New to Philix Finance?{" "}
+              <a href="/portal/register" className="text-indigo-400 hover:text-indigo-300 font-semibold">Create an account →</a>
+            </p>
+            <p className="text-xs text-slate-700">
+              Staff accounts are managed by your administrator.
+            </p>
           </div>
 
         </div>
