@@ -13,6 +13,7 @@ import {
   mockPAR, mockCapitalUtilization, mockAnnouncements,
   formatKwacha, formatDate,
 } from "../lib/mock-data";
+import { useLoanApplicationStore } from "../store/loanApplicationStore";
 
 const COLORS = {
   ACTIVE: "#6366f1",
@@ -71,8 +72,20 @@ function CustomTooltip({ active, payload, label, formatter }: any) {
   );
 }
 
+const K = (n: number) => `K${n.toLocaleString("en-ZM", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
+const STATUS_STYLES: Record<string, string> = {
+  PENDING:      "bg-amber-900/30 text-amber-400 border-amber-800/40",
+  UNDER_REVIEW: "bg-blue-900/30 text-blue-400 border-blue-800/40",
+  APPROVED:     "bg-emerald-900/30 text-emerald-400 border-emerald-800/40",
+  REJECTED:     "bg-red-900/30 text-red-400 border-red-800/40",
+  DISBURSED:    "bg-indigo-900/30 text-indigo-400 border-indigo-800/40",
+};
+
 export default function DashboardPage() {
   const kpis = mockKPIs;
+  const { applications, updateStatus } = useLoanApplicationStore();
+  const pendingApps = applications.filter(a => a.status === "PENDING" || a.status === "UNDER_REVIEW");
 
   return (
     <div className="space-y-6">
@@ -200,6 +213,102 @@ export default function DashboardPage() {
           icon={DollarSign}
           color="emerald"
         />
+      </div>
+
+      {/* Live Loan Applications Queue */}
+      <div className="philix-card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="section-title flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse inline-block" />
+              Live Loan Applications
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">Submitted by clients — awaiting review</p>
+          </div>
+          <span className="text-xs font-semibold bg-amber-900/30 text-amber-400 border border-amber-800/40 px-2.5 py-1 rounded-full">
+            {pendingApps.length} pending
+          </span>
+        </div>
+        {applications.length === 0 ? (
+          <div className="text-center py-8 text-slate-600 text-sm">No applications submitted yet.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-slate-500 border-b border-slate-800">
+                  <th className="text-left pb-2 font-medium">Ref</th>
+                  <th className="text-left pb-2 font-medium">Client</th>
+                  <th className="text-left pb-2 font-medium">Product</th>
+                  <th className="text-right pb-2 font-medium">Amount</th>
+                  <th className="text-right pb-2 font-medium">Repayable</th>
+                  <th className="text-left pb-2 font-medium">Duration</th>
+                  <th className="text-left pb-2 font-medium">Status</th>
+                  <th className="text-left pb-2 font-medium">Submitted</th>
+                  <th className="pb-2" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {applications.map(app => (
+                  <tr key={app.id} className="hover:bg-slate-800/30 transition-colors">
+                    <td className="py-2.5 pr-3 font-mono text-xs text-slate-400">{app.ref}</td>
+                    <td className="py-2.5 pr-3">
+                      <div className="font-medium text-slate-200 text-xs">{app.clientName}</div>
+                      <div className="text-slate-500 text-[10px]">{app.clientEmail}</div>
+                    </td>
+                    <td className="py-2.5 pr-3 text-slate-300 text-xs max-w-[140px] truncate">{app.productName}</td>
+                    <td className="py-2.5 pr-3 text-right text-slate-200 text-xs font-semibold">{K(app.amount)}</td>
+                    <td className="py-2.5 pr-3 text-right text-emerald-400 text-xs font-semibold">{K(app.totalRepayable)}</td>
+                    <td className="py-2.5 pr-3 text-slate-400 text-xs">{app.rateDuration}</td>
+                    <td className="py-2.5 pr-3">
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${STATUS_STYLES[app.status] ?? "bg-slate-800 text-slate-400 border-slate-700"}`}>
+                        {app.status.replace("_", " ")}
+                      </span>
+                    </td>
+                    <td className="py-2.5 pr-3 text-slate-500 text-xs whitespace-nowrap">
+                      {new Date(app.submittedAt).toLocaleDateString("en-ZM", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </td>
+                    <td className="py-2.5">
+                      {app.status === "PENDING" && (
+                        <div className="flex gap-1">
+                          <button onClick={() => updateStatus(app.id, "UNDER_REVIEW")}
+                            className="text-[10px] px-2 py-0.5 rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 transition-colors border border-blue-800/40">
+                            Review
+                          </button>
+                          <button onClick={() => updateStatus(app.id, "APPROVED")}
+                            className="text-[10px] px-2 py-0.5 rounded bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 transition-colors border border-emerald-800/40">
+                            Approve
+                          </button>
+                          <button onClick={() => updateStatus(app.id, "REJECTED")}
+                            className="text-[10px] px-2 py-0.5 rounded bg-red-600/20 text-red-400 hover:bg-red-600/40 transition-colors border border-red-800/40">
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                      {app.status === "UNDER_REVIEW" && (
+                        <div className="flex gap-1">
+                          <button onClick={() => updateStatus(app.id, "APPROVED")}
+                            className="text-[10px] px-2 py-0.5 rounded bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 transition-colors border border-emerald-800/40">
+                            Approve
+                          </button>
+                          <button onClick={() => updateStatus(app.id, "REJECTED")}
+                            className="text-[10px] px-2 py-0.5 rounded bg-red-600/20 text-red-400 hover:bg-red-600/40 transition-colors border border-red-800/40">
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                      {app.status === "APPROVED" && (
+                        <button onClick={() => updateStatus(app.id, "DISBURSED")}
+                          className="text-[10px] px-2 py-0.5 rounded bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/40 transition-colors border border-indigo-800/40">
+                          Disburse
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Charts Row 1 */}

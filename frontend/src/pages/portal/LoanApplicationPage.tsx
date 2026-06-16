@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { CheckCircle, AlertCircle, ArrowLeft, Shield, Star } from "lucide-react";
 import { useClientAuthStore } from "../../store/clientAuth";
 import { mockLoanProducts, type LoanProduct, type LoanProductRate } from "../../lib/mock-data";
+import { useLoanApplicationStore } from "../../store/loanApplicationStore";
 
 const K = (n: number) => `K${n.toLocaleString("en-ZM", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
@@ -19,6 +20,7 @@ const STEPS = ["Product", "Details", "Employment", "Collateral", "References", "
 export default function LoanApplicationPage() {
   const navigate = useNavigate();
   const client = useClientAuthStore(s => s.client)!;
+  const submitApplication = useLoanApplicationStore(s => s.submit);
   const [step, setStep] = useState(0);
   const [done, setDone] = useState(false);
   const [ref] = useState(`APP-${Date.now().toString().slice(-6)}`);
@@ -103,6 +105,29 @@ export default function LoanApplicationPage() {
     if (step < 5) {
       setStep(step + 1);
     } else if (step === 5) {
+      submitApplication({
+        ref,
+        clientId: client.id,
+        clientName: `${client.firstName} ${client.lastName}`,
+        clientEmail: client.email,
+        clientPhone: client.phone,
+        productId: selectedProduct?.id ?? "",
+        productName: selectedProduct?.name ?? "",
+        rateDuration: selectedRate?.displayLabel ?? "",
+        interestRate: selectedRate?.interestRate ?? 0,
+        amount: loanAmount,
+        totalRepayable,
+        weeklyPayment,
+        purpose: form.purpose,
+        occupation: form.occupation,
+        employer: form.employer,
+        monthlyIncome: Number(form.monthlyIncome) || 0,
+        collateralType: form.collateralType,
+        collateralDescription: form.collateralDescription,
+        collateralValue: Number(form.collateralValue) || 0,
+        collateralCondition: form.collateralCondition,
+        status: "PENDING",
+      });
       setStep(6);
       setTimeout(() => setDone(true), 1600);
     }
