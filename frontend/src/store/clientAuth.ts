@@ -112,3 +112,25 @@ export const useClientAuthStore = create<ClientAuthState>()(
     { name: "philix-client-auth" }
   )
 );
+
+// Persisted store for self-registered clients + their passwords
+interface RegisteredClientsState {
+  clients: ClientUser[];
+  passwords: Record<string, string>;
+  register: (client: ClientUser, password: string) => void;
+}
+
+export const useRegisteredClientsStore = create<RegisteredClientsState>()(
+  persist(
+    (set) => ({
+      clients: [],
+      passwords: {},
+      register: (client, password) =>
+        set(state => ({
+          clients: [...state.clients, client],
+          passwords: { ...state.passwords, [client.id]: password },
+        })),
+    }),
+    { name: "philix-registered-clients" }
+  )
+);

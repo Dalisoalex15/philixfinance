@@ -2,13 +2,14 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CheckCircle, Eye, EyeOff, ArrowLeft, User, Phone, Briefcase, Lock } from "lucide-react";
 import PhilixLogo from "../../components/ui/PhilixLogo";
-import { useClientAuthStore } from "../../store/clientAuth";
+import { useClientAuthStore, useRegisteredClientsStore } from "../../store/clientAuth";
 
 const STEPS = ["Personal", "Identity", "Employment", "Security"];
 
 export default function ClientRegisterPage() {
   const navigate = useNavigate();
   const login = useClientAuthStore(s => s.login);
+  const registerClient = useRegisteredClientsStore(s => s.register);
   const [step, setStep] = useState(0);
   const [done, setDone] = useState(false);
   const [showPass, setShowPass] = useState(false);
@@ -59,7 +60,7 @@ export default function ClientRegisterPage() {
     if (step < 3) { setStep(step + 1); }
     else {
       setTimeout(() => {
-        login({
+        const newClient = {
           id: `clt-new-${Date.now()}`,
           clientNumber: `PHX-C-${String(Math.floor(Math.random() * 9000) + 1000)}`,
           firstName: form.firstName,
@@ -74,11 +75,13 @@ export default function ClientRegisterPage() {
           occupation: form.occupation,
           employer: form.employer,
           monthlyIncome: Number(form.monthlyIncome),
-          status: "ACTIVE",
-          kycStatus: form.nrcFront ? "SUBMITTED" : "NOT_STARTED",
+          status: "ACTIVE" as const,
+          kycStatus: (form.nrcFront ? "SUBMITTED" : "NOT_STARTED") as "SUBMITTED" | "NOT_STARTED",
           avatarInitials: `${form.firstName[0]}${form.lastName[0]}`.toUpperCase(),
           joinedAt: new Date().toISOString(),
-        });
+        };
+        registerClient(newClient, form.password);
+        login(newClient);
         setDone(true);
       }, 1000);
     }

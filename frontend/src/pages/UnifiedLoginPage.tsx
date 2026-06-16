@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, AlertCircle, ArrowRight, Shield, Zap, TrendingUp, Users, ChevronDown, ChevronUp } from "lucide-react";
 import PhilixLogo from "../components/ui/PhilixLogo";
 import { useAuthStore } from "../store/auth";
-import { useClientAuthStore, demoClients, demoStaff } from "../store/clientAuth";
+import { useClientAuthStore, useRegisteredClientsStore, demoClients } from "../store/clientAuth";
+import { useStaffStore } from "../store/staffStore";
 
 const STAFF_PASSWORDS: Record<string, string> = {
   "staff-001": "philix@CEO2025",
@@ -33,6 +34,8 @@ export default function UnifiedLoginPage() {
   const navigate = useNavigate();
   const setAuth = useAuthStore(s => s.setAuth);
   const clientLogin = useClientAuthStore(s => s.login);
+  const { staff: allStaff, passwords: staffPasswords } = useStaffStore();
+  const { clients: registeredClients, passwords: clientPasswords } = useRegisteredClientsStore();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -42,10 +45,12 @@ export default function UnifiedLoginPage() {
   const [showStaffCreds, setShowStaffCreds] = useState(true);
   const [showClientCreds, setShowClientCreds] = useState(true);
 
+  const allClients = [...demoClients, ...registeredClients];
+
   const detectedType = (() => {
     if (!email) return null;
-    if (demoStaff.some(s => s.email.toLowerCase() === email.toLowerCase())) return "staff";
-    if (demoClients.some(c => c.email.toLowerCase() === email.toLowerCase())) return "client";
+    if (allStaff.some(s => s.email.toLowerCase() === email.toLowerCase())) return "staff";
+    if (allClients.some(c => c.email.toLowerCase() === email.toLowerCase())) return "client";
     if (email.toLowerCase().endsWith("@philixfinance.com")) return "staff";
     return "client";
   })();
@@ -56,11 +61,12 @@ export default function UnifiedLoginPage() {
     setLoading(true);
     await new Promise(r => setTimeout(r, 700));
 
-    const staffMatch = demoStaff.find(s => s.email.toLowerCase() === email.toLowerCase());
-    const clientMatch = demoClients.find(c => c.email.toLowerCase() === email.toLowerCase());
+    const staffMatch = allStaff.find(s => s.email.toLowerCase() === email.toLowerCase());
+    const clientMatch = allClients.find(c => c.email.toLowerCase() === email.toLowerCase());
 
     if (staffMatch) {
-      if (password !== STAFF_PASSWORDS[staffMatch.id]) {
+      const correctPass = staffPasswords[staffMatch.id];
+      if (password !== correctPass) {
         setError("Incorrect password. Use the credentials shown below.");
         setLoading(false);
         return;
@@ -85,8 +91,10 @@ export default function UnifiedLoginPage() {
     }
 
     if (clientMatch) {
-      if (password !== "client123") {
-        setError("Incorrect password. Client password is: client123");
+      const isDemoClient = demoClients.some(c => c.id === clientMatch.id);
+      const correctPass = isDemoClient ? "client123" : clientPasswords[clientMatch.id];
+      if (password !== correctPass) {
+        setError("Incorrect password.");
         setLoading(false);
         return;
       }
@@ -233,9 +241,9 @@ export default function UnifiedLoginPage() {
             </button>
             {showStaffCreds && (
               <div className="divide-y divide-slate-800/60">
-                {demoStaff.map(s => (
+                {allStaff.map(s => (
                   <button key={s.id}
-                    onClick={() => fill(s.email, STAFF_PASSWORDS[s.id])}
+                    onClick={() => fill(s.email, staffPasswords[s.id] ?? "")}
                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-800/50 transition-all text-left group">
                     <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-white text-xs flex-shrink-0">
                       {s.avatarInitials}
@@ -251,7 +259,7 @@ export default function UnifiedLoginPage() {
                     </div>
                     <div className="text-right flex-shrink-0">
                       <div className="text-[10px] text-slate-600 group-hover:text-slate-500">password</div>
-                      <div className="text-xs font-mono text-slate-400 group-hover:text-slate-200">{STAFF_PASSWORDS[s.id]}</div>
+                      <div className="text-xs font-mono text-slate-400 group-hover:text-slate-200">{staffPasswords[s.id] ?? "—"}</div>
                     </div>
                   </button>
                 ))}
