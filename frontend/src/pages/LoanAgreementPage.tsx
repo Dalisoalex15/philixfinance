@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { FileText, Printer, Download, CheckSquare, Edit3 } from "lucide-react";
 import { formatKwacha } from "../lib/mock-data";
 
@@ -45,7 +45,7 @@ export default function LoanAgreementPage() {
         {/* Header */}
         <div className="text-center mb-8 border-b-2 border-navy-900 pb-6">
           <div className="text-2xl font-black text-navy-900 mb-1">PHILIX FINANCE LIMITED</div>
-          <div className="text-sm font-semibold text-amber-600 tracking-widest uppercase mb-2">Creating A Future Together</div>
+          <div className="text-sm font-semibold text-amber-700 tracking-widest uppercase mb-2">Creating A Future Together</div>
           <div className="text-xs text-gray-500">P.O. Box XXXXX, Lusaka, Zambia · Tel: +260 211 XXX XXX · BoZ Licensed MFI</div>
           <div className="mt-4 text-lg font-bold text-navy-900 uppercase tracking-wide border border-navy-900 inline-block px-6 py-1 rounded">
             LOAN AGREEMENT
@@ -183,12 +183,12 @@ export default function LoanAgreementPage() {
       {/* Digital signature acknowledgement */}
       <div className="no-print max-w-3xl mx-auto philix-card p-4 flex items-center gap-4">
         <button onClick={() => setSigned(!signed)}
-          className={`flex items-center gap-2 text-sm font-semibold transition-colors ${signed ? "text-emerald-400" : "text-slate-400"}`}>
-          <CheckSquare size={18} className={signed ? "text-emerald-400" : "text-slate-600"} />
+          className={`flex items-center gap-2 text-sm font-semibold transition-colors ${signed ? "text-emerald-700" : "text-navy-600"}`}>
+          <CheckSquare size={18} className={signed ? "text-emerald-700" : "text-navy-500"} />
           {signed ? "Client has signed — agreement confirmed" : "Mark as signed by client"}
         </button>
         {signed && (
-          <span className="ml-auto text-xs text-emerald-400 bg-emerald-900/30 border border-emerald-800/40 px-3 py-1 rounded-full">
+          <span className="ml-auto text-xs text-emerald-700 bg-emerald-100 border border-emerald-200 px-3 py-1 rounded-full">
             Signed {new Date().toLocaleString("en-GB")}
           </span>
         )}

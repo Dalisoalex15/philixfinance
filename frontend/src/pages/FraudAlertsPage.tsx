@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { ShieldAlert, AlertTriangle, CheckCircle, Eye, XCircle, User, Phone, CreditCard } from "lucide-react";
 
 type AlertSeverity = "HIGH" | "MEDIUM" | "LOW";
@@ -50,16 +50,16 @@ const alerts: FraudAlert[] = [
 ];
 
 const SEVERITY_STYLES: Record<AlertSeverity, string> = {
-  HIGH: "bg-red-900/30 text-red-400 border-red-800/40",
-  MEDIUM: "bg-amber-900/30 text-amber-400 border-amber-800/40",
-  LOW: "bg-slate-800 text-slate-400 border-slate-700",
+  HIGH: "bg-red-100 text-red-700 border-red-200",
+  MEDIUM: "bg-amber-100 text-amber-700 border-amber-200",
+  LOW: "bg-warm-200 text-navy-600 border-warm-300",
 };
 
 const STATUS_STYLES: Record<AlertStatus, string> = {
-  OPEN: "bg-red-900/30 text-red-400 border-red-800/40",
-  INVESTIGATING: "bg-blue-900/30 text-blue-400 border-blue-800/40",
-  RESOLVED: "bg-emerald-900/30 text-emerald-400 border-emerald-800/40",
-  DISMISSED: "bg-slate-800 text-slate-500 border-slate-700",
+  OPEN: "bg-red-100 text-red-700 border-red-200",
+  INVESTIGATING: "bg-blue-100 text-blue-700 border-blue-200",
+  RESOLVED: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  DISMISSED: "bg-warm-200 text-navy-500 border-warm-300",
 };
 
 export default function FraudAlertsPage() {
@@ -85,7 +85,7 @@ export default function FraudAlertsPage() {
         </div>
         <div className="flex items-center gap-2">
           {openCount > 0 && (
-            <span className="text-xs font-bold text-red-400 bg-red-900/30 border border-red-800/40 px-3 py-1.5 rounded-full flex items-center gap-1.5">
+            <span className="text-xs font-bold text-red-700 bg-red-100 border border-red-200 px-3 py-1.5 rounded-full flex items-center gap-1.5">
               <AlertTriangle size={12} /> {openCount} Open Alert{openCount > 1 ? "s" : ""}
             </span>
           )}
@@ -101,7 +101,7 @@ export default function FraudAlertsPage() {
         ].map(k => (
           <div key={k.label} className="stat-card cursor-pointer" onClick={() => setFilter(k.label.toUpperCase() as AlertStatus)}>
             <div className={`text-3xl font-bold text-${k.color}-400 mb-1`}>{k.count}</div>
-            <div className="text-xs text-slate-500">{k.label}</div>
+            <div className="text-xs text-navy-500">{k.label}</div>
           </div>
         ))}
       </div>
@@ -109,7 +109,7 @@ export default function FraudAlertsPage() {
       <div className="flex items-center gap-2">
         {(["ALL", "OPEN", "INVESTIGATING", "RESOLVED", "DISMISSED"] as const).map(f => (
           <button key={f} onClick={() => setFilter(f)}
-            className={`text-xs px-3 py-1.5 rounded-full border font-semibold transition-all ${filter === f ? "bg-indigo-600 border-indigo-500 text-white" : "border-slate-700 text-slate-500 hover:text-slate-300"}`}>
+            className={`text-xs px-3 py-1.5 rounded-full border font-semibold transition-all ${filter === f ? "bg-indigo-600 border-indigo-500 text-white" : "border-warm-300 text-navy-500 hover:text-navy-700"}`}>
             {f === "ALL" ? "All Alerts" : f.charAt(0) + f.slice(1).toLowerCase()}
           </button>
         ))}
@@ -126,20 +126,20 @@ export default function FraudAlertsPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-slate-200 text-sm">{alert.type}</span>
+                    <span className="font-semibold text-navy-800 text-sm">{alert.type}</span>
                     <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full border ${SEVERITY_STYLES[alert.severity]}`}>{alert.severity}</span>
                     <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full border ${STATUS_STYLES[alert.status]}`}>{alert.status}</span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1 line-clamp-2">{alert.description}</p>
-                  <div className="text-xs text-slate-600 mt-1">{new Date(alert.detectedAt).toLocaleString("en-GB")}</div>
+                  <p className="text-xs text-navy-500 mt-1 line-clamp-2">{alert.description}</p>
+                  <div className="text-xs text-navy-500 mt-1">{new Date(alert.detectedAt).toLocaleString("en-GB")}</div>
                 </div>
               </div>
             </button>
           ))}
           {filtered.length === 0 && (
             <div className="philix-card p-10 text-center">
-              <CheckCircle size={32} className="text-emerald-400 mx-auto mb-3" />
-              <p className="text-slate-400 font-semibold">No alerts with this status</p>
+              <CheckCircle size={32} className="text-emerald-700 mx-auto mb-3" />
+              <p className="text-navy-600 font-semibold">No alerts with this status</p>
             </div>
           )}
         </div>
@@ -149,23 +149,23 @@ export default function FraudAlertsPage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <span className="font-bold text-slate-100 text-lg">{selected.type}</span>
+                  <span className="font-bold text-navy-900 text-lg">{selected.type}</span>
                   <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${SEVERITY_STYLES[selected.severity]}`}>{selected.severity}</span>
                 </div>
-                <div className="text-xs text-slate-500">{new Date(selected.detectedAt).toLocaleString("en-GB")}</div>
+                <div className="text-xs text-navy-500">{new Date(selected.detectedAt).toLocaleString("en-GB")}</div>
               </div>
               <span className={`text-xs font-bold px-2 py-1 rounded-full border ${STATUS_STYLES[selected.status]}`}>{selected.status}</span>
             </div>
 
-            <div className="bg-slate-800/30 rounded-xl p-4">
-              <p className="text-sm text-slate-300 leading-relaxed">{selected.details}</p>
+            <div className="bg-warm-50 rounded-xl p-4">
+              <p className="text-sm text-navy-700 leading-relaxed">{selected.details}</p>
             </div>
 
             <div>
-              <div className="text-xs text-slate-500 mb-2">Affected Clients</div>
+              <div className="text-xs text-navy-500 mb-2">Affected Clients</div>
               <div className="flex flex-wrap gap-2">
                 {selected.affectedClients.map(c => (
-                  <span key={c} className="text-xs font-mono bg-slate-800 text-indigo-400 px-2 py-1 rounded-lg">{c}</span>
+                  <span key={c} className="text-xs font-mono bg-warm-200 text-indigo-700 px-2 py-1 rounded-lg">{c}</span>
                 ))}
               </div>
             </div>
@@ -187,7 +187,7 @@ export default function FraudAlertsPage() {
             )}
           </div>
         ) : (
-          <div className="philix-card flex items-center justify-center text-slate-500 text-sm" style={{ minHeight: 300 }}>
+          <div className="philix-card flex items-center justify-center text-navy-500 text-sm" style={{ minHeight: 300 }}>
             Select an alert to review details
           </div>
         )}

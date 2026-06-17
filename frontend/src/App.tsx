@@ -80,6 +80,7 @@ import FraudAlertsPage from "./pages/FraudAlertsPage";
 import ReferralProgrammePage from "./pages/ReferralProgrammePage";
 import GroupLendingPage from "./pages/GroupLendingPage";
 import APIManagementPage from "./pages/APIManagementPage";
+import DefaultRiskPage from "./pages/DefaultRiskPage";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
@@ -182,6 +183,7 @@ export default function App() {
           <Route path="referrals" element={<ReferralProgrammePage />} />
           <Route path="group-lending" element={<GroupLendingPage />} />
           <Route path="api-management" element={<APIManagementPage />} />
+          <Route path="default-risk" element={<DefaultRiskPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

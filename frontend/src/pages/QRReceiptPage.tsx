@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { QrCode, Printer, CheckCircle, Search, Download } from "lucide-react";
 
 const K = (n: number) => `K${n.toLocaleString("en-ZM", { minimumFractionDigits: 2 })}`;
@@ -65,7 +65,7 @@ export default function QRReceiptPage() {
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-navy-500" />
             <input type="text" value={search} onChange={e => setSearch(e.target.value)}
               className="input-base pl-9 text-sm py-1.5 w-52" placeholder="Search receipts..." />
           </div>
@@ -74,18 +74,18 @@ export default function QRReceiptPage() {
 
       {/* Verify Panel */}
       <div className="philix-card p-4">
-        <h3 className="font-semibold text-slate-200 mb-3 flex items-center gap-2"><QrCode size={16} className="text-indigo-400" /> Verify a Receipt</h3>
+        <h3 className="font-semibold text-navy-800 mb-3 flex items-center gap-2"><QrCode size={16} className="text-indigo-700" /> Verify a Receipt</h3>
         <form onSubmit={handleVerify} className="flex gap-2 mb-3">
           <input type="text" value={verifyRef} onChange={e => setVerifyRef(e.target.value)}
             className="input-base text-sm py-1.5 flex-1" placeholder="Scan QR or enter payment reference (PAY-YYYYMMDD-XXX)" />
           <button type="submit" className="btn-primary text-xs py-1.5"><CheckCircle size={12} /> Verify</button>
         </form>
         {verifyResult === "notfound" && (
-          <div className="text-sm text-red-400 bg-red-900/20 border border-red-800/40 rounded-xl p-3">Receipt not found or invalid reference.</div>
+          <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">Receipt not found or invalid reference.</div>
         )}
         {verifyResult && verifyResult !== "notfound" && (
-          <div className="text-sm text-emerald-300 bg-emerald-900/20 border border-emerald-800/40 rounded-xl p-3 flex items-center gap-3">
-            <CheckCircle size={16} className="text-emerald-400" />
+          <div className="text-sm text-emerald-700 bg-emerald-900/20 border border-emerald-200 rounded-xl p-3 flex items-center gap-3">
+            <CheckCircle size={16} className="text-emerald-700" />
             <div>
               <span className="font-semibold">VERIFIED</span> — {verifyResult.client} · {K(verifyResult.amount)} on {verifyResult.date} · Loan {verifyResult.loanRef}
             </div>
@@ -100,17 +100,17 @@ export default function QRReceiptPage() {
             <button key={r.id} onClick={() => setSelected(r)}
               className={`w-full text-left philix-card p-4 transition-all hover:border-indigo-700 ${selected.id === r.id ? "border border-indigo-600" : ""}`}>
               <div className="flex items-center gap-3">
-                <QrCode size={20} className="text-indigo-400 flex-shrink-0" />
+                <QrCode size={20} className="text-indigo-700 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-200">{r.client}</span>
-                    <span className="text-xs text-emerald-400 bg-emerald-900/30 border border-emerald-800/40 px-1.5 py-0.5 rounded-full">Verified</span>
+                    <span className="font-semibold text-navy-800">{r.client}</span>
+                    <span className="text-xs text-emerald-700 bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 rounded-full">Verified</span>
                   </div>
-                  <div className="text-xs text-slate-500">{r.paymentRef} · {r.loanRef}</div>
+                  <div className="text-xs text-navy-500">{r.paymentRef} · {r.loanRef}</div>
                 </div>
                 <div className="text-right">
-                  <div className="font-bold text-slate-100">{K(r.amount)}</div>
-                  <div className="text-xs text-slate-500">{r.date}</div>
+                  <div className="font-bold text-navy-900">{K(r.amount)}</div>
+                  <div className="text-xs text-navy-500">{r.date}</div>
                 </div>
               </div>
             </button>
@@ -122,7 +122,7 @@ export default function QRReceiptPage() {
           <div id="receipt-print" className="bg-white rounded-2xl p-6 text-gray-900 shadow-xl">
             <div className="text-center mb-4 border-b border-gray-100 pb-4">
               <div className="font-black text-lg text-navy-900">PHILIX FINANCE LIMITED</div>
-              <div className="text-xs text-amber-600 font-semibold tracking-widest">Creating A Future Together</div>
+              <div className="text-xs text-amber-700 font-semibold tracking-widest">Creating A Future Together</div>
               <div className="text-xs text-gray-400 mt-1">Payment Receipt</div>
             </div>
 

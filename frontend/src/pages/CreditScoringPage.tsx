@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Brain, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Search, User } from "lucide-react";
 import { RadialBarChart, RadialBar, ResponsiveContainer } from "recharts";
 
@@ -42,17 +42,17 @@ const clients = [
 ];
 
 const TIER_STYLES: Record<string, string> = {
-  "Low Risk": "text-emerald-400 bg-emerald-900/30 border-emerald-800/40",
-  "Medium Risk": "text-amber-400 bg-amber-900/30 border-amber-800/40",
-  "High Risk": "text-red-400 bg-red-900/30 border-red-800/40",
+  "Low Risk": "text-emerald-700 bg-emerald-100 border-emerald-200",
+  "Medium Risk": "text-amber-700 bg-amber-100 border-amber-200",
+  "High Risk": "text-red-700 bg-red-100 border-red-200",
 };
 
 const SCORE_COLOR = (s: number) => s >= 70 ? "#10b981" : s >= 50 ? "#f59e0b" : "#ef4444";
 
 const REC_STYLES: Record<string, { color: string; label: string; icon: React.ElementType }> = {
-  PROCEED: { color: "text-emerald-400", label: "Proceed", icon: CheckCircle },
-  PROCEED_WITH_ATTENTION: { color: "text-amber-400", label: "Proceed with Attention", icon: AlertTriangle },
-  ESCALATE_TO_CEO: { color: "text-red-400", label: "Escalate to CEO", icon: AlertTriangle },
+  PROCEED: { color: "text-emerald-700", label: "Proceed", icon: CheckCircle },
+  PROCEED_WITH_ATTENTION: { color: "text-amber-700", label: "Proceed with Attention", icon: AlertTriangle },
+  ESCALATE_TO_CEO: { color: "text-red-700", label: "Escalate to CEO", icon: AlertTriangle },
 };
 
 export default function CreditScoringPage() {
@@ -72,7 +72,7 @@ export default function CreditScoringPage() {
           <p className="page-subtitle">Real-time client risk scores computed from repayment history and loan behaviour</p>
         </div>
         <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-navy-500" />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             className="input-base pl-9 text-sm py-1.5 w-52" placeholder="Search clients..." />
         </div>
@@ -87,7 +87,7 @@ export default function CreditScoringPage() {
         ].map(s => (
           <div key={s.label} className="stat-card">
             <div className={`text-3xl font-bold text-${s.color}-400 mb-1`}>{s.count}</div>
-            <div className="text-xs text-slate-500">{s.label}</div>
+            <div className="text-xs text-navy-500">{s.label}</div>
           </div>
         ))}
       </div>
@@ -99,12 +99,12 @@ export default function CreditScoringPage() {
             <button key={c.id} onClick={() => setSelected(c)}
               className={`w-full text-left philix-card p-4 transition-all hover:border-indigo-700 ${selected.id === c.id ? "border border-indigo-600" : ""}`}>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center font-bold text-slate-300 flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-warm-200 flex items-center justify-center font-bold text-navy-700 flex-shrink-0">
                   {c.name[0]}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-slate-200 text-sm">{c.name}</div>
-                  <div className="text-xs text-slate-500">{c.clientNo}</div>
+                  <div className="font-semibold text-navy-800 text-sm">{c.name}</div>
+                  <div className="text-xs text-navy-500">{c.clientNo}</div>
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-bold" style={{ color: SCORE_COLOR(c.score) }}>{c.score}</div>
@@ -129,12 +129,12 @@ export default function CreditScoringPage() {
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center font-bold text-slate-300">
+                  <div className="w-10 h-10 rounded-full bg-warm-200 flex items-center justify-center font-bold text-navy-700">
                     <User size={16} />
                   </div>
                   <div>
-                    <div className="font-bold text-slate-100 text-lg">{selected.name}</div>
-                    <div className="text-xs text-slate-500">{selected.clientNo}</div>
+                    <div className="font-bold text-navy-900 text-lg">{selected.name}</div>
+                    <div className="text-xs text-navy-500">{selected.clientNo}</div>
                   </div>
                 </div>
 
@@ -154,9 +154,9 @@ export default function CreditScoringPage() {
                     { label: "Active", value: selected.loansActive, color: "indigo" },
                     { label: "Defaults", value: selected.defaults, color: "red" },
                   ].map(s => (
-                    <div key={s.label} className="bg-slate-800/50 rounded-lg p-2">
+                    <div key={s.label} className="bg-warm-100 rounded-lg p-2">
                       <div className={`text-xl font-bold text-${s.color}-400`}>{s.value}</div>
-                      <div className="text-xs text-slate-500">{s.label}</div>
+                      <div className="text-xs text-navy-500">{s.label}</div>
                     </div>
                   ))}
                 </div>
@@ -166,18 +166,18 @@ export default function CreditScoringPage() {
 
           {/* Score Factors */}
           <div className="philix-card p-5">
-            <h3 className="font-semibold text-slate-200 mb-4 flex items-center gap-2"><Brain size={16} className="text-indigo-400" /> Score Factors</h3>
+            <h3 className="font-semibold text-navy-800 mb-4 flex items-center gap-2"><Brain size={16} className="text-indigo-700" /> Score Factors</h3>
             <div className="space-y-3">
               {selected.factors.map(f => (
                 <div key={f.label}>
                   <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-slate-400 flex items-center gap-1">
-                      {f.positive ? <TrendingUp size={11} className="text-emerald-400" /> : <TrendingDown size={11} className="text-red-400" />}
+                    <span className="text-navy-600 flex items-center gap-1">
+                      {f.positive ? <TrendingUp size={11} className="text-emerald-700" /> : <TrendingDown size={11} className="text-red-700" />}
                       {f.label}
                     </span>
-                    <span className="font-semibold" style={{ color: SCORE_COLOR(f.value) }}>{f.value}/100 <span className="text-slate-600">({f.weight}% weight)</span></span>
+                    <span className="font-semibold" style={{ color: SCORE_COLOR(f.value) }}>{f.value}/100 <span className="text-navy-500">({f.weight}% weight)</span></span>
                   </div>
-                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                  <div className="h-2 bg-warm-200 rounded-full overflow-hidden">
                     <div className="h-full rounded-full transition-all" style={{ width: `${f.value}%`, backgroundColor: SCORE_COLOR(f.value) }} />
                   </div>
                 </div>

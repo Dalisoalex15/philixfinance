@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useClientAuthStore } from "../../store/clientAuth";
 import { useLoanApplicationStore } from "../../store/loanApplicationStore";
@@ -139,9 +139,25 @@ export default function ClientDashboardPage() {
 
   const hasActiveLoan = myApplications.some(a => a.status === "DISBURSED" || a.status === "APPROVED");
   const notifCount = myApplications.filter(a => a.status !== "PENDING").length;
+  const activeLoanApp = myApplications.find(a => a.status === "DISBURSED" || a.status === "APPROVED");
 
-  const pct = Math.round(((mockActiveLoan.principal - mockActiveLoan.outstanding) / mockActiveLoan.principal) * 100);
-  const daysToNext = Math.ceil((new Date(mockActiveLoan.nextPaymentDate).getTime() - Date.now()) / 86400000);
+  // Use real application data when available, fallback to mock for demo
+  const realLoan = activeLoanApp ? {
+    loanNumber: activeLoanApp.ref,
+    product: activeLoanApp.productName,
+    principal: activeLoanApp.amount,
+    outstanding: activeLoanApp.totalRepayable,
+    nextPayment: Math.round(activeLoanApp.totalRepayable / 3),
+    nextPaymentDate: new Date(Date.now() + 25 * 86400000).toISOString().slice(0, 10),
+    monthsPaid: 0,
+    totalMonths: 3,
+    status: activeLoanApp.status,
+  } : mockActiveLoan;
+
+  const pct = activeLoanApp
+    ? Math.round((realLoan.monthsPaid / Math.max(realLoan.totalMonths, 1)) * 100)
+    : Math.round(((mockActiveLoan.principal - mockActiveLoan.outstanding) / mockActiveLoan.principal) * 100);
+  const daysToNext = Math.ceil((new Date(realLoan.nextPaymentDate).getTime() - Date.now()) / 86400000);
 
   const hourOfDay = new Date().getHours();
   const greeting = hourOfDay < 12 ? "Good morning" : hourOfDay < 17 ? "Good afternoon" : "Good evening";
@@ -178,9 +194,9 @@ export default function ClientDashboardPage() {
         {hasActiveLoan && (
           <div className="relative grid grid-cols-3 gap-3 mt-5">
             {[
-              { label: "Outstanding", value: `K${mockActiveLoan.outstanding.toLocaleString()}`, color: "text-amber-400", sub: "active loan" },
-              { label: "Next Payment", value: `K${mockActiveLoan.nextPayment.toLocaleString()}`, color: "text-slate-200", sub: `in ${daysToNext} day${daysToNext !== 1 ? "s" : ""}` },
-              { label: "Repaid", value: `${pct}%`, color: "text-emerald-400", sub: `${mockActiveLoan.monthsPaid}/${mockActiveLoan.totalMonths} months` },
+              { label: "Outstanding", value: `K${realLoan.outstanding.toLocaleString()}`, color: "text-amber-400", sub: "active loan" },
+              { label: "Next Payment", value: `K${realLoan.nextPayment.toLocaleString()}`, color: "text-slate-200", sub: `in ${daysToNext} day${daysToNext !== 1 ? "s" : ""}` },
+              { label: "Repaid", value: `${pct}%`, color: "text-emerald-400", sub: `${realLoan.monthsPaid}/${realLoan.totalMonths} months` },
             ].map(s => (
               <div key={s.label} className="bg-white/5 border border-white/10 rounded-xl p-3 text-center">
                 <div className={`text-lg font-bold ${s.color}`}>{s.value}</div>
@@ -228,15 +244,15 @@ export default function ClientDashboardPage() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <div className="font-bold text-slate-200">{mockActiveLoan.product}</div>
-                <div className="text-xs text-slate-500 font-mono">{mockActiveLoan.loanNumber}</div>
+                <div className="font-bold text-slate-200">{realLoan.product}</div>
+                <div className="text-xs text-slate-500 font-mono">{realLoan.loanNumber}</div>
               </div>
-              <span className="bg-emerald-900/40 border border-emerald-700/40 text-emerald-400 text-xs font-semibold px-3 py-1 rounded-full">{mockActiveLoan.status}</span>
+              <span className="bg-emerald-900/40 border border-emerald-700/40 text-emerald-400 text-xs font-semibold px-3 py-1 rounded-full">{realLoan.status}</span>
             </div>
 
             <div className="mb-4">
               <div className="flex justify-between text-xs text-slate-500 mb-1.5">
-                <span>{mockActiveLoan.monthsPaid} of {mockActiveLoan.totalMonths} payments made</span>
+                <span>{realLoan.monthsPaid} of {realLoan.totalMonths} payments made</span>
                 <span className="text-emerald-400 font-semibold">{pct}% repaid</span>
               </div>
               <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
@@ -265,11 +281,11 @@ export default function ClientDashboardPage() {
                 <Clock size={14} className="text-indigo-400" />
                 <div>
                   <div className="text-xs text-slate-500">Next payment due</div>
-                  <div className="text-sm font-semibold text-slate-200">{new Date(mockActiveLoan.nextPaymentDate).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}</div>
+                  <div className="text-sm font-semibold text-slate-200">{new Date(realLoan.nextPaymentDate).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}</div>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-xl font-bold text-indigo-300">K{mockActiveLoan.nextPayment.toLocaleString()}</div>
+                <div className="text-xl font-bold text-indigo-300">K{realLoan.nextPayment.toLocaleString()}</div>
                 <div className="text-xs text-slate-600">{daysToNext} days away</div>
               </div>
             </div>
@@ -388,7 +404,7 @@ export default function ClientDashboardPage() {
               {[
                 { label: "Client Since", value: new Date(client.joinedAt).toLocaleDateString("en-GB", { month: "short", year: "numeric" }) },
                 { label: "Total Borrowed", value: "K5,000" },
-                { label: "Total Repaid", value: `K${(mockActiveLoan.principal - mockActiveLoan.outstanding).toLocaleString()}` },
+                { label: "Total Repaid", value: `K${(mockActiveLoan.principal - realLoan.outstanding).toLocaleString()}` },
                 { label: "Loan Count", value: "2 loans" },
                 { label: "Credit Score", value: "Good ●", valueClass: "text-emerald-400" },
               ].map(s => (

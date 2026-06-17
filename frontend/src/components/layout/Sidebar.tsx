@@ -10,7 +10,7 @@ import {
   Calendar, Users2, FileText, ShoppingBag, Mail, Upload, Download,
   Search, Percent, Wallet, Scale,
   MessageSquare, Smartphone, MessageCircle, FileSignature, QrCode,
-  Brain, ShieldAlert, Gift, UsersRound, Webhook,
+  Brain, ShieldAlert, Gift, UsersRound, Webhook, TrendingDown,
 } from "lucide-react";
 import { useAuthStore } from "../../store/auth";
 import { useLoanApplicationStore } from "../../store/loanApplicationStore";
@@ -65,6 +65,7 @@ const navGroups: NavGroup[] = [
       { href: "/provisioning",      icon: Percent,       label: "Provisioning (PAR)" },
       { href: "/credit-scoring",    icon: Brain,         label: "AI Credit Scoring" },
       { href: "/fraud-alerts",      icon: ShieldAlert,   label: "Fraud Detection" },
+      { href: "/default-risk",      icon: TrendingDown,  label: "Default Risk" },
     ],
   },
   {
