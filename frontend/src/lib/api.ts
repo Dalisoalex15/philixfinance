@@ -80,7 +80,51 @@ export const staffApi = {
     staffRequest(`/portal/applications/staff/${id}`, {
       method: "PATCH", body: JSON.stringify({ status, rejectedReason }),
     }),
+
+  // Admin endpoints
+  getActivity: () =>
+    staffRequest<ActivityEvent[]>("/admin/activity"),
+
+  getAdminSummary: () =>
+    staffRequest<AdminSummary>("/admin/summary"),
+
+  fraudScan: () =>
+    staffRequest<{ alerts: FraudAlert[]; scannedAt: string; totalAccounts: number }>("/admin/fraud-scan"),
+
+  wipeDemoData: () =>
+    staffRequest("/admin/wipe-demo-data", {
+      method: "POST", body: JSON.stringify({ confirm: "WIPE_ALL_DEMO_DATA" }),
+    }),
 };
+
+export interface ActivityEvent {
+  id: string;
+  type: string;
+  client: string;
+  clientNo?: string;
+  ref: string;
+  amount: number;
+  description: string;
+  timestamp: string;
+}
+
+export interface AdminSummary {
+  totalPortalAccounts: number;
+  pendingApplications: number;
+  approvedToday: number;
+  submittedToday: number;
+  totalApplications: number;
+}
+
+export interface FraudAlert {
+  id: string;
+  type: string;
+  severity: "HIGH" | "MEDIUM" | "LOW";
+  value: string;
+  description: string;
+  accounts: { id: string; name: string; clientNo: string; email: string }[];
+  detectedAt: string;
+}
 
 export function saveStaffTokens(accessToken: string, refreshToken: string) {
   localStorage.setItem("philix_staff_token", accessToken);

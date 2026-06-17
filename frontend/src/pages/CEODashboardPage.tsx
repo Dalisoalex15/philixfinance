@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  RadialBarChart, RadialBar, PieChart, Pie, Cell,
 } from "recharts";
 import {
   DollarSign, TrendingUp, AlertTriangle, CheckCircle, Users,
-  Zap, ArrowUpRight, Crown, Clock, XCircle,
+  Zap, ArrowUpRight, Crown, Clock, XCircle, Activity, FileText,
+  ThumbsUp, ThumbsDown, Banknote, RefreshCw,
 } from "lucide-react";
 import {
   mockKPIs, mockCapitalUtilization, mockPAR, mockTopOfficers,
@@ -14,6 +14,25 @@ import {
 } from "../lib/mock-data";
 import { useLoanApplicationStore } from "../store/loanApplicationStore";
 import { staffApi } from "../lib/api";
+
+interface ActivityEvent {
+  id: string;
+  type: string;
+  client: string;
+  ref: string;
+  amount: number;
+  description: string;
+  timestamp: string;
+}
+
+const EVENT_ICONS: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
+  APPLICATION_SUBMITTED: { icon: FileText,    color: "text-blue-700",    bg: "bg-blue-100" },
+  APPLICATION_REVIEWING: { icon: Clock,       color: "text-amber-700",   bg: "bg-amber-100" },
+  APPLICATION_APPROVED:  { icon: ThumbsUp,    color: "text-emerald-700", bg: "bg-emerald-100" },
+  APPLICATION_REJECTED:  { icon: ThumbsDown,  color: "text-red-700",     bg: "bg-red-100" },
+  LOAN_DISBURSED:        { icon: Banknote,    color: "text-indigo-700",  bg: "bg-indigo-100" },
+  APPLICATION_UPDATED:   { icon: RefreshCw,   color: "text-navy-600",    bg: "bg-navy-100" },
+};
 
 const profitData = mockMonthlyDisbursements.map((m) => ({
   month: m.month.split(" ")[0],
@@ -28,8 +47,36 @@ export default function CEODashboardPage() {
 
   const { applications, syncFromApi, updateStatus } = useLoanApplicationStore();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [liveActivity, setLiveActivity] = useState<ActivityEvent[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [clockTime, setClockTime] = useState(new Date());
+  const [portalSummary, setPortalSummary] = useState({ totalPortalAccounts: 0, pendingApplications: 0, submittedToday: 0, approvedToday: 0 });
 
-  useEffect(() => { syncFromApi(); }, []);
+  const fetchActivity = useCallback(async () => {
+    setActivityLoading(true);
+    try {
+      const token = localStorage.getItem("philix_staff_token");
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+      const [actRes, sumRes] = await Promise.all([
+        fetch("/api/admin/activity", { headers }),
+        fetch("/api/admin/summary", { headers }),
+      ]);
+      if (actRes.ok) setLiveActivity(await actRes.json());
+      if (sumRes.ok) setPortalSummary(await sumRes.json());
+    } catch {
+      // fall back to store-derived events below
+    } finally {
+      setActivityLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    syncFromApi();
+    fetchActivity();
+    const activityInterval = setInterval(() => { syncFromApi(); fetchActivity(); }, 30000);
+    const clockInterval = setInterval(() => setClockTime(new Date()), 1000);
+    return () => { clearInterval(activityInterval); clearInterval(clockInterval); };
+  }, [fetchActivity]);
 
   const pendingApps = applications.filter(a => a.status === "PENDING" || a.status === "UNDER_REVIEW");
 
@@ -69,14 +116,20 @@ export default function CEODashboardPage() {
         </div>
         <div className="text-right hidden md:block">
           <div className="text-4xl font-bold font-mono text-navy-900">
-            {today.toLocaleTimeString("en-ZM", { hour: "2-digit", minute: "2-digit" })}
+            {clockTime.toLocaleTimeString("en-ZM", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
           </div>
-          <div className="text-xs text-navy-600 mt-1">CAT (Central Africa Time)</div>
+          <div className="text-xs text-navy-600 mt-1 flex items-center justify-end gap-1.5">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            LIVE · CAT
+          </div>
         </div>
       </div>
 
       {/* Critical KPIs — "In 30 seconds" */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {[
           {
             label: "Today's Collections", value: formatKwacha(24500), sub: "From 12 payments",
@@ -94,6 +147,12 @@ export default function CEODashboardPage() {
           {
             label: "Capital Utilization", value: `${mockCapitalUtilization.utilizationPct}%`, sub: formatKwacha(mockCapitalUtilization.availableCapital) + " free",
             icon: Zap, color: "indigo", change: `${formatKwacha(mockCapitalUtilization.capitalLoaned)} deployed`,
+          },
+          {
+            label: "Portal Applications", value: String(portalSummary.pendingApplications || pendingApps.length),
+            sub: `${portalSummary.submittedToday} submitted today`,
+            icon: Users, color: portalSummary.pendingApplications > 0 ? "amber" : "emerald",
+            change: `${portalSummary.totalPortalAccounts} client accounts`,
           },
         ].map((card) => (
           <div key={card.label} className="philix-card p-5">
@@ -497,6 +556,100 @@ export default function CEODashboardPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Live Activity Feed */}
+      <div className="philix-card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="section-title flex items-center gap-2">
+              <Activity size={16} className="text-emerald-500" />
+              Live Activity Feed
+            </h3>
+            <p className="text-xs text-navy-600 mt-0.5">Real-time portal events — refreshes every 30 seconds</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-semibold">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              LIVE
+            </div>
+            <button
+              onClick={() => { syncFromApi(); fetchActivity(); }}
+              disabled={activityLoading}
+              className="flex items-center gap-1 px-2 py-1 text-xs border border-warm-300 rounded-lg hover:bg-warm-50 text-navy-600 disabled:opacity-50"
+            >
+              <RefreshCw size={11} className={activityLoading ? "animate-spin" : ""} />
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        {(() => {
+          // Merge API events with store-derived fallback
+          const storeEvents: ActivityEvent[] = applications.slice(0, 10).map(a => ({
+            id: a.id,
+            type: a.status === "PENDING" ? "APPLICATION_SUBMITTED" :
+                  a.status === "UNDER_REVIEW" ? "APPLICATION_REVIEWING" :
+                  a.status === "APPROVED" ? "APPLICATION_APPROVED" :
+                  a.status === "REJECTED" ? "APPLICATION_REJECTED" : "LOAN_DISBURSED",
+            client: a.clientName,
+            ref: a.ref,
+            amount: a.amount,
+            description: a.status === "PENDING"
+              ? `${a.clientName} submitted a ${a.productName} application for ${formatKwacha(a.amount)}`
+              : a.status === "APPROVED"
+              ? `${a.clientName}'s loan of ${formatKwacha(a.amount)} was APPROVED`
+              : a.status === "REJECTED"
+              ? `${a.clientName}'s application was rejected`
+              : `${a.clientName} — ${a.productName} · ${formatKwacha(a.amount)}`,
+            timestamp: a.submittedAt,
+          }));
+          const events = liveActivity.length > 0 ? liveActivity : storeEvents;
+
+          if (events.length === 0) {
+            return (
+              <div className="flex items-center gap-3 p-4 bg-warm-50 border border-warm-200 rounded-xl text-sm text-navy-600">
+                <Activity size={16} className="text-navy-400 flex-shrink-0" />
+                No activity yet — portal events will appear here as clients submit applications.
+              </div>
+            );
+          }
+
+          return (
+            <div className="space-y-2">
+              {events.slice(0, 12).map((evt) => {
+                const meta = EVENT_ICONS[evt.type] ?? EVENT_ICONS.APPLICATION_UPDATED;
+                const Icon = meta.icon;
+                const ts = new Date(evt.timestamp);
+                const isToday = ts.toDateString() === new Date().toDateString();
+                const timeStr = isToday
+                  ? ts.toLocaleTimeString("en-ZM", { hour: "2-digit", minute: "2-digit" })
+                  : ts.toLocaleDateString("en-ZM", { day: "numeric", month: "short" });
+                return (
+                  <div key={evt.id} className="flex items-start gap-3 p-3 rounded-xl hover:bg-warm-50 transition-colors border border-transparent hover:border-warm-200">
+                    <div className={`p-2 rounded-lg flex-shrink-0 ${meta.bg}`}>
+                      <Icon size={14} className={meta.color} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-navy-800">{evt.description}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs font-mono text-navy-500">{evt.ref}</span>
+                        <span className="text-navy-300">·</span>
+                        <span className="text-xs text-navy-500">{timeStr}</span>
+                      </div>
+                    </div>
+                    <div className="text-xs font-mono font-semibold text-navy-700 flex-shrink-0">
+                      {evt.amount > 0 ? formatKwacha(evt.amount) : ""}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
 
       {/* PAR >30 Alert Banner (CGAP standard) */}

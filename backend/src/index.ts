@@ -30,6 +30,7 @@ import wikiRoutes from "./routes/wiki";
 import auditRoutes from "./routes/audit";
 import branchRoutes from "./routes/branches";
 import recoveryRoutes from "./routes/recovery";
+import adminRoutes from "./routes/admin";
 // Client Portal routes
 import portalAuthRoutes from "./routes/portal/auth";
 import portalMeRoutes from "./routes/portal/me";
@@ -123,6 +124,7 @@ app.use("/api/wiki", wikiRoutes);
 app.use("/api/audit", auditRoutes);
 app.use("/api/branches", branchRoutes);
 app.use("/api/recovery", recoveryRoutes);
+app.use("/api/admin", adminRoutes);
 // Client Portal
 app.use("/api/portal/auth", authLimiter, portalAuthRoutes);
 app.use("/api/portal/me", portalMeRoutes);

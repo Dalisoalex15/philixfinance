@@ -1,6 +1,26 @@
-import { Settings, Shield, Database, Bell, Mail, Server } from "lucide-react";
+import { useState } from "react";
+import { Settings, Shield, Database, Bell, Mail, Server, AlertTriangle, Trash2, CheckCircle, Loader2 } from "lucide-react";
+import { staffApi } from "../lib/api";
 
 export default function SettingsPage() {
+  const [wipeConfirm, setWipeConfirm] = useState("");
+  const [wiping, setWiping] = useState(false);
+  const [wipeResult, setWipeResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  async function handleWipe() {
+    if (wipeConfirm !== "WIPE") return;
+    setWiping(true);
+    try {
+      await staffApi.wipeDemoData();
+      setWipeResult({ success: true, message: "All demo data wiped. CEO account preserved. System ready for live use." });
+      setWipeConfirm("");
+    } catch (e: any) {
+      setWipeResult({ success: false, message: e.message ?? "Wipe failed" });
+    } finally {
+      setWiping(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="page-header">
@@ -140,17 +160,73 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* AI Features Placeholder */}
-      <div className="philix-card p-5 border-dashed border-slate-700">
-        <div className="text-center">
-          <div className="text-sm font-semibold text-slate-400 mb-2">🤖 Future AI Features (Planned)</div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
-            {["Credit Scoring AI", "Default Prediction", "Cash Flow Forecasting", "WhatsApp AI Assistant", "Fraud Detection", "Portfolio Risk Analysis", "Investor Analytics", "Automated Reporting"].map((f) => (
-              <div key={f} className="bg-slate-800/30 rounded-lg p-3 text-xs text-slate-500 text-center border border-slate-800 border-dashed">
-                {f}
+      {/* Clean-Slate Launch Protocol */}
+      <div className="philix-card p-5 border border-red-200 bg-red-50/50">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="p-2 rounded-lg bg-red-100 flex-shrink-0">
+            <Trash2 size={16} className="text-red-600" />
+          </div>
+          <div>
+            <h3 className="section-title text-red-800">Clean-Slate Launch Protocol</h3>
+            <p className="text-xs text-red-600 mt-0.5">
+              Wipes all portal demo data (client accounts, loan applications, KYC documents, notifications).
+              Your CEO staff account and system configuration are preserved. This cannot be undone.
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white border border-red-200 rounded-xl p-4 space-y-3">
+          <div className="flex items-center gap-2 text-xs text-red-700 font-semibold">
+            <AlertTriangle size={14} />
+            What will be deleted:
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              "All client portal accounts",
+              "All loan applications",
+              "All KYC documents",
+              "All client notifications",
+              "All portal refresh tokens",
+            ].map(item => (
+              <div key={item} className="flex items-center gap-2 text-xs text-red-600">
+                <div className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />
+                {item}
               </div>
             ))}
           </div>
+          <div className="flex items-center gap-2 text-xs text-emerald-700 font-semibold pt-2 border-t border-red-100">
+            <CheckCircle size={14} />
+            What is preserved: CEO account · staff users · system configuration
+          </div>
+        </div>
+
+        {wipeResult && (
+          <div className={`mt-3 p-3 rounded-xl text-sm font-medium flex items-center gap-2 ${
+            wipeResult.success
+              ? "bg-emerald-50 border border-emerald-200 text-emerald-700"
+              : "bg-red-50 border border-red-200 text-red-700"
+          }`}>
+            {wipeResult.success ? <CheckCircle size={15} /> : <AlertTriangle size={15} />}
+            {wipeResult.message}
+          </div>
+        )}
+
+        <div className="flex items-center gap-3 mt-4">
+          <input
+            type="text"
+            placeholder='Type "WIPE" to confirm'
+            value={wipeConfirm}
+            onChange={e => { setWipeConfirm(e.target.value); setWipeResult(null); }}
+            className="input-base text-sm flex-1 border-red-200 focus:border-red-400"
+          />
+          <button
+            onClick={handleWipe}
+            disabled={wipeConfirm !== "WIPE" || wiping}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {wiping ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            {wiping ? "Wiping…" : "Wipe Demo Data"}
+          </button>
         </div>
       </div>
     </div>
