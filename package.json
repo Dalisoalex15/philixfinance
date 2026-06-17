@@ -2,6 +2,8 @@
   "name": "philix-finance",
   "private": true,
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "@prisma/adapter-neon": "^7.8.0",
     "@prisma/client": "^5.14.0",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
@@ -18,14 +20,15 @@
     "nodemailer": "^6.9.13",
     "otplib": "^12.0.1",
     "pdfkit": "^0.15.0",
+    "prisma": "^5.14.0",
     "qrcode": "^1.5.3",
     "speakeasy": "^2.0.0",
+    "tsx": "^4.15.5",
     "uuid": "^10.0.0",
     "winston": "^3.13.0",
+    "ws": "^8.21.0",
     "xlsx": "^0.18.5",
-    "tsx": "^4.15.5",
-    "zod": "^3.23.8",
-    "prisma": "^5.14.0"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
