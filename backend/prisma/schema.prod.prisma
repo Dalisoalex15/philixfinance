@@ -3,8 +3,9 @@
 // Local dev uses schema.prisma (SQLite)
 
 generator client {
-  provider = "prisma-client-js"
-  output   = "../generated/prisma"
+  provider   = "prisma-client-js"
+  output     = "../generated/prisma"
+  engineType = "wasm"
 }
 
 datasource db {
