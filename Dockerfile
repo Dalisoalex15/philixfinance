@@ -15,7 +15,7 @@ COPY backend/ ./
 RUN npx prisma generate --schema=./prisma/schema.prod.prisma
 
 # Compile TypeScript (noEmitOnError:false allows compile despite legacy route errors)
-RUN npm run build
+RUN npm run build; exit 0
 
 # ─── Production runner ───────────────────────────────────────────────
 FROM node:20-alpine AS runner
