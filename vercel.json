@@ -2,6 +2,12 @@
   "installCommand": "npm install",
   "buildCommand": "npx prisma generate --schema=backend/prisma/schema.prod.prisma && npx prisma db push --schema=backend/prisma/schema.prod.prisma --accept-data-loss && (npx tsx backend/prisma/seed.ts || true) && cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 30,
+      "includeFiles": "node_modules/.prisma/client/**"
+    }
+  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
