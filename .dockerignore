@@ -1,0 +1,11 @@
+frontend/
+nginx/
+backend/node_modules
+backend/dist
+backend/*.log
+backend/backend.log
+backend/logs/
+backend/.env
+backend/prisma/dev.db
+backend/prisma/dev.db-journal
+backend/prisma/migrations
