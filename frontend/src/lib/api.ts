@@ -16,18 +16,39 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   return data as T;
 }
 
-// ── Staff helper (uses staff JWT stored separately) ──────────────────────────
+// ── Staff helper (uses staff JWT stored separately, auto-refreshes on expiry) ──
 async function staffRequest<T>(path: string, opts: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem("philix_staff_token");
-  const res = await fetch(`${BASE}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(opts.headers as Record<string, string> ?? {}),
-    },
-    ...opts,
+  const makeHeaders = (token: string | null) => ({
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(opts.headers as Record<string, string> ?? {}),
   });
+
+  let token = localStorage.getItem("philix_staff_token");
+  const res = await fetch(`${BASE}${path}`, { headers: makeHeaders(token), ...opts });
   const data = await res.json().catch(() => ({}));
+
+  // Auto-refresh on token expiry then retry once
+  if (res.status === 401 && data.code === "TOKEN_EXPIRED") {
+    const refreshToken = localStorage.getItem("philix_staff_refresh");
+    if (refreshToken) {
+      const rr = await fetch(`${BASE}/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
+      });
+      const rd = await rr.json().catch(() => ({}));
+      if (rr.ok && rd.accessToken) {
+        localStorage.setItem("philix_staff_token", rd.accessToken);
+        token = rd.accessToken;
+        const retry = await fetch(`${BASE}${path}`, { headers: makeHeaders(token), ...opts });
+        const retryData = await retry.json().catch(() => ({}));
+        if (!retry.ok) throw new Error(retryData.message || retryData.error || `Request failed ${retry.status}`);
+        return retryData as T;
+      }
+    }
+  }
+
   if (!res.ok) throw new Error(data.message || data.error || `Request failed ${res.status}`);
   return data as T;
 }

@@ -1,18 +1,21 @@
+import { useEffect, useState } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   RadialBarChart, RadialBar, PieChart, Pie, Cell,
 } from "recharts";
 import {
   DollarSign, TrendingUp, AlertTriangle, CheckCircle, Users,
-  Zap, ArrowUpRight, Crown,
+  Zap, ArrowUpRight, Crown, Clock, XCircle,
 } from "lucide-react";
 import {
   mockKPIs, mockCapitalUtilization, mockPAR, mockTopOfficers,
   mockCampusPerformance,
   mockRepaymentTrend, mockMonthlyDisbursements, formatKwacha,
 } from "../lib/mock-data";
+import { useLoanApplicationStore } from "../store/loanApplicationStore";
+import { staffApi } from "../lib/api";
 
-const profitData = mockMonthlyDisbursements.map((m, i) => ({
+const profitData = mockMonthlyDisbursements.map((m) => ({
   month: m.month.split(" ")[0],
   revenue: m.amount * 0.18,
   expenses: m.amount * 0.04 + 57000,
@@ -22,6 +25,26 @@ const profitData = mockMonthlyDisbursements.map((m, i) => ({
 export default function CEODashboardPage() {
   const today = new Date();
   const greeting = today.getHours() < 12 ? "Good morning" : today.getHours() < 17 ? "Good afternoon" : "Good evening";
+
+  const { applications, syncFromApi, updateStatus } = useLoanApplicationStore();
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  useEffect(() => { syncFromApi(); }, []);
+
+  const pendingApps = applications.filter(a => a.status === "PENDING" || a.status === "UNDER_REVIEW");
+
+  async function handleAction(id: string, action: "APPROVED" | "REJECTED") {
+    setActionLoading(id);
+    try {
+      await staffApi.updateApplicationStatus(id, action);
+      updateStatus(id, action);
+      await syncFromApi();
+    } catch {
+      // ignore
+    } finally {
+      setActionLoading(null);
+    }
+  }
 
   const monthlyInterest = mockMonthlyDisbursements[11].amount * 0.18;
   const monthlyExpenses = 58820;
@@ -90,6 +113,83 @@ export default function CEODashboardPage() {
             <div className="text-xs text-emerald-600 mt-2 font-medium">{card.change}</div>
           </div>
         ))}
+      </div>
+
+      {/* Pending Portal Applications */}
+      <div className="philix-card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="section-title flex items-center gap-2">
+              <Clock size={16} className="text-amber-500" />
+              Pending Loan Applications
+            </h3>
+            <p className="text-xs text-navy-600 mt-0.5">Online portal submissions awaiting review</p>
+          </div>
+          {pendingApps.length > 0 && (
+            <span className="bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold px-2.5 py-1 rounded-full">
+              {pendingApps.length} pending
+            </span>
+          )}
+        </div>
+
+        {pendingApps.length === 0 ? (
+          <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+            <CheckCircle size={18} className="text-emerald-600 flex-shrink-0" />
+            <span className="text-sm text-emerald-700 font-medium">All caught up — no pending applications right now.</span>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {pendingApps.map(app => (
+              <div key={app.id} className="flex items-center justify-between p-4 bg-warm-50 border border-warm-200 rounded-xl hover:border-gold-300 transition-colors">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-navy-900">{app.clientName}</span>
+                    <span className="text-xs text-navy-500">·</span>
+                    <span className="text-xs text-navy-600 font-mono">{app.ref}</span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${
+                      app.status === "UNDER_REVIEW"
+                        ? "bg-blue-50 text-blue-700 border-blue-200"
+                        : "bg-amber-50 text-amber-700 border-amber-200"
+                    }`}>
+                      {app.status === "UNDER_REVIEW" ? "Under Review" : "Pending"}
+                    </span>
+                  </div>
+                  <div className="text-xs text-navy-600 mt-1">
+                    <span className="font-medium text-navy-700">{app.productName}</span>
+                    {" · "}
+                    <span className="font-mono font-semibold text-navy-800">{formatKwacha(app.amount)}</span>
+                    {" · "}
+                    {app.rateDuration}
+                    {app.purpose && <span> · {app.purpose}</span>}
+                  </div>
+                  <div className="text-xs text-navy-500 mt-0.5">
+                    {app.clientEmail}
+                    {" · Submitted "}
+                    {new Date(app.submittedAt).toLocaleDateString("en-ZM", { day: "numeric", month: "short", year: "numeric" })}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+                  <button
+                    onClick={() => handleAction(app.id, "APPROVED")}
+                    disabled={actionLoading === app.id}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <CheckCircle size={13} />
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => handleAction(app.id, "REJECTED")}
+                    disabled={actionLoading === app.id}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-red-100 hover:bg-red-200 text-red-700 border border-red-200 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <XCircle size={13} />
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Financial Summary */}

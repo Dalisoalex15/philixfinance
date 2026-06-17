@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle, AlertCircle, ArrowLeft, Shield, Star } from "lucide-react";
+import { CheckCircle, AlertCircle, ArrowLeft, Shield, Star, Loader2 } from "lucide-react";
 import { useClientAuthStore } from "../../store/clientAuth";
 import { mockLoanProducts, type LoanProduct, type LoanProductRate } from "../../lib/mock-data";
 import { useLoanApplicationStore } from "../../store/loanApplicationStore";
+import { portalApi } from "../../lib/api";
 
 const K = (n: number) => `K${n.toLocaleString("en-ZM", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
@@ -23,6 +24,8 @@ export default function LoanApplicationPage() {
   const submitApplication = useLoanApplicationStore(s => s.submit);
   const [step, setStep] = useState(0);
   const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [ref] = useState(`APP-${Date.now().toString().slice(-6)}`);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -100,36 +103,57 @@ export default function LoanApplicationPage() {
     return Object.keys(e).length === 0;
   };
 
-  const next = () => {
+  const next = async () => {
     if (!validate()) return;
     if (step < 5) {
       setStep(step + 1);
     } else if (step === 5) {
-      submitApplication({
-        ref,
-        clientId: client.id,
-        clientName: `${client.firstName} ${client.lastName}`,
-        clientEmail: client.email,
-        clientPhone: client.phone,
-        productId: selectedProduct?.id ?? "",
-        productName: selectedProduct?.name ?? "",
-        rateDuration: selectedRate?.displayLabel ?? "",
-        interestRate: selectedRate?.interestRate ?? 0,
-        amount: loanAmount,
-        totalRepayable,
-        weeklyPayment,
-        purpose: form.purpose,
-        occupation: form.occupation,
-        employer: form.employer,
-        monthlyIncome: Number(form.monthlyIncome) || 0,
-        collateralType: form.collateralType,
-        collateralDescription: form.collateralDescription,
-        collateralValue: Number(form.collateralValue) || 0,
-        collateralCondition: form.collateralCondition,
-        status: "PENDING",
-      });
-      setStep(6);
-      setTimeout(() => setDone(true), 1600);
+      setSubmitting(true);
+      setSubmitError("");
+      try {
+        await portalApi.submitApplication({
+          productType: selectedProduct?.id ?? selectedProduct?.name ?? "",
+          amountRequested: loanAmount,
+          termMonths: selectedRate ? parseInt(selectedRate.displayLabel) || 1 : 1,
+          purpose: form.purpose,
+          occupation: form.occupation,
+          employer: form.employer,
+          monthlyIncome: Number(form.monthlyIncome) || undefined,
+          collateralType: form.collateralType || undefined,
+          collateralDesc: form.collateralDescription || undefined,
+          collateralValue: Number(form.collateralValue) || undefined,
+        });
+        // Also save to local store for immediate UI
+        submitApplication({
+          ref,
+          clientId: client.id,
+          clientName: `${client.firstName} ${client.lastName}`,
+          clientEmail: client.email,
+          clientPhone: client.phone,
+          productId: selectedProduct?.id ?? "",
+          productName: selectedProduct?.name ?? "",
+          rateDuration: selectedRate?.displayLabel ?? "",
+          interestRate: selectedRate?.interestRate ?? 0,
+          amount: loanAmount,
+          totalRepayable,
+          weeklyPayment,
+          purpose: form.purpose,
+          occupation: form.occupation,
+          employer: form.employer,
+          monthlyIncome: Number(form.monthlyIncome) || 0,
+          collateralType: form.collateralType,
+          collateralDescription: form.collateralDescription,
+          collateralValue: Number(form.collateralValue) || 0,
+          collateralCondition: form.collateralCondition,
+          status: "PENDING",
+        });
+        setStep(6);
+        setTimeout(() => setDone(true), 1600);
+      } catch (err: unknown) {
+        setSubmitError(err instanceof Error ? err.message : "Failed to submit application. Please try again.");
+      } finally {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -561,9 +585,15 @@ export default function LoanApplicationPage() {
                 <ArrowLeft size={14} /> Back
               </button>
             )}
-            <button onClick={next}
-              className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl text-sm transition-all">
-              {step === 5 ? "Submit Application →" : step === 3 ? "Continue (Skip if no collateral yet)" : "Continue →"}
+            {submitError && (
+              <div className="w-full flex items-center gap-2 p-3 bg-red-900/30 border border-red-800/50 rounded-xl text-xs text-red-300">
+                <AlertCircle size={14} className="flex-shrink-0" />
+                {submitError}
+              </div>
+            )}
+            <button onClick={next} disabled={submitting}
+              className="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl text-sm transition-all flex items-center justify-center gap-2">
+              {submitting ? <><Loader2 size={14} className="animate-spin" /> Submitting...</> : step === 5 ? "Submit Application →" : step === 3 ? "Continue (Skip if no collateral yet)" : "Continue →"}
             </button>
           </div>
         )}
