@@ -37,7 +37,7 @@ export default function CEODashboardPage() {
             <span className="text-xs font-semibold text-gold-600 uppercase tracking-wider">CEO Dashboard</span>
           </div>
           <h1 className="page-title text-3xl">{greeting}, Daliso.</h1>
-          <p className="text-navy-400 mt-1">
+          <p className="text-navy-600 mt-1">
             Here's how Philix Finance is performing right now —{" "}
             <span className="text-emerald-600 font-medium">
               {today.toLocaleDateString("en-ZM", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
@@ -48,7 +48,7 @@ export default function CEODashboardPage() {
           <div className="text-4xl font-bold font-mono text-navy-900">
             {today.toLocaleTimeString("en-ZM", { hour: "2-digit", minute: "2-digit" })}
           </div>
-          <div className="text-xs text-navy-400 mt-1">CAT (Central Africa Time)</div>
+          <div className="text-xs text-navy-600 mt-1">CAT (Central Africa Time)</div>
         </div>
       </div>
 
@@ -82,11 +82,11 @@ export default function CEODashboardPage() {
               }`}>
                 <card.icon size={18} />
               </div>
-              <ArrowUpRight size={14} className="text-navy-300" />
+              <ArrowUpRight size={14} className="text-navy-500" />
             </div>
             <div className="text-2xl font-bold font-mono text-navy-900">{card.value}</div>
             <div className="text-xs text-navy-600 mt-1 font-medium">{card.label}</div>
-            <div className="text-xs text-navy-400 mt-0.5">{card.sub}</div>
+            <div className="text-xs text-navy-600 mt-0.5">{card.sub}</div>
             <div className="text-xs text-emerald-600 mt-2 font-medium">{card.change}</div>
           </div>
         ))}
@@ -103,7 +103,7 @@ export default function CEODashboardPage() {
             <div className="flex-1">
               <div className={`text-2xl font-bold font-mono ${f.color}`}>{f.value}</div>
               <div className="text-sm font-medium text-navy-700 mt-1">{f.label}</div>
-              <div className="text-xs text-navy-400 mt-0.5">{f.detail}</div>
+              <div className="text-xs text-navy-600 mt-0.5">{f.detail}</div>
             </div>
           </div>
         ))}
@@ -114,7 +114,7 @@ export default function CEODashboardPage() {
         <div className="philix-card p-5">
           <div className="mb-4">
             <h3 className="section-title">Monthly P&L</h3>
-            <p className="text-xs text-navy-400">Revenue, expenses & net profit trend</p>
+            <p className="text-xs text-navy-600">Revenue, expenses & net profit trend</p>
           </div>
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={profitData}>
@@ -142,7 +142,7 @@ export default function CEODashboardPage() {
         <div className="philix-card p-5">
           <div className="mb-4">
             <h3 className="section-title">Portfolio at Risk (PAR)</h3>
-            <p className="text-xs text-navy-400">CGAP microfinance health indicators</p>
+            <p className="text-xs text-navy-600">CGAP microfinance health indicators</p>
           </div>
           <div className="grid grid-cols-3 gap-4">
             {mockPAR.map((p) => (
@@ -153,7 +153,7 @@ export default function CEODashboardPage() {
                   {p.percentage}%
                 </div>
                 <div className="text-xs font-semibold text-navy-600 mt-1">PAR {p.days}+</div>
-                <div className="text-xs text-navy-400">{p.count} loans</div>
+                <div className="text-xs text-navy-600">{p.count} loans</div>
                 <div className="text-xs font-mono text-navy-500 mt-1">{formatKwacha(p.amount)}</div>
               </div>
             ))}
@@ -168,7 +168,7 @@ export default function CEODashboardPage() {
               ].map((g) => (
                 <div key={g.label} className={`text-center p-2 rounded-lg ${g.bg}`}>
                   <div className={`font-bold ${g.color}`}>{g.range}</div>
-                  <div className="text-navy-400">{g.label}</div>
+                  <div className="text-navy-600">{g.label}</div>
                 </div>
               ))}
             </div>
@@ -182,7 +182,7 @@ export default function CEODashboardPage() {
         <div className="philix-card p-5">
           <div className="mb-4">
             <h3 className="section-title">Top Collectors — This Month</h3>
-            <p className="text-xs text-navy-400">Collection performance leaderboard</p>
+            <p className="text-xs text-navy-600">Collection performance leaderboard</p>
           </div>
           <div className="space-y-4">
             {mockTopOfficers.map((officer, i) => (
@@ -190,7 +190,7 @@ export default function CEODashboardPage() {
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
                   i === 0 ? "bg-gold-500 text-navy-950" :
                   i === 1 ? "bg-warm-300 text-navy-700" :
-                  i === 2 ? "bg-orange-100 text-orange-700" : "bg-warm-100 text-navy-400"
+                  i === 2 ? "bg-orange-100 text-orange-700" : "bg-warm-100 text-navy-600"
                 }`}>
                   #{i + 1}
                 </div>
@@ -208,7 +208,7 @@ export default function CEODashboardPage() {
                       }}
                     />
                   </div>
-                  <div className="flex justify-between text-xs text-navy-400 mt-0.5">
+                  <div className="flex justify-between text-xs text-navy-600 mt-0.5">
                     <span>{officer.loansIssued} loans</span>
                     <span>{officer.collectionRate}% rate</span>
                   </div>
@@ -222,7 +222,7 @@ export default function CEODashboardPage() {
         <div className="philix-card p-5">
           <div className="mb-4">
             <h3 className="section-title">Projected Metrics</h3>
-            <p className="text-xs text-navy-400">Based on current trajectory</p>
+            <p className="text-xs text-navy-600">Based on current trajectory</p>
           </div>
           <div className="space-y-3">
             {[
@@ -234,7 +234,7 @@ export default function CEODashboardPage() {
               <div key={p.label} className="flex items-center justify-between p-3 bg-warm-50 border border-warm-200 rounded-lg">
                 <div>
                   <div className="text-xs text-navy-600 font-medium">{p.label}</div>
-                  <div className="text-xs text-navy-400 mt-0.5">{p.sub}</div>
+                  <div className="text-xs text-navy-600 mt-0.5">{p.sub}</div>
                 </div>
                 <div className={`text-base font-bold font-mono ${p.color} ml-4 flex-shrink-0`}>{p.value}</div>
               </div>
@@ -248,7 +248,7 @@ export default function CEODashboardPage() {
         <div className="flex items-center justify-between mb-5">
           <div>
             <h3 className="section-title">Campus Performance</h3>
-            <p className="text-xs text-navy-400">Portfolio breakdown by university campus — UNZA · CBU · UNILUS</p>
+            <p className="text-xs text-navy-600">Portfolio breakdown by university campus — UNZA · CBU · UNILUS</p>
           </div>
           <span className="text-xs bg-gold-100 text-gold-800 border border-gold-300 px-2.5 py-1 rounded-full font-semibold">§5.8 Report</span>
         </div>
@@ -262,7 +262,7 @@ export default function CEODashboardPage() {
           ].map(t => (
             <div key={t.label} className="text-center p-3 bg-navy-900 rounded-xl">
               <div className="text-lg font-bold font-mono text-gold-400">{t.value}</div>
-              <div className="text-xs text-navy-300 mt-0.5">{t.label}</div>
+              <div className="text-xs text-navy-500 mt-0.5">{t.label}</div>
             </div>
           ))}
         </div>
@@ -282,7 +282,7 @@ export default function CEODashboardPage() {
                   </div>
                   <div>
                     <div className="font-bold text-navy-900 text-sm" style={{ fontFamily: "Fraunces, serif" }}>{campus.campus}</div>
-                    <div className="text-[10px] text-navy-400">{campus.clients} clients · {campus.activeLoans} active</div>
+                    <div className="text-[10px] text-navy-600">{campus.clients} clients · {campus.activeLoans} active</div>
                   </div>
                 </div>
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
@@ -294,25 +294,25 @@ export default function CEODashboardPage() {
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between text-xs">
-                  <span className="text-navy-400">Disbursed</span>
+                  <span className="text-navy-600">Disbursed</span>
                   <span className="font-mono font-semibold text-navy-800">{formatKwacha(campus.totalDisbursed)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-navy-400">Outstanding</span>
+                  <span className="text-navy-600">Outstanding</span>
                   <span className="font-mono font-semibold text-navy-800">{formatKwacha(campus.totalOutstanding)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-navy-400">Collected</span>
+                  <span className="text-navy-600">Collected</span>
                   <span className="font-mono font-semibold text-emerald-700">{formatKwacha(campus.totalCollected)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-navy-400">Overdue Loans</span>
+                  <span className="text-navy-600">Overdue Loans</span>
                   <span className={`font-semibold ${campus.overdueLoans > 10 ? "text-red-600" : "text-amber-600"}`}>{campus.overdueLoans}</span>
                 </div>
               </div>
               {/* Collection rate bar */}
               <div className="mt-3">
-                <div className="flex justify-between text-[10px] text-navy-400 mb-1">
+                <div className="flex justify-between text-[10px] text-navy-600 mb-1">
                   <span>Collection Rate</span>
                   <span className="font-semibold text-navy-700">{campus.collectionRate}%</span>
                 </div>
