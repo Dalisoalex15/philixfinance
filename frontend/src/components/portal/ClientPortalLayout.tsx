@@ -75,7 +75,8 @@ export default function ClientPortalLayout() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-slate-200 text-sm truncate">{client.firstName} {client.lastName}</div>
-                <div className="text-xs text-indigo-400 font-mono">{client.clientNumber}</div>
+                <div className="text-xs text-slate-400 truncate">{client.email}</div>
+                <div className="text-[10px] text-indigo-400 font-mono">{client.clientNumber}</div>
                 <div className="flex items-center gap-1 mt-0.5">
                   <div className={`w-1.5 h-1.5 rounded-full ${client.status === "ACTIVE" ? "bg-emerald-400" : "bg-amber-400"}`} />
                   <span className="text-[10px] text-slate-500 capitalize">{client.status.toLowerCase().replace("_", " ")}</span>
@@ -152,7 +153,10 @@ export default function ClientPortalLayout() {
           <button onClick={() => setMobileOpen(true)} className="lg:hidden text-slate-500 hover:text-slate-300 p-1">
             <Menu size={20} />
           </button>
-          <div className="flex-1 min-w-0">
+          <div className="lg:hidden">
+            <PhilixLogo variant="full" size="sm" />
+          </div>
+          <div className="flex-1 min-w-0 hidden lg:block">
             <div className="text-sm font-semibold text-slate-300 truncate">
               {[...navItems, { href: "/portal/calculator", label: "Loan Calculator" }].find(n => n.href === location.pathname)?.label ?? "Client Portal"}
             </div>
