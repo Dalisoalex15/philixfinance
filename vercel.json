@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd backend && npm install && npx prisma generate --schema=./prisma/schema.prod.prisma && npx prisma db push --schema=./prisma/schema.prod.prisma --accept-data-loss && npx tsx prisma/seed.ts ; cd ../frontend && npm install && npm run build",
+  "buildCommand": "cd backend && npm install && npx prisma generate --schema=./prisma/schema.prod.prisma && npx prisma db push --schema=./prisma/schema.prod.prisma --accept-data-loss && (npx tsx prisma/seed.ts || true) && cd ../frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
   "installCommand": "echo skip",
   "rewrites": [
