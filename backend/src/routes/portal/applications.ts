@@ -20,7 +20,12 @@ router.get("/staff/all", authenticate, wrap(async (_req: Request, res: Response)
       },
     },
   });
-  res.json(apps);
+  // Parse collateralPhotos JSON back to array for frontend
+  const parsed = apps.map(a => ({
+    ...a,
+    collateralPhotos: a.collateralPhotos ? JSON.parse(a.collateralPhotos) : [],
+  }));
+  res.json(parsed);
 }));
 
 // Staff-only: PATCH /api/portal/applications/staff/:id
@@ -56,7 +61,7 @@ router.post("/", wrap(async (req: Request, res: Response) => {
   const {
     productType, amountRequested, termMonths, purpose, description,
     occupation, employer, employerPhone, monthlyIncome, payDate,
-    collateralType, collateralDesc, collateralValue,
+    collateralType, collateralDesc, collateralValue, collateralPhotos,
     ref1Name, ref1Phone, ref1Relation, ref2Name, ref2Phone, ref2Relation,
   } = req.body;
 
@@ -82,6 +87,9 @@ router.post("/", wrap(async (req: Request, res: Response) => {
       collateralType,
       collateralDesc,
       collateralValue: collateralValue ? parseFloat(collateralValue) : null,
+      collateralPhotos: Array.isArray(collateralPhotos) && collateralPhotos.length > 0
+        ? JSON.stringify(collateralPhotos)
+        : null,
       ref1Name, ref1Phone, ref1Relation,
       ref2Name, ref2Phone, ref2Relation,
     },

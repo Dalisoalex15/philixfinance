@@ -29,6 +29,7 @@ export interface LoanApplication {
   collateralDescription: string;
   collateralValue: number;
   collateralCondition: string;
+  collateralPhotos?: string[];
   ref1Name?: string;
   ref1Phone?: string;
   ref1Relation?: string;
@@ -69,6 +70,7 @@ function fromApiApp(a: StaffPortalApplication): LoanApplication {
     collateralDescription: a.collateralDesc ?? "",
     collateralValue: a.collateralValue ?? 0,
     collateralCondition: "",
+    collateralPhotos: a.collateralPhotos ?? [],
     ref1Name: a.ref1Name,
     ref1Phone: a.ref1Phone,
     ref1Relation: a.ref1Relation,

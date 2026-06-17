@@ -211,7 +211,7 @@ export default function OnlineApplicationsPage() {
             )}
 
             {/* Collateral */}
-            {(selected.collateralType || selected.collateralDescription || selected.collateralValue) && (
+            {(selected.collateralType || selected.collateralDescription || selected.collateralValue || (selected.collateralPhotos && selected.collateralPhotos.length > 0)) && (
               <section>
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-6 h-6 rounded bg-amber-600/20 flex items-center justify-center">
@@ -219,12 +219,28 @@ export default function OnlineApplicationsPage() {
                   </div>
                   <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Collateral</span>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2 mb-3">
                   <Field label="Type" value={selected.collateralType} />
                   <Field label="Description" value={selected.collateralDescription} />
                   <Field label="Estimated Value" value={selected.collateralValue ? formatKwacha(selected.collateralValue) : undefined} />
                   {selected.collateralCondition && <Field label="Condition" value={selected.collateralCondition} />}
                 </div>
+                {selected.collateralPhotos && selected.collateralPhotos.length > 0 && (
+                  <div>
+                    <div className="text-xs text-slate-500 mb-2">{selected.collateralPhotos.length} photo{selected.collateralPhotos.length > 1 ? "s" : ""} uploaded</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {selected.collateralPhotos.map((src, i) => (
+                        <a key={i} href={src} target="_blank" rel="noopener noreferrer" className="block">
+                          <img
+                            src={src}
+                            alt={`Collateral photo ${i + 1}`}
+                            className="w-full h-36 object-cover rounded-xl border border-slate-700 hover:border-amber-500 transition-colors cursor-zoom-in"
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </section>
             )}
 

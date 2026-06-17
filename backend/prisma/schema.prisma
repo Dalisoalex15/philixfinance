@@ -134,9 +134,10 @@ model PortalLoanApplication {
   employerPhone   String?
   monthlyIncome   Float?
   payDate         String?
-  collateralType  String?
-  collateralDesc  String?
-  collateralValue Float?
+  collateralType   String?
+  collateralDesc   String?
+  collateralValue  Float?
+  collateralPhotos String?
   ref1Name        String?
   ref1Phone       String?
   ref1Relation    String?

@@ -109,6 +109,7 @@ export interface StaffPortalApplication {
   collateralType?: string;
   collateralDesc?: string;
   collateralValue?: number;
+  collateralPhotos?: string[];
   ref1Name?: string;
   ref1Phone?: string;
   ref1Relation?: string;

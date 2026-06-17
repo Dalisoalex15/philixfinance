@@ -103,6 +103,15 @@ export default function LoanApplicationPage() {
     return Object.keys(e).length === 0;
   };
 
+  async function toBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
   const next = async () => {
     if (!validate()) return;
     if (step < 5) {
@@ -111,6 +120,11 @@ export default function LoanApplicationPage() {
       setSubmitting(true);
       setSubmitError("");
       try {
+        // Convert photos to base64 data URLs
+        const photoBase64 = form.collateralPhotos.length > 0
+          ? await Promise.all(form.collateralPhotos.map(toBase64))
+          : [];
+
         await portalApi.submitApplication({
           productType: selectedProduct?.id ?? selectedProduct?.name ?? "",
           amountRequested: loanAmount,
@@ -118,10 +132,19 @@ export default function LoanApplicationPage() {
           purpose: form.purpose,
           occupation: form.occupation,
           employer: form.employer,
+          employerPhone: form.employerPhone || undefined,
           monthlyIncome: Number(form.monthlyIncome) || undefined,
+          payDate: form.payDate || undefined,
           collateralType: form.collateralType || undefined,
           collateralDesc: form.collateralDescription || undefined,
           collateralValue: Number(form.collateralValue) || undefined,
+          collateralPhotos: photoBase64.length > 0 ? photoBase64 : undefined,
+          ref1Name: form.ref1Name || undefined,
+          ref1Phone: form.ref1Phone || undefined,
+          ref1Relation: form.ref1Relationship || undefined,
+          ref2Name: form.ref2Name || undefined,
+          ref2Phone: form.ref2Phone || undefined,
+          ref2Relation: form.ref2Relationship || undefined,
         });
         // Also save to local store for immediate UI
         submitApplication({
@@ -145,6 +168,7 @@ export default function LoanApplicationPage() {
           collateralDescription: form.collateralDescription,
           collateralValue: Number(form.collateralValue) || 0,
           collateralCondition: form.collateralCondition,
+          collateralPhotos: photoBase64,
           status: "PENDING",
         });
         setStep(6);

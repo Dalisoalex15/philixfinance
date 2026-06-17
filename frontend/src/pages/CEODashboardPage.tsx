@@ -167,6 +167,20 @@ export default function CEODashboardPage() {
                     {" · Submitted "}
                     {new Date(app.submittedAt).toLocaleDateString("en-ZM", { day: "numeric", month: "short", year: "numeric" })}
                   </div>
+                  {app.collateralPhotos && app.collateralPhotos.length > 0 && (
+                    <div className="flex gap-1.5 mt-2 flex-wrap">
+                      {app.collateralPhotos.slice(0, 4).map((src, i) => (
+                        <a key={i} href={src} target="_blank" rel="noopener noreferrer">
+                          <img src={src} alt={`Collateral ${i + 1}`} className="w-12 h-12 object-cover rounded-lg border border-warm-300 hover:border-gold-400 transition-colors" />
+                        </a>
+                      ))}
+                      {app.collateralPhotos.length > 4 && (
+                        <div className="w-12 h-12 rounded-lg bg-warm-100 border border-warm-300 flex items-center justify-center text-xs font-semibold text-navy-600">
+                          +{app.collateralPhotos.length - 4}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 ml-4 flex-shrink-0">
                   <button
