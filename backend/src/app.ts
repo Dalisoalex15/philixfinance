@@ -128,6 +128,17 @@ app.use("/api/portal/applications", portalApplicationRoutes);
 app.use("/api/portal/kyc", portalKycRoutes);
 app.use("/api/portal/notifications", portalNotificationRoutes);
 
+// Temporary debug
+app.get("/api/debug-env", (_req, res) => {
+  const dbUrl = process.env.DATABASE_URL;
+  res.json({
+    DATABASE_URL_SET: !!dbUrl,
+    DATABASE_URL_PREFIX: dbUrl ? dbUrl.substring(0, 15) + "..." : "MISSING",
+    JWT_SECRET_SET: !!process.env.JWT_SECRET,
+    NODE_ENV: process.env.NODE_ENV,
+  });
+});
+
 app.use((_req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
