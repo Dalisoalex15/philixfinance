@@ -129,13 +129,23 @@ app.use("/api/portal/kyc", portalKycRoutes);
 app.use("/api/portal/notifications", portalNotificationRoutes);
 
 // Temporary debug
-app.get("/api/debug-env", (_req, res) => {
+app.get("/api/debug-env", async (_req, res) => {
   const dbUrl = process.env.DATABASE_URL;
+  let neonTest = "not tested";
+  try {
+    const { neon } = require("@neondatabase/serverless");
+    const sql = neon(dbUrl!);
+    const result = await sql`SELECT 1 as n`;
+    neonTest = `ok: ${JSON.stringify(result)}`;
+  } catch (e: any) {
+    neonTest = `error: ${e.message}`;
+  }
   res.json({
     DATABASE_URL_SET: !!dbUrl,
-    DATABASE_URL_PREFIX: dbUrl ? dbUrl.substring(0, 15) + "..." : "MISSING",
+    DATABASE_URL_PREFIX: dbUrl ? dbUrl.substring(0, 20) + "..." : "MISSING",
     JWT_SECRET_SET: !!process.env.JWT_SECRET,
     NODE_ENV: process.env.NODE_ENV,
+    neonTest,
   });
 });
 
