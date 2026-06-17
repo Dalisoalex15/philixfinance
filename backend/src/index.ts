@@ -56,8 +56,17 @@ app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (curl, mobile apps, server-to-server)
     if (!origin) return callback(null, true);
-    // Allow any localhost port or local network IP
-    if (allowedOrigins.includes(origin) || /^http:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+):\d+$/.test(origin)) {
+    if (
+      allowedOrigins.includes(origin) ||
+      // Any localhost port or local network IP
+      /^http:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+)(:\d+)?$/.test(origin) ||
+      // Vercel deployments (*.vercel.app)
+      /^https:\/\/[\w-]+(\.vercel\.app)$/.test(origin) ||
+      // Railway deployments (*.up.railway.app)
+      /^https:\/\/[\w-]+(\.up\.railway\.app)$/.test(origin) ||
+      // Custom domain (philixfinance.com or www.philixfinance.com)
+      /^https?:\/\/(www\.)?philixfinance\.com$/.test(origin)
+    ) {
       return callback(null, true);
     }
     callback(new Error("Not allowed by CORS"));

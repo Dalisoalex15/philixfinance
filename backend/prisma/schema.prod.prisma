@@ -1,0 +1,174 @@
+// Philix Finance - PRODUCTION schema (PostgreSQL)
+// Used for Railway/Render/Supabase deployment
+// Local dev uses schema.prisma (SQLite)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// STAFF AUTH
+// ============================================================
+
+model User {
+  id               String     @id @default(uuid())
+  employeeId       String     @unique
+  firstName        String
+  lastName         String
+  email            String     @unique
+  phone            String
+  passwordHash     String
+  role             String     @default("LOAN_OFFICER")
+  status           String     @default("ACTIVE")
+  branchId         String?
+  avatarUrl        String?
+  mfaEnabled       Boolean    @default(false)
+  mfaSecret        String?
+  lastLoginAt      DateTime?
+  lastLoginIp      String?
+  failedLoginCount Int        @default(0)
+  lockedUntil      DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  refreshTokens    RefreshToken[]
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+  ipAddress String?
+  userAgent String?
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  action      String
+  entity      String
+  entityId    String?
+  oldValue    String?
+  newValue    String?
+  description String
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+}
+
+// ============================================================
+// CLIENT PORTAL
+// ============================================================
+
+model ClientPortalAccount {
+  id                String   @id @default(uuid())
+  clientNumber      String   @unique
+  email             String   @unique
+  passwordHash      String
+  firstName         String
+  lastName          String
+  phone             String
+  dateOfBirth       DateTime?
+  gender            String?
+  address           String?
+  city              String?
+  occupation        String?
+  employer          String?
+  monthlyIncome     Float?
+  nrcNumber         String?
+  kycStatus         String   @default("NOT_STARTED")
+  kycSubmittedAt    DateTime?
+  kycVerifiedAt     DateTime?
+  kycRejectedReason String?
+  status            String   @default("PENDING_KYC")
+  linkedClientId    String?  @unique
+  failedLoginCount  Int      @default(0)
+  lockedUntil       DateTime?
+  lastLoginAt       DateTime?
+  emailVerified     Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  portalLoans         PortalLoanApplication[]
+  portalRefreshTokens PortalRefreshToken[]
+  notifications       ClientNotification[]
+  kycDocuments        KycDocument[]
+
+  @@index([email])
+  @@index([clientNumber])
+}
+
+model PortalRefreshToken {
+  id          String              @id @default(uuid())
+  token       String              @unique
+  accountId   String
+  account     ClientPortalAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  expiresAt   DateTime
+  createdAt   DateTime            @default(now())
+}
+
+model PortalLoanApplication {
+  id              String              @id @default(uuid())
+  reference       String              @unique
+  accountId       String
+  account         ClientPortalAccount @relation(fields: [accountId], references: [id])
+  productType     String
+  amountRequested Float
+  termMonths      Int
+  purpose         String
+  description     String?
+  occupation      String?
+  employer        String?
+  employerPhone   String?
+  monthlyIncome   Float?
+  payDate         String?
+  collateralType   String?
+  collateralDesc   String?
+  collateralValue  Float?
+  collateralPhotos String?
+  ref1Name        String?
+  ref1Phone       String?
+  ref1Relation    String?
+  ref2Name        String?
+  ref2Phone       String?
+  ref2Relation    String?
+  status          String   @default("SUBMITTED")
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  rejectedReason  String?
+  linkedLoanId    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ClientNotification {
+  id           String              @id @default(uuid())
+  accountId    String
+  account      ClientPortalAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  subject      String
+  body         String
+  category     String
+  isRead       Boolean  @default(false)
+  sentViaEmail Boolean  @default(false)
+  createdAt    DateTime @default(now())
+}
+
+model KycDocument {
+  id         String              @id @default(uuid())
+  accountId  String
+  account    ClientPortalAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  docType    String
+  fileUrl    String
+  fileName   String
+  mimeType   String   @default("image/jpeg")
+  uploadedAt DateTime @default(now())
+}
