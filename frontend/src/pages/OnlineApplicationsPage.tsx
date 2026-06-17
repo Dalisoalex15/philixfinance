@@ -1,66 +1,65 @@
-import { useState } from "react";
-import { ExternalLink, Eye, CheckCircle, XCircle, AlertCircle, Clock, Send } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ExternalLink, Eye, CheckCircle, XCircle, AlertCircle, Clock, Send, RefreshCw, User, Briefcase, Shield, Users } from "lucide-react";
 import { formatKwacha, formatDate, getStatusColor } from "../lib/mock-data";
 import { useLoanApplicationStore, type LoanApplication } from "../store/loanApplicationStore";
 import { staffApi } from "../lib/api";
 import { toast } from "../store/toastStore";
 
-// Adapter: map store LoanApplication → display shape used by this page
-function toDisplayApp(a: LoanApplication) {
-  const parts = a.clientName.split(" ");
-  return {
-    id: a.id,
-    firstName: parts[0] ?? a.clientName,
-    lastName: parts.slice(1).join(" ") || "",
-    nrcNumber: "—",
-    phone: a.clientPhone,
-    email: a.clientEmail,
-    collateralType: a.collateralType || "—",
-    collateralBrand: a.collateralDescription || "—",
-    collateralModel: "",
-    loanAmount: a.amount,
-    loanPurpose: a.purpose,
-    status: a.status === "PENDING" ? "SUBMITTED" : a.status,
-    applicationRef: a.ref,
-    submittedAt: a.submittedAt,
-    clientType: a.occupation || "Individual",
-    reviewNotes: "",
-    // extra
-    productName: a.productName,
-    rateDuration: a.rateDuration,
-    totalRepayable: a.totalRepayable,
-    storeId: a.id,
-  };
-}
-
 export default function OnlineApplicationsPage() {
-  const { applications: storeApps, updateStatus } = useLoanApplicationStore();
-  const displayApps = storeApps.map(toDisplayApp);
-  type DisplayApp = ReturnType<typeof toDisplayApp>;
-  const [selected, setSelected] = useState<DisplayApp | null>(null);
+  const { applications, updateStatus, syncFromApi } = useLoanApplicationStore();
+  const [selected, setSelected] = useState<LoanApplication | null>(null);
   const [note, setNote] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState("ALL");
 
-  const handleAction = (id: string, newStatus: string) => {
-    updateStatus(id, newStatus as LoanApplication["status"]);
-    setSelected(prev => prev?.storeId === id ? { ...prev, status: newStatus } : prev);
-    staffApi.updateApplicationStatus(id, newStatus, note || undefined).catch(() => {});
-    const label = newStatus === "APPROVED" ? "approved" : newStatus === "REJECTED" ? "rejected" : newStatus === "DISBURSED" ? "marked as disbursed" : newStatus.toLowerCase().replace("_", " ");
-    const app = storeApps.find(a => a.id === id);
-    const type = newStatus === "REJECTED" ? "error" : newStatus === "APPROVED" || newStatus === "DISBURSED" ? "success" : "info";
-    toast[type](`Application ${app?.ref ?? id} ${label}`);
+  useEffect(() => { syncFromApi(); }, []);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    await syncFromApi();
+    setSyncing(false);
+  };
+
+  const handleAction = async (id: string, newStatus: string) => {
+    setActionLoading(id);
+    try {
+      await staffApi.updateApplicationStatus(id, newStatus, note || undefined);
+      updateStatus(id, newStatus as LoanApplication["status"]);
+      setSelected(prev => prev?.id === id ? { ...prev, status: newStatus as LoanApplication["status"] } : prev);
+      const app = applications.find(a => a.id === id);
+      const label = newStatus === "APPROVED" ? "approved" : newStatus === "REJECTED" ? "rejected" : newStatus === "DISBURSED" ? "marked as disbursed" : newStatus.toLowerCase().replace("_", " ");
+      const type = newStatus === "REJECTED" ? "error" : newStatus === "APPROVED" || newStatus === "DISBURSED" ? "success" : "info";
+      toast[type](`Application ${app?.ref ?? id} ${label}`);
+    } catch {
+      toast.error("Action failed — please try again");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const statusMeta: Record<string, { icon: React.ElementType; color: string; bg: string; label: string }> = {
+    PENDING:      { icon: Clock,         color: "text-amber-400",   bg: "bg-amber-900/20 border-amber-800/40",   label: "Pending" },
+    UNDER_REVIEW: { icon: Eye,           color: "text-blue-400",    bg: "bg-blue-900/20 border-blue-800/40",     label: "Under Review" },
+    APPROVED:     { icon: CheckCircle,   color: "text-emerald-400", bg: "bg-emerald-900/20 border-emerald-800/40", label: "Approved" },
+    REJECTED:     { icon: XCircle,       color: "text-red-400",     bg: "bg-red-900/20 border-red-800/40",       label: "Rejected" },
+    DISBURSED:    { icon: Send,          color: "text-indigo-400",  bg: "bg-indigo-900/20 border-indigo-800/40", label: "Disbursed" },
   };
 
   const counts: Record<string, number> = {};
-  displayApps.forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1; });
+  applications.forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1; });
 
-  const statusMeta: Record<string, { icon: React.ElementType; color: string; label: string }> = {
-    DRAFT: { icon: Clock, color: "text-slate-400", label: "Draft" },
-    SUBMITTED: { icon: Send, color: "text-blue-400", label: "Submitted" },
-    UNDER_REVIEW: { icon: Eye, color: "text-amber-400", label: "Under Review" },
-    INFO_REQUIRED: { icon: AlertCircle, color: "text-orange-400", label: "Info Required" },
-    APPROVED: { icon: CheckCircle, color: "text-emerald-400", label: "Approved" },
-    REJECTED: { icon: XCircle, color: "text-red-400", label: "Rejected" },
-  };
+  const filtered = statusFilter === "ALL" ? applications : applications.filter(a => a.status === statusFilter);
+
+  function Field({ label, value }: { label: string; value?: string | number | null }) {
+    if (!value && value !== 0) return null;
+    return (
+      <div className="bg-slate-800/50 rounded-lg p-2.5">
+        <div className="text-xs text-slate-500">{label}</div>
+        <div className="text-sm font-medium text-slate-200 mt-0.5">{value}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -70,50 +69,63 @@ export default function OnlineApplicationsPage() {
           <p className="page-subtitle">Review and process client self-service loan applications</p>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={handleSync} disabled={syncing} className="btn-secondary text-xs py-1.5">
+            <RefreshCw size={12} className={syncing ? "animate-spin" : ""} /> Refresh
+          </button>
           <span className="text-xs text-slate-500">Portal URL:</span>
           <span className="text-xs font-mono text-indigo-400 bg-slate-800 px-2 py-1 rounded">apply.philixfinance.com</span>
           <button className="btn-secondary text-xs py-1.5"><ExternalLink size={12} /> Visit</button>
         </div>
       </div>
 
-      {/* Status Overview */}
-      <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
+      {/* Status Tabs */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          onClick={() => setStatusFilter("ALL")}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${statusFilter === "ALL" ? "bg-indigo-600 text-white" : "bg-slate-800 text-slate-400 hover:text-slate-200"}`}
+        >
+          All ({applications.length})
+        </button>
         {Object.entries(statusMeta).map(([status, meta]) => (
-          <div key={status} className="philix-card p-3 text-center">
-            <meta.icon size={18} className={`${meta.color} mx-auto mb-1`} />
-            <div className={`text-xl font-bold ${meta.color}`}>{counts[status] || 0}</div>
-            <div className="text-xs text-slate-500">{meta.label}</div>
-          </div>
+          <button
+            key={status}
+            onClick={() => setStatusFilter(status)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${statusFilter === status ? "bg-slate-700 text-white" : "bg-slate-800/50 text-slate-400 hover:text-slate-200"}`}
+          >
+            <meta.icon size={12} className={meta.color} />
+            {meta.label} {counts[status] ? `(${counts[status]})` : "(0)"}
+          </button>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Application List */}
-        <div className="space-y-3">
-          {displayApps.length === 0 && (
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Application List — 2 cols */}
+        <div className="lg:col-span-2 space-y-2">
+          {filtered.length === 0 && (
             <div className="philix-card p-10 text-center text-slate-500 text-sm">
-              No client applications yet. They will appear here when clients submit loan applications through the portal.
+              {statusFilter === "ALL" ? "No applications yet. They appear here when clients submit through the portal." : `No ${statusMeta[statusFilter]?.label} applications.`}
             </div>
           )}
-          {displayApps.map(app => {
-            const meta = statusMeta[app.status] ?? statusMeta.SUBMITTED;
+          {filtered.map(app => {
+            const meta = statusMeta[app.status] ?? statusMeta.PENDING;
+            const initials = app.clientName.split(" ").map(p => p[0]).slice(0, 2).join("");
             return (
-              <button key={app.id} onClick={() => setSelected(app)}
+              <button key={app.id} onClick={() => { setSelected(app); setNote(""); }}
                 className={`w-full text-left philix-card p-4 transition-all hover:border-indigo-700 ${selected?.id === app.id ? "border-indigo-600 border" : ""}`}>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-indigo-600/20 flex items-center justify-center font-bold text-indigo-400 flex-shrink-0">
-                    {app.firstName[0]}{app.lastName[0]}
+                  <div className="w-10 h-10 rounded-full bg-indigo-600/20 flex items-center justify-center font-bold text-indigo-400 flex-shrink-0 text-sm">
+                    {initials}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-200">{app.firstName} {app.lastName}</span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-slate-200 text-sm">{app.clientName}</span>
                       <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${meta.color} bg-slate-800`}>{meta.label}</span>
                     </div>
-                    <div className="text-xs text-slate-500 mt-0.5">{app.applicationRef} · {app.collateralType}: {app.collateralBrand} {app.collateralModel}</div>
+                    <div className="text-xs text-slate-500 mt-0.5 truncate">{app.ref} · {app.productName}</div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-bold text-slate-100">{formatKwacha(app.loanAmount)}</div>
-                    <div className="text-xs text-slate-500">{app.submittedAt ? formatDate(app.submittedAt) : "Draft"}</div>
+                  <div className="text-right flex-shrink-0">
+                    <div className="font-bold text-slate-100 text-sm">{formatKwacha(app.amount)}</div>
+                    <div className="text-xs text-slate-500">{app.submittedAt ? formatDate(app.submittedAt) : "—"}</div>
                   </div>
                 </div>
               </button>
@@ -121,74 +133,185 @@ export default function OnlineApplicationsPage() {
           })}
         </div>
 
-        {/* Detail Panel */}
+        {/* Detail Panel — 3 cols */}
         {selected ? (
-          <div className="philix-card p-5 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-indigo-600/20 flex items-center justify-center font-bold text-indigo-400 text-lg flex-shrink-0">
-                {selected.firstName[0]}{selected.lastName[0]}
+          <div className="lg:col-span-3 philix-card p-5 space-y-5 overflow-y-auto" style={{ maxHeight: "calc(100vh - 200px)" }}>
+            {/* Header */}
+            <div className="flex items-start gap-3">
+              <div className="w-14 h-14 rounded-full bg-indigo-600/20 flex items-center justify-center font-bold text-indigo-400 text-xl flex-shrink-0">
+                {selected.clientName.split(" ").map(p => p[0]).slice(0, 2).join("")}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-slate-100 text-lg leading-tight">{selected.clientName}</div>
+                <div className="text-xs text-slate-500 mt-0.5 space-x-2">
+                  {selected.clientNumber && <span className="font-mono">{selected.clientNumber}</span>}
+                  <span>{selected.clientEmail}</span>
+                </div>
+                <div className="text-xs text-slate-500">{selected.clientPhone}</div>
               </div>
               <div>
-                <div className="font-bold text-slate-100 text-lg">{selected.firstName} {selected.lastName}</div>
-                <div className="text-xs text-slate-500">{selected.applicationRef} · {selected.clientType}</div>
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${statusMeta[selected.status]?.bg ?? ""} ${statusMeta[selected.status]?.color ?? ""}`}>
+                  {statusMeta[selected.status]?.label ?? selected.status}
+                </span>
+                {selected.reviewedAt && (
+                  <div className="text-xs text-slate-500 mt-1 text-right">Reviewed {formatDate(selected.reviewedAt)}</div>
+                )}
               </div>
-              <span className={`ml-auto text-xs font-bold px-2 py-1 rounded-full ${getStatusColor(selected.status)}`}>{selected.status}</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: "NRC", value: selected.nrcNumber },
-                { label: "Phone", value: selected.phone },
-                { label: "Email", value: selected.email || "—" },
-                { label: "Loan Amount", value: formatKwacha(selected.loanAmount) },
-                { label: "Collateral", value: `${selected.collateralBrand} ${selected.collateralModel}` },
-                { label: "Type", value: selected.collateralType },
-              ].map(f => (
-                <div key={f.label} className="bg-slate-800/50 rounded p-2.5">
-                  <div className="text-xs text-slate-500">{f.label}</div>
-                  <div className="text-sm font-medium text-slate-200 mt-0.5">{f.value}</div>
+            {selected.rejectedReason && (
+              <div className="flex items-start gap-2 p-3 bg-red-900/20 border border-red-800/40 rounded-xl">
+                <XCircle size={14} className="text-red-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <div className="text-xs font-semibold text-red-400">Rejection Reason</div>
+                  <div className="text-xs text-red-300 mt-0.5">{selected.rejectedReason}</div>
                 </div>
-              ))}
-            </div>
-
-            <div className="bg-slate-800/30 rounded-lg p-3">
-              <div className="text-xs text-slate-500 mb-1">Loan Purpose</div>
-              <div className="text-sm text-slate-300">{selected.loanPurpose}</div>
-            </div>
-
-            {selected.reviewNotes && (
-              <div className="bg-amber-900/20 border border-amber-800/40 rounded-lg p-3 text-xs text-amber-300">
-                <AlertCircle size={12} className="inline mr-1" />{selected.reviewNotes}
               </div>
             )}
 
-            <div>
-              <label className="text-xs text-slate-400 mb-1 block">Review Notes</label>
-              <textarea className="input-base" rows={2} value={note} onChange={e => setNote(e.target.value)} placeholder="Add notes for client or internal..." />
-            </div>
+            {/* Loan Details */}
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded bg-indigo-600/20 flex items-center justify-center">
+                  <Send size={12} className="text-indigo-400" />
+                </div>
+                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Loan Details</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Reference" value={selected.ref} />
+                <Field label="Product" value={selected.productName} />
+                <Field label="Amount Requested" value={formatKwacha(selected.amount)} />
+                <Field label="Term" value={selected.termMonths ? `${selected.termMonths} months` : selected.rateDuration} />
+                {selected.totalRepayable > selected.amount && (
+                  <Field label="Total Repayable" value={formatKwacha(selected.totalRepayable)} />
+                )}
+                <Field label="Purpose" value={selected.purpose} />
+                {selected.description && <Field label="Description" value={selected.description} />}
+                <Field label="Submitted" value={selected.submittedAt ? formatDate(selected.submittedAt) : undefined} />
+              </div>
+            </section>
 
-            {(selected.status === "SUBMITTED" || selected.status === "UNDER_REVIEW") && (
+            {/* Employment & Income */}
+            {(selected.occupation || selected.employer || selected.monthlyIncome) && (
+              <section>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 rounded bg-emerald-600/20 flex items-center justify-center">
+                    <Briefcase size={12} className="text-emerald-400" />
+                  </div>
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Employment & Income</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Occupation" value={selected.occupation} />
+                  <Field label="Employer" value={selected.employer} />
+                  <Field label="Employer Phone" value={selected.employerPhone} />
+                  <Field label="Monthly Income" value={selected.monthlyIncome ? formatKwacha(selected.monthlyIncome) : undefined} />
+                  <Field label="Pay Date" value={selected.payDate} />
+                </div>
+              </section>
+            )}
+
+            {/* Collateral */}
+            {(selected.collateralType || selected.collateralDescription || selected.collateralValue) && (
+              <section>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 rounded bg-amber-600/20 flex items-center justify-center">
+                    <Shield size={12} className="text-amber-400" />
+                  </div>
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Collateral</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Type" value={selected.collateralType} />
+                  <Field label="Description" value={selected.collateralDescription} />
+                  <Field label="Estimated Value" value={selected.collateralValue ? formatKwacha(selected.collateralValue) : undefined} />
+                  {selected.collateralCondition && <Field label="Condition" value={selected.collateralCondition} />}
+                </div>
+              </section>
+            )}
+
+            {/* References */}
+            {(selected.ref1Name || selected.ref2Name) && (
+              <section>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 rounded bg-blue-600/20 flex items-center justify-center">
+                    <Users size={12} className="text-blue-400" />
+                  </div>
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">References</span>
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  {selected.ref1Name && (
+                    <div className="bg-slate-800/50 rounded-lg p-3">
+                      <div className="text-xs text-slate-500 mb-1">Reference 1</div>
+                      <div className="text-sm font-semibold text-slate-200">{selected.ref1Name}</div>
+                      <div className="text-xs text-slate-400 mt-0.5">{selected.ref1Phone}{selected.ref1Relation ? ` · ${selected.ref1Relation}` : ""}</div>
+                    </div>
+                  )}
+                  {selected.ref2Name && (
+                    <div className="bg-slate-800/50 rounded-lg p-3">
+                      <div className="text-xs text-slate-500 mb-1">Reference 2</div>
+                      <div className="text-sm font-semibold text-slate-200">{selected.ref2Name}</div>
+                      <div className="text-xs text-slate-400 mt-0.5">{selected.ref2Phone}{selected.ref2Relation ? ` · ${selected.ref2Relation}` : ""}</div>
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* Client Identity */}
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded bg-slate-600/40 flex items-center justify-center">
+                  <User size={12} className="text-slate-400" />
+                </div>
+                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Client</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Full Name" value={selected.clientName} />
+                <Field label="Client Number" value={selected.clientNumber} />
+                <Field label="Email" value={selected.clientEmail} />
+                <Field label="Phone" value={selected.clientPhone} />
+              </div>
+            </section>
+
+            {/* Review Notes */}
+            <section>
+              <label className="text-xs text-slate-400 mb-1.5 block font-semibold">Review Notes</label>
+              <textarea className="input-base" rows={2} value={note} onChange={e => setNote(e.target.value)} placeholder="Add notes for client or internal records..." />
+            </section>
+
+            {/* Actions */}
+            {(selected.status === "PENDING" || selected.status === "UNDER_REVIEW") && (
               <div className="flex gap-2">
-                <button onClick={() => handleAction(selected.storeId, "APPROVED")} className="btn-success flex-1">
+                <button onClick={() => handleAction(selected.id, "APPROVED")} disabled={actionLoading === selected.id}
+                  className="btn-success flex-1 disabled:opacity-50">
                   <CheckCircle size={13} /> Approve
                 </button>
-                <button onClick={() => handleAction(selected.storeId, "UNDER_REVIEW")} className="btn-secondary flex-1">
-                  <AlertCircle size={13} /> Under Review
+                <button onClick={() => handleAction(selected.id, "UNDER_REVIEW")} disabled={actionLoading === selected.id}
+                  className="btn-secondary flex-1 disabled:opacity-50">
+                  <Eye size={13} /> Under Review
                 </button>
-                <button onClick={() => handleAction(selected.storeId, "REJECTED")} className="btn-danger flex-1">
+                <button onClick={() => handleAction(selected.id, "REJECTED")} disabled={actionLoading === selected.id}
+                  className="btn-danger flex-1 disabled:opacity-50">
                   <XCircle size={13} /> Reject
                 </button>
               </div>
             )}
             {selected.status === "APPROVED" && (
-              <button onClick={() => handleAction(selected.storeId, "DISBURSED")} className="btn-primary w-full">
+              <button onClick={() => handleAction(selected.id, "DISBURSED")} disabled={actionLoading === selected.id}
+                className="btn-primary w-full disabled:opacity-50">
                 Mark as Disbursed →
               </button>
             )}
+            {(selected.status === "REJECTED" || selected.status === "DISBURSED") && (
+              <div className="text-center text-xs text-slate-500 py-2">
+                {selected.status === "DISBURSED" ? "This application has been disbursed." : "This application was rejected."}
+              </div>
+            )}
           </div>
         ) : (
-          <div className="philix-card flex items-center justify-center text-slate-500 text-sm" style={{ minHeight: 300 }}>
-            Select an application to review
+          <div className="lg:col-span-3 philix-card flex flex-col items-center justify-center text-center py-16 text-slate-500">
+            <Eye size={32} className="mb-3 opacity-30" />
+            <div className="text-sm font-medium">Select an application</div>
+            <div className="text-xs mt-1">to review all details</div>
           </div>
         )}
       </div>

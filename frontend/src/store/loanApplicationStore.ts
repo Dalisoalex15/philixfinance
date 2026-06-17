@@ -9,22 +9,35 @@ export interface LoanApplication {
   clientName: string;
   clientEmail: string;
   clientPhone: string;
+  clientNumber?: string;
   productId: string;
   productName: string;
   rateDuration: string;
+  termMonths?: number;
   interestRate: number;
   amount: number;
   totalRepayable: number;
   weeklyPayment: number;
   purpose: string;
+  description?: string;
   occupation: string;
   employer: string;
+  employerPhone?: string;
   monthlyIncome: number;
+  payDate?: string;
   collateralType: string;
   collateralDescription: string;
   collateralValue: number;
   collateralCondition: string;
+  ref1Name?: string;
+  ref1Phone?: string;
+  ref1Relation?: string;
+  ref2Name?: string;
+  ref2Phone?: string;
+  ref2Relation?: string;
   status: "PENDING" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "DISBURSED";
+  rejectedReason?: string;
+  reviewedAt?: string;
   submittedAt: string;
 }
 
@@ -36,22 +49,35 @@ function fromApiApp(a: StaffPortalApplication): LoanApplication {
     clientName: a.account ? `${a.account.firstName} ${a.account.lastName}` : "Unknown",
     clientEmail: a.account?.email ?? "",
     clientPhone: a.account?.phone ?? "",
+    clientNumber: a.account?.clientNumber,
     productId: a.productType,
     productName: a.productType.replace(/_/g, " "),
     rateDuration: `${a.termMonths} months`,
+    termMonths: a.termMonths,
     interestRate: 0,
     amount: a.amountRequested,
     totalRepayable: a.amountRequested,
     weeklyPayment: 0,
     purpose: a.purpose,
+    description: a.description,
     occupation: a.occupation ?? "",
     employer: a.employer ?? "",
+    employerPhone: a.employerPhone,
     monthlyIncome: a.monthlyIncome ?? 0,
+    payDate: a.payDate,
     collateralType: a.collateralType ?? "",
     collateralDescription: a.collateralDesc ?? "",
     collateralValue: a.collateralValue ?? 0,
     collateralCondition: "",
+    ref1Name: a.ref1Name,
+    ref1Phone: a.ref1Phone,
+    ref1Relation: a.ref1Relation,
+    ref2Name: a.ref2Name,
+    ref2Phone: a.ref2Phone,
+    ref2Relation: a.ref2Relation,
     status: (a.status === "SUBMITTED" ? "PENDING" : a.status) as LoanApplication["status"],
+    rejectedReason: a.rejectedReason,
+    reviewedAt: a.reviewedAt,
     submittedAt: a.createdAt,
   };
 }
