@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { useAuthStore } from "./store/auth";
 import MainLayout from "./components/layout/MainLayout";
 import UnifiedLoginPage from "./pages/UnifiedLoginPage";
@@ -87,6 +88,23 @@ import PaymentSubmissionsPage from "./pages/PaymentSubmissionsPage";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
+  const [hydrated, setHydrated] = useState(() => useAuthStore.persist.hasHydrated());
+
+  useEffect(() => {
+    if (useAuthStore.persist.hasHydrated()) { setHydrated(true); return; }
+    const unsub = useAuthStore.persist.onFinishHydration(() => setHydrated(true));
+    const t = setTimeout(() => setHydrated(true), 300);
+    return () => { unsub(); clearTimeout(t); };
+  }, []);
+
+  if (!hydrated) {
+    return (
+      <div className="min-h-screen bg-warm-100 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 

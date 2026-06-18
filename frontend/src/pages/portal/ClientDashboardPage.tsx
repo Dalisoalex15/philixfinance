@@ -9,16 +9,17 @@ import {
 } from "lucide-react";
 import { mockLoanProducts } from "../../lib/mock-data";
 
+// Fields match what GET /api/portal/applications actually returns
 interface PortalApplication {
   id: string;
-  ref: string;
-  productName: string;
-  amount: number;
-  totalRepayable: number;
-  rateDuration: string;
+  reference: string;
+  productType: string;
+  amountRequested: number;
+  termMonths: number;
   purpose?: string;
   status: string;
-  submittedAt: string;
+  createdAt: string;
+  reviewedAt?: string | null;
 }
 
 const PRODUCT_COLORS = [
@@ -114,12 +115,11 @@ function OnboardingChecklist({ kycVerified }: { kycVerified: boolean }) {
 }
 
 export default function ClientDashboardPage() {
-  const client = useClientAuthStore(s => s.client)!;
+  const client = useClientAuthStore(s => s.client);
   const accessToken = useClientAuthStore(s => s.accessToken);
   const [myApplications, setMyApplications] = useState<PortalApplication[]>([]);
 
-  const initials = `${client.firstName[0]}${client.lastName[0]}`.toUpperCase();
-
+  // All hooks must be called before any early return
   useEffect(() => {
     if (!accessToken) return;
     fetch("/api/portal/applications", {
@@ -130,33 +130,33 @@ export default function ClientDashboardPage() {
       .catch(() => {});
   }, [accessToken]);
 
+  // Guard: portal layout should prevent this, but be safe
+  if (!client) return null;
+
+  const initials = `${(client.firstName?.[0] ?? "?")}${(client.lastName?.[0] ?? "")}`.toUpperCase();
+
   const activeLoanApp = myApplications.find(a => a.status === "DISBURSED" || a.status === "APPROVED");
   const hasActiveLoan = !!activeLoanApp;
-  const notifCount = myApplications.filter(a => a.status !== "PENDING").length;
+  const notifCount = myApplications.filter(a => a.status !== "SUBMITTED").length;
 
   const hourOfDay = new Date().getHours();
   const greeting = hourOfDay < 12 ? "Good morning" : hourOfDay < 17 ? "Good afternoon" : "Good evening";
 
-  // For the active loan card — derive simple progress from term
-  const termMonths = activeLoanApp
-    ? (() => {
-        const d = activeLoanApp.rateDuration ?? "";
-        const m = d.match(/(\d+)\s*month/i);
-        return m ? parseInt(m[1], 10) : 3;
-      })()
-    : 3;
-  const submittedMs = activeLoanApp ? new Date(activeLoanApp.submittedAt).getTime() : 0;
-  const monthsElapsed = activeLoanApp
+  // Safe date calculations — createdAt from API, with NaN protection
+  const termMonths = activeLoanApp?.termMonths ?? 3;
+  const submittedMs = activeLoanApp ? (new Date(activeLoanApp.createdAt).getTime() || 0) : 0;
+  const monthsElapsed = submittedMs > 0
     ? Math.min(termMonths, Math.floor((Date.now() - submittedMs) / (30 * 86400000)))
     : 0;
   const pct = termMonths > 0 ? Math.round((monthsElapsed / termMonths) * 100) : 0;
-  const nextPaymentDate = activeLoanApp
-    ? new Date(submittedMs + (monthsElapsed + 1) * 30 * 86400000).toISOString().slice(0, 10)
-    : "";
+  const nextPaymentMs = submittedMs > 0 ? submittedMs + (monthsElapsed + 1) * 30 * 86400000 : 0;
+  const nextPaymentDate = nextPaymentMs > 0 ? new Date(nextPaymentMs).toISOString().slice(0, 10) : "";
   const daysToNext = nextPaymentDate
     ? Math.ceil((new Date(nextPaymentDate).getTime() - Date.now()) / 86400000)
     : 0;
-  const monthlyPayment = activeLoanApp ? Math.round(activeLoanApp.totalRepayable / Math.max(termMonths, 1)) : 0;
+  const monthlyPayment = activeLoanApp
+    ? Math.round(activeLoanApp.amountRequested / Math.max(termMonths, 1))
+    : 0;
 
   return (
     <div className="space-y-6 pb-8">
@@ -190,7 +190,7 @@ export default function ClientDashboardPage() {
         {hasActiveLoan && activeLoanApp && (
           <div className="relative grid grid-cols-3 gap-3 mt-5">
             {[
-              { label: "Outstanding", value: `K${activeLoanApp.totalRepayable.toLocaleString()}`, color: "text-amber-400", sub: "active loan" },
+              { label: "Outstanding", value: `K${activeLoanApp.amountRequested.toLocaleString()}`, color: "text-amber-400", sub: "active loan" },
               { label: "Next Payment", value: `K${monthlyPayment.toLocaleString()}`, color: "text-slate-200", sub: `in ${daysToNext} day${daysToNext !== 1 ? "s" : ""}` },
               { label: "Term Progress", value: `${pct}%`, color: "text-emerald-400", sub: `${monthsElapsed}/${termMonths} months` },
             ].map(s => (
@@ -240,8 +240,8 @@ export default function ClientDashboardPage() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <div className="font-bold text-slate-200">{activeLoanApp.productName}</div>
-                <div className="text-xs text-slate-500 font-mono">{activeLoanApp.ref}</div>
+                <div className="font-bold text-slate-200">{activeLoanApp.productType.replace(/_/g, " ")}</div>
+                <div className="text-xs text-slate-500 font-mono">{activeLoanApp.reference}</div>
               </div>
               <span className="bg-emerald-900/40 border border-emerald-700/40 text-emerald-400 text-xs font-semibold px-3 py-1 rounded-full">{activeLoanApp.status}</span>
             </div>
@@ -397,9 +397,9 @@ export default function ClientDashboardPage() {
           <div className="space-y-3">
             {[
               { label: "Client Since", value: new Date(client.joinedAt).toLocaleDateString("en-GB", { month: "short", year: "numeric" }) },
-              { label: "Total Borrowed", value: `K${activeLoanApp.amount.toLocaleString()}` },
-              { label: "Total Repayable", value: `K${activeLoanApp.totalRepayable.toLocaleString()}` },
-              { label: "Loan Ref", value: activeLoanApp.ref },
+              { label: "Total Borrowed", value: `K${activeLoanApp.amountRequested.toLocaleString()}` },
+              { label: "Est. Repayable", value: `K${Math.round(activeLoanApp.amountRequested * 1.04 * termMonths).toLocaleString()}` },
+              { label: "Loan Ref", value: activeLoanApp.reference },
               { label: "Status", value: activeLoanApp.status, valueClass: "text-emerald-400" },
             ].map(s => (
               <div key={s.label} className="flex items-center justify-between text-sm">
