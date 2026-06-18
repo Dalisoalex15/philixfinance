@@ -264,6 +264,43 @@ router.patch("/portal-accounts/:id/status", wrap(async (req: Request, res: Respo
   res.json(account);
 }));
 
+// POST /api/admin/portal-accounts/:id/unlock — clear failed logins and lock
+router.post("/portal-accounts/:id/unlock", wrap(async (req: Request, res: Response) => {
+  await prisma.clientPortalAccount.update({
+    where: { id: req.params.id },
+    data: { failedLoginCount: 0, lockedUntil: null },
+  });
+  res.json({ success: true });
+}));
+
+// POST /api/admin/portal-accounts/:id/notify — send in-app notification to client
+router.post("/portal-accounts/:id/notify", wrap(async (req: Request, res: Response) => {
+  const { subject, body, category } = req.body as { subject: string; body: string; category?: string };
+  if (!subject || !body) return res.status(400).json({ error: "subject and body required" });
+  const notification = await prisma.clientNotification.create({
+    data: {
+      accountId: req.params.id,
+      subject,
+      body,
+      category: category ?? "GENERAL",
+    },
+  });
+  res.status(201).json(notification);
+}));
+
+// PATCH /api/admin/portal-accounts/:id/kyc — manually set KYC status
+router.patch("/portal-accounts/:id/kyc", wrap(async (req: Request, res: Response) => {
+  const { kycStatus } = req.body as { kycStatus: string };
+  const allowed = ["NOT_STARTED", "SUBMITTED", "IN_REVIEW", "VERIFIED", "REJECTED"];
+  if (!allowed.includes(kycStatus)) return res.status(400).json({ error: "Invalid kycStatus" });
+  const account = await prisma.clientPortalAccount.update({
+    where: { id: req.params.id },
+    data: { kycStatus },
+    select: { id: true, kycStatus: true },
+  });
+  res.json(account);
+}));
+
 // DELETE /api/admin/portal-accounts/:id — permanently delete account + all linked data
 router.delete("/portal-accounts/:id", wrap(async (req: Request, res: Response) => {
   const user = (req as any).user;

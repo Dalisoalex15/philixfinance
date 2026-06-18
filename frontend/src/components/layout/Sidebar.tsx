@@ -48,10 +48,11 @@ const navGroups: NavGroup[] = [
   {
     label: "Client Management",
     items: [
-      { href: "/online-applications", icon: Globe,        label: "Online Applications" },
-      { href: "/kyc",                 icon: ScanFace,     label: "KYC Verification" },
-      { href: "/client-timeline",     icon: Clock,        label: "Client Timeline" },
-      { href: "/document-expiry",     icon: FileWarning,  label: "Document Expiry" },
+      { href: "/portal-clients",       icon: Users,        label: "Client Accounts",    roles: ["SUPER_ADMIN", "MANAGER"] },
+      { href: "/online-applications",  icon: Globe,        label: "Online Applications" },
+      { href: "/kyc",                  icon: ScanFace,     label: "KYC Verification" },
+      { href: "/client-timeline",      icon: Clock,        label: "Client Timeline" },
+      { href: "/document-expiry",      icon: FileWarning,  label: "Document Expiry" },
     ],
   },
   {
