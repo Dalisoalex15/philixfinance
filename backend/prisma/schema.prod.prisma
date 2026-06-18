@@ -1,6 +1,5 @@
-// Philix Finance - PRODUCTION schema (PostgreSQL)
-// Used for Railway/Render/Supabase deployment
-// Local dev uses schema.prisma (SQLite)
+// Philix Finance - PRODUCTION schema (PostgreSQL / Neon)
+// Deployed via Vercel. Local dev uses schema.prisma (SQLite).
 
 generator client {
   provider   = "prisma-client-js"
@@ -173,4 +172,21 @@ model KycDocument {
   fileName   String
   mimeType   String   @default("image/jpeg")
   uploadedAt DateTime @default(now())
+}
+
+// ============================================================
+// CAPITAL & FUNDING
+// ============================================================
+
+model CapitalEntry {
+  id          String   @id @default(uuid())
+  type        String   // DEPOSIT | WITHDRAWAL
+  amount      Float
+  source      String   // MOBILE_MONEY | BANK_TRANSFER | CASH | INVESTOR | OTHER
+  provider    String?  // e.g. "Airtel Money", "Zanaco", "FNB"
+  reference   String?  // transaction reference number
+  description String?
+  addedBy     String   // staff name or ID
+  entryDate   DateTime @default(now())
+  createdAt   DateTime @default(now())
 }

@@ -177,3 +177,21 @@ model KycDocument {
   mimeType   String   @default("image/jpeg")
   uploadedAt DateTime @default(now())
 }
+
+
+// ============================================================
+// CAPITAL & FUNDING
+// ============================================================
+
+model CapitalEntry {
+  id          String   @id @default(uuid())
+  type        String   // DEPOSIT | WITHDRAWAL
+  amount      Float
+  source      String   // MOBILE_MONEY | BANK_TRANSFER | CASH | INVESTOR | OTHER
+  provider    String?  // e.g. "Airtel Money", "Zanaco", "FNB"
+  reference   String?
+  description String?
+  addedBy     String
+  entryDate   DateTime @default(now())
+  createdAt   DateTime @default(now())
+}
