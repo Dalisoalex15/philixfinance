@@ -176,7 +176,7 @@ GETTING STARTED
 We are here to help you achieve your financial goals.
 
 Philix Finance Ltd
-Tel: +260 211 XXX XXX
+Tel: +260 777 158 901
 Email: info@philixfinance.com`,
     });
   },

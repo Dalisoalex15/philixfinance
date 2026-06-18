@@ -40,7 +40,7 @@ Thank you for choosing Philix Finance.
 Warm regards,
 ${v.officerName}
 Loan Officer — Philix Finance
-Tel: +260 211 XXX XXX
+Tel: +260 777 158 901
 Email: loans@philixfinance.com
 
 ─────────────────────────────
@@ -119,7 +119,7 @@ Total Now Due:    K${v.totalDue}
 ACTION REQUIRED
 Please make your payment immediately to avoid further penalties. Contact us today to discuss a repayment arrangement.
 
-📞 Call: +260 211 XXX XXX
+📞 Call: +260 777 158 901
 📧 Email: collections@philixfinance.com
 
 Philix Finance Ltd`,

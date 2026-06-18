@@ -46,7 +46,7 @@ export default function LoanAgreementPage() {
         <div className="text-center mb-8 border-b-2 border-navy-900 pb-6">
           <div className="text-2xl font-black text-navy-900 mb-1">PHILIX FINANCE LIMITED</div>
           <div className="text-sm font-semibold text-amber-700 tracking-widest uppercase mb-2">Creating A Future Together</div>
-          <div className="text-xs text-gray-500">P.O. Box XXXXX, Lusaka, Zambia · Tel: +260 211 XXX XXX · BoZ Licensed MFI</div>
+          <div className="text-xs text-gray-500">P.O. Box XXXXX, Lusaka, Zambia · Tel: +260 777 158 901 · BoZ Licensed MFI</div>
           <div className="mt-4 text-lg font-bold text-navy-900 uppercase tracking-wide border border-navy-900 inline-block px-6 py-1 rounded">
             LOAN AGREEMENT
           </div>

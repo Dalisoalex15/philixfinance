@@ -816,7 +816,7 @@ export default function MyLoansPage() {
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 text-center">
         <div className="font-semibold text-slate-300 mb-1">Need help with a loan?</div>
         <div className="text-xs text-slate-500 mb-3">Contact our support team for repayment assistance or loan restructuring</div>
-        <a href="tel:+260211000000" className="text-indigo-400 hover:text-indigo-300 text-sm font-medium">📞 +260 211 XXX XXX</a>
+        <a href="tel:+260777158901" className="text-indigo-400 hover:text-indigo-300 text-sm font-medium">📞 +260 777 158 901</a>
       </div>
     </div>
   );

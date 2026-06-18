@@ -6,7 +6,7 @@ const templates = [
     id: "approval",
     name: "Loan Approved",
     trigger: "Auto — on loan approval",
-    message: "Hello {firstName}, your Philix Finance loan of K{amount} has been APPROVED! Disbursement within 24hrs. Ref: {loanRef}. Questions? Call +260 211 XXX XXX",
+    message: "Hello {firstName}, your Philix Finance loan of K{amount} has been APPROVED! Disbursement within 24hrs. Ref: {loanRef}. Questions? Call +260 777 158 901",
     active: true,
   },
   {
@@ -34,7 +34,7 @@ const templates = [
     id: "overdue",
     name: "Overdue Notice",
     trigger: "Auto — on grace period expiry",
-    message: "URGENT: Your Philix Finance loan {loanRef} payment of K{amount} is overdue by {days} day(s). Pay NOW to avoid further penalties. Call +260 211 XXX XXX",
+    message: "URGENT: Your Philix Finance loan {loanRef} payment of K{amount} is overdue by {days} day(s). Pay NOW to avoid further penalties. Call +260 777 158 901",
     active: true,
   },
   {

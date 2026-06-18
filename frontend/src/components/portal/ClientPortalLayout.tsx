@@ -163,8 +163,8 @@ export default function ClientPortalLayout() {
 
         {/* Footer */}
         <div className="flex-shrink-0 border-t border-slate-800/60 p-3 space-y-1">
-          <a href="tel:+260211000000" className="flex items-center gap-2 px-3 py-2 text-xs text-slate-600 hover:text-slate-400 rounded-xl hover:bg-slate-800/50 transition-all">
-            <Phone size={12} /> +260 211 XXX XXX — Support
+          <a href="tel:+260777158901" className="flex items-center gap-2 px-3 py-2 text-xs text-slate-600 hover:text-slate-400 rounded-xl hover:bg-slate-800/50 transition-all">
+            <Phone size={12} /> +260 777 158 901 — Support
           </a>
           <button onClick={handleLogout}
             className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-500/70 hover:text-red-400 rounded-xl hover:bg-red-900/20 transition-all">

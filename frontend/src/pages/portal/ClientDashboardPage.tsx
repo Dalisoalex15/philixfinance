@@ -466,8 +466,8 @@ export default function ClientDashboardPage() {
         <Link to="/portal/apply" className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3.5 rounded-xl text-sm transition-all">
           <Zap size={15} /> Apply for a New Loan
         </Link>
-        <a href="tel:+260211000000" className="w-full flex items-center justify-center gap-2 bg-slate-800 text-slate-400 py-3 rounded-xl text-sm border border-slate-700">
-          <Phone size={14} /> +260 211 XXX XXX — Need help?
+        <a href="tel:+260777158901" className="w-full flex items-center justify-center gap-2 bg-slate-800 text-slate-400 py-3 rounded-xl text-sm border border-slate-700">
+          <Phone size={14} /> +260 777 158 901 — Need help?
         </a>
       </div>
 
