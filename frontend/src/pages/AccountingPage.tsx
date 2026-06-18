@@ -127,7 +127,7 @@ export default function AccountingPage() {
                   <table className="w-full text-sm">
                     <thead><tr className="text-xs text-slate-500"><th className="text-left pb-2">Debit Account</th><th className="text-left pb-2">Credit Account</th><th className="text-right pb-2">Amount</th></tr></thead>
                     <tbody>
-                      {je.lines.map((line, i) => (
+                      {je.lines.map((line: any, i: number) => (
                         <tr key={i}>
                           <td className="py-1 text-slate-300">{line.debitAccount}</td>
                           <td className="py-1 text-slate-300">{line.creditAccount}</td>

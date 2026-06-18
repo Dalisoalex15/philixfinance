@@ -12,7 +12,7 @@ export default function BudgetingPage() {
   const variance = totalActual - totalBudgeted;
 
   const chartData = mockBudgets.map(b => ({
-    name: b.category.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()),
+    name: b.category.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase()),
     Budgeted: b.budgeted,
     Actual: b.actual,
   }));

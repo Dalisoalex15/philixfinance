@@ -22,7 +22,7 @@ export default function CollateralDetailPage() {
 
   const handleRelease = () => {
     if (!releasedTo) return;
-    setItem(i => i ? { ...i, status: "RELEASED" } : i);
+    setItem((i: any) => i ? { ...i, status: "RELEASED" } : i);
     setReleased(true);
     setShowRelease(false);
   };

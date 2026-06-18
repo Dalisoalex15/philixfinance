@@ -19,15 +19,15 @@ export default function LoanDetailPage() {
   }
 
   const handleApprove = () => {
-    setLoan(l => l ? { ...l, status: "APPROVED" } : l);
+    setLoan((l: any) => l ? { ...l, status: "APPROVED" } : l);
     setAction("approved");
   };
   const handleReject = () => {
-    setLoan(l => l ? { ...l, status: "REJECTED" } : l);
+    setLoan((l: any) => l ? { ...l, status: "REJECTED" } : l);
     setAction("rejected");
   };
   const handleDisburse = () => {
-    setLoan(l => l ? { ...l, status: "ACTIVE", disbursementDate: new Date().toISOString() } : l);
+    setLoan((l: any) => l ? { ...l, status: "ACTIVE", disbursementDate: new Date().toISOString() } : l);
     setAction("disbursed");
   };
 
