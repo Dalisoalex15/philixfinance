@@ -1,43 +1,25 @@
-﻿import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useClientAuthStore } from "../../store/clientAuth";
-import { useLoanApplicationStore } from "../../store/loanApplicationStore";
 import {
   CreditCard, FileText, Shield, AlertCircle, ChevronRight,
   TrendingUp, Clock, CheckCircle, Package, Bell, Wallet,
-  ArrowUpRight, ArrowDownRight, Star, Zap, Phone, Calculator,
+  Star, Zap, Phone, Calculator,
   BadgeCheck, ListChecks, Gift, Sparkles, Info, ShieldCheck,
 } from "lucide-react";
-import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
 import { mockLoanProducts } from "../../lib/mock-data";
 
-// Mock data for returning clients with active loans
-const mockActiveLoan = {
-  loanNumber: "PHX-L-2024-0034",
-  product: "Salary Advance",
-  principal: 5000,
-  outstanding: 2160,
-  nextPayment: 1080,
-  nextPaymentDate: "2025-07-25",
-  monthsPaid: 3,
-  totalMonths: 5,
-  status: "ACTIVE",
-};
-
-const repaymentHistory = [
-  { month: "Apr", paid: 1080 },
-  { month: "May", paid: 1080 },
-  { month: "Jun", paid: 1080 },
-  { month: "Jul", paid: 0 },
-  { month: "Aug", paid: 0 },
-];
-
-const mockTransactions = [
-  { id: "1", date: "2025-06-15", description: "Monthly Repayment", amount: -1080, type: "PAYMENT" },
-  { id: "2", date: "2025-05-15", description: "Monthly Repayment", amount: -1080, type: "PAYMENT" },
-  { id: "3", date: "2025-04-15", description: "Monthly Repayment", amount: -1080, type: "PAYMENT" },
-  { id: "4", date: "2025-04-01", description: "Loan Disbursement", amount: 5000, type: "DISBURSEMENT" },
-];
+interface PortalApplication {
+  id: string;
+  ref: string;
+  productName: string;
+  amount: number;
+  totalRepayable: number;
+  rateDuration: string;
+  purpose?: string;
+  status: string;
+  submittedAt: string;
+}
 
 const PRODUCT_COLORS = [
   "from-indigo-700 to-indigo-900",
@@ -133,34 +115,48 @@ function OnboardingChecklist({ kycVerified }: { kycVerified: boolean }) {
 
 export default function ClientDashboardPage() {
   const client = useClientAuthStore(s => s.client)!;
-  const allApplications = useLoanApplicationStore(s => s.applications);
-  const myApplications = allApplications.filter(a => a.clientId === client.id);
+  const accessToken = useClientAuthStore(s => s.accessToken);
+  const [myApplications, setMyApplications] = useState<PortalApplication[]>([]);
+
   const initials = `${client.firstName[0]}${client.lastName[0]}`.toUpperCase();
 
-  const hasActiveLoan = myApplications.some(a => a.status === "DISBURSED" || a.status === "APPROVED");
-  const notifCount = myApplications.filter(a => a.status !== "PENDING").length;
+  useEffect(() => {
+    if (!accessToken) return;
+    fetch("/api/portal/applications", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setMyApplications(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [accessToken]);
+
   const activeLoanApp = myApplications.find(a => a.status === "DISBURSED" || a.status === "APPROVED");
-
-  // Use real application data when available, fallback to mock for demo
-  const realLoan = activeLoanApp ? {
-    loanNumber: activeLoanApp.ref,
-    product: activeLoanApp.productName,
-    principal: activeLoanApp.amount,
-    outstanding: activeLoanApp.totalRepayable,
-    nextPayment: Math.round(activeLoanApp.totalRepayable / 3),
-    nextPaymentDate: new Date(Date.now() + 25 * 86400000).toISOString().slice(0, 10),
-    monthsPaid: 0,
-    totalMonths: 3,
-    status: activeLoanApp.status,
-  } : mockActiveLoan;
-
-  const pct = activeLoanApp
-    ? Math.round((realLoan.monthsPaid / Math.max(realLoan.totalMonths, 1)) * 100)
-    : Math.round(((mockActiveLoan.principal - mockActiveLoan.outstanding) / mockActiveLoan.principal) * 100);
-  const daysToNext = Math.ceil((new Date(realLoan.nextPaymentDate).getTime() - Date.now()) / 86400000);
+  const hasActiveLoan = !!activeLoanApp;
+  const notifCount = myApplications.filter(a => a.status !== "PENDING").length;
 
   const hourOfDay = new Date().getHours();
   const greeting = hourOfDay < 12 ? "Good morning" : hourOfDay < 17 ? "Good afternoon" : "Good evening";
+
+  // For the active loan card — derive simple progress from term
+  const termMonths = activeLoanApp
+    ? (() => {
+        const d = activeLoanApp.rateDuration ?? "";
+        const m = d.match(/(\d+)\s*month/i);
+        return m ? parseInt(m[1], 10) : 3;
+      })()
+    : 3;
+  const submittedMs = activeLoanApp ? new Date(activeLoanApp.submittedAt).getTime() : 0;
+  const monthsElapsed = activeLoanApp
+    ? Math.min(termMonths, Math.floor((Date.now() - submittedMs) / (30 * 86400000)))
+    : 0;
+  const pct = termMonths > 0 ? Math.round((monthsElapsed / termMonths) * 100) : 0;
+  const nextPaymentDate = activeLoanApp
+    ? new Date(submittedMs + (monthsElapsed + 1) * 30 * 86400000).toISOString().slice(0, 10)
+    : "";
+  const daysToNext = nextPaymentDate
+    ? Math.ceil((new Date(nextPaymentDate).getTime() - Date.now()) / 86400000)
+    : 0;
+  const monthlyPayment = activeLoanApp ? Math.round(activeLoanApp.totalRepayable / Math.max(termMonths, 1)) : 0;
 
   return (
     <div className="space-y-6 pb-8">
@@ -191,12 +187,12 @@ export default function ClientDashboardPage() {
         </div>
 
         {/* Stats strip — only for active loan holders */}
-        {hasActiveLoan && (
+        {hasActiveLoan && activeLoanApp && (
           <div className="relative grid grid-cols-3 gap-3 mt-5">
             {[
-              { label: "Outstanding", value: `K${realLoan.outstanding.toLocaleString()}`, color: "text-amber-400", sub: "active loan" },
-              { label: "Next Payment", value: `K${realLoan.nextPayment.toLocaleString()}`, color: "text-slate-200", sub: `in ${daysToNext} day${daysToNext !== 1 ? "s" : ""}` },
-              { label: "Repaid", value: `${pct}%`, color: "text-emerald-400", sub: `${realLoan.monthsPaid}/${realLoan.totalMonths} months` },
+              { label: "Outstanding", value: `K${activeLoanApp.totalRepayable.toLocaleString()}`, color: "text-amber-400", sub: "active loan" },
+              { label: "Next Payment", value: `K${monthlyPayment.toLocaleString()}`, color: "text-slate-200", sub: `in ${daysToNext} day${daysToNext !== 1 ? "s" : ""}` },
+              { label: "Term Progress", value: `${pct}%`, color: "text-emerald-400", sub: `${monthsElapsed}/${termMonths} months` },
             ].map(s => (
               <div key={s.label} className="bg-white/5 border border-white/10 rounded-xl p-3 text-center">
                 <div className={`text-lg font-bold ${s.color}`}>{s.value}</div>
@@ -232,8 +228,8 @@ export default function ClientDashboardPage() {
         </div>
       )}
 
-      {/* Active loan card — returning clients */}
-      {hasActiveLoan && (
+      {/* Active loan card */}
+      {hasActiveLoan && activeLoanApp ? (
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-bold text-slate-200">Active Loan</h2>
@@ -244,36 +240,20 @@ export default function ClientDashboardPage() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <div className="font-bold text-slate-200">{realLoan.product}</div>
-                <div className="text-xs text-slate-500 font-mono">{realLoan.loanNumber}</div>
+                <div className="font-bold text-slate-200">{activeLoanApp.productName}</div>
+                <div className="text-xs text-slate-500 font-mono">{activeLoanApp.ref}</div>
               </div>
-              <span className="bg-emerald-900/40 border border-emerald-700/40 text-emerald-400 text-xs font-semibold px-3 py-1 rounded-full">{realLoan.status}</span>
+              <span className="bg-emerald-900/40 border border-emerald-700/40 text-emerald-400 text-xs font-semibold px-3 py-1 rounded-full">{activeLoanApp.status}</span>
             </div>
 
             <div className="mb-4">
               <div className="flex justify-between text-xs text-slate-500 mb-1.5">
-                <span>{realLoan.monthsPaid} of {realLoan.totalMonths} payments made</span>
-                <span className="text-emerald-400 font-semibold">{pct}% repaid</span>
+                <span>{monthsElapsed} of {termMonths} months elapsed</span>
+                <span className="text-emerald-400 font-semibold">{pct}% term elapsed</span>
               </div>
               <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
               </div>
-            </div>
-
-            <div className="h-16 mb-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={repaymentHistory}>
-                  <defs>
-                    <linearGradient id="pg" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <Area type="monotone" dataKey="paid" stroke="#6366f1" fill="url(#pg)" strokeWidth={2} dot={false} />
-                  <Tooltip contentStyle={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, fontSize: 11 }}
-                    formatter={(v: number) => [`K${v.toLocaleString()}`, "Paid"]} />
-                </AreaChart>
-              </ResponsiveContainer>
             </div>
 
             <div className="flex items-center justify-between bg-indigo-900/20 border border-indigo-800/30 rounded-xl px-4 py-3">
@@ -281,14 +261,33 @@ export default function ClientDashboardPage() {
                 <Clock size={14} className="text-indigo-400" />
                 <div>
                   <div className="text-xs text-slate-500">Next payment due</div>
-                  <div className="text-sm font-semibold text-slate-200">{new Date(realLoan.nextPaymentDate).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}</div>
+                  <div className="text-sm font-semibold text-slate-200">
+                    {nextPaymentDate ? new Date(nextPaymentDate).toLocaleDateString("en-GB", { day: "numeric", month: "long" }) : "—"}
+                  </div>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-xl font-bold text-indigo-300">K{realLoan.nextPayment.toLocaleString()}</div>
-                <div className="text-xs text-slate-600">{daysToNext} days away</div>
+                <div className="text-xl font-bold text-indigo-300">K{monthlyPayment.toLocaleString()}</div>
+                <div className="text-xs text-slate-600">{daysToNext > 0 ? `${daysToNext} days away` : "Due soon"}</div>
               </div>
             </div>
+          </div>
+        </div>
+      ) : (
+        /* No active loan state */
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-bold text-slate-200">Active Loan</h2>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-900/40 flex items-center justify-center mx-auto mb-3">
+              <CreditCard size={22} className="text-indigo-400" />
+            </div>
+            <div className="font-semibold text-slate-300 mb-1">No active loan</div>
+            <div className="text-xs text-slate-500 mb-4">You don't have an active or approved loan yet.</div>
+            <Link to="/portal/apply" className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-all">
+              <FileText size={13} /> Apply Now
+            </Link>
           </div>
         </div>
       )}
@@ -327,7 +326,6 @@ export default function ClientDashboardPage() {
           <Link to="/portal/apply" className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1">Apply <ChevronRight size={12} /></Link>
         </div>
 
-        {/* Product cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
           {mockLoanProducts.filter(p => p.isActive).map((prod, i) => {
             const Icon = PRODUCT_ICONS[i % PRODUCT_ICONS.length];
@@ -351,7 +349,6 @@ export default function ClientDashboardPage() {
                   </div>
                   <div className="text-xs text-white/60 mb-4">Up to · from {lowestRate}% flat · {prod.rates.filter(r => r.isActive).length} tiers</div>
 
-                  {/* Rate pills */}
                   <div className="flex gap-1.5 flex-wrap mb-4">
                     {prod.rates.filter(r => r.isActive).map(r => (
                       <span key={r.id} className="bg-white/15 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
@@ -360,7 +357,6 @@ export default function ClientDashboardPage() {
                     ))}
                   </div>
 
-                  {/* Key details row */}
                   <div className="grid grid-cols-3 gap-2 mb-4">
                     {[
                       { label: "Min Loan",   value: `K${prod.minAmount.toLocaleString()}` },
@@ -374,7 +370,6 @@ export default function ClientDashboardPage() {
                     ))}
                   </div>
 
-                  {/* Collateral badge */}
                   {prod.collateralRequired && (
                     <div className="flex items-center gap-1.5 text-[10px] text-white/60 mb-3">
                       <ShieldCheck size={11} className="text-white/40" />
@@ -393,54 +388,40 @@ export default function ClientDashboardPage() {
         </div>
       </div>
 
-      {/* Stats + Transactions grid — returning clients */}
-      {hasActiveLoan && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-            <h3 className="font-semibold text-slate-300 text-sm mb-4 flex items-center gap-2">
-              <Wallet size={14} className="text-indigo-400" /> Account Summary
-            </h3>
-            <div className="space-y-3">
-              {[
-                { label: "Client Since", value: new Date(client.joinedAt).toLocaleDateString("en-GB", { month: "short", year: "numeric" }) },
-                { label: "Total Borrowed", value: "K5,000" },
-                { label: "Total Repaid", value: `K${(mockActiveLoan.principal - realLoan.outstanding).toLocaleString()}` },
-                { label: "Loan Count", value: "2 loans" },
-                { label: "Credit Score", value: "Good ●", valueClass: "text-emerald-400" },
-              ].map(s => (
-                <div key={s.label} className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">{s.label}</span>
-                  <span className={`font-semibold ${(s as { valueClass?: string }).valueClass ?? "text-slate-200"}`}>{s.value}</span>
-                </div>
-              ))}
-            </div>
+      {/* Account Summary — shown to active loan holders */}
+      {hasActiveLoan && activeLoanApp && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <h3 className="font-semibold text-slate-300 text-sm mb-4 flex items-center gap-2">
+            <Wallet size={14} className="text-indigo-400" /> Account Summary
+          </h3>
+          <div className="space-y-3">
+            {[
+              { label: "Client Since", value: new Date(client.joinedAt).toLocaleDateString("en-GB", { month: "short", year: "numeric" }) },
+              { label: "Total Borrowed", value: `K${activeLoanApp.amount.toLocaleString()}` },
+              { label: "Total Repayable", value: `K${activeLoanApp.totalRepayable.toLocaleString()}` },
+              { label: "Loan Ref", value: activeLoanApp.ref },
+              { label: "Status", value: activeLoanApp.status, valueClass: "text-emerald-400" },
+            ].map(s => (
+              <div key={s.label} className="flex items-center justify-between text-sm">
+                <span className="text-slate-500">{s.label}</span>
+                <span className={`font-semibold ${(s as { valueClass?: string }).valueClass ?? "text-slate-200"}`}>{s.value}</span>
+              </div>
+            ))}
           </div>
+        </div>
+      )}
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-slate-300 text-sm flex items-center gap-2">
-                <TrendingUp size={14} className="text-emerald-400" /> Recent Activity
-              </h3>
-              <Link to="/portal/loans" className="text-xs text-indigo-400">View all</Link>
-            </div>
-            <div className="space-y-3">
-              {mockTransactions.map(t => (
-                <div key={t.id} className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${t.type === "DISBURSEMENT" ? "bg-emerald-900/40" : "bg-slate-800"}`}>
-                    {t.type === "DISBURSEMENT"
-                      ? <ArrowDownRight size={13} className="text-emerald-400" />
-                      : <ArrowUpRight size={13} className="text-slate-500" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium text-slate-300 truncate">{t.description}</div>
-                    <div className="text-xs text-slate-600">{new Date(t.date).toLocaleDateString("en-GB")}</div>
-                  </div>
-                  <span className={`text-sm font-bold flex-shrink-0 ${t.amount > 0 ? "text-emerald-400" : "text-slate-400"}`}>
-                    {t.amount > 0 ? "+" : ""}K{Math.abs(t.amount).toLocaleString()}
-                  </span>
-                </div>
-              ))}
-            </div>
+      {/* Recent Transactions — empty state */}
+      {hasActiveLoan && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <h3 className="font-semibold text-slate-300 text-sm mb-3 flex items-center gap-2">
+            <TrendingUp size={14} className="text-emerald-400" /> Recent Transactions
+          </h3>
+          <div className="flex items-start gap-3 bg-slate-800/40 border border-slate-700/40 rounded-xl p-4">
+            <Info size={15} className="text-slate-500 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-slate-500">
+              Payment history will appear here once your loan is disbursed.
+            </p>
           </div>
         </div>
       )}
