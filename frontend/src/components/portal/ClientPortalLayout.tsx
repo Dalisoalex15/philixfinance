@@ -1,4 +1,4 @@
-import { Outlet, NavLink, Link, useNavigate, useLocation } from "react-router-dom";
+import { Outlet, NavLink, Link, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { useClientAuthStore } from "../../store/clientAuth";
 import { useLoanApplicationStore } from "../../store/loanApplicationStore";
 import {
@@ -45,8 +45,7 @@ export default function ClientPortalLayout() {
   };
 
   if (!client) {
-    navigate("/portal/login");
-    return null;
+    return <Navigate to="/portal/login" replace />;
   }
 
   const initials = `${client.firstName[0]}${client.lastName[0]}`.toUpperCase();

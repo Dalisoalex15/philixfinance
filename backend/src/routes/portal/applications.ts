@@ -49,7 +49,8 @@ router.patch("/staff/:id", authenticate, wrap(async (req: Request, res: Response
 router.use(authenticatePortal);
 
 function genRef() {
-  return `APP-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+  const n = Math.floor(Math.random() * 9000) + 1000;
+  return `PHX-${n}`;
 }
 
 // POST /api/portal/applications
@@ -248,6 +249,52 @@ router.post("/:appId/reloan", wrap(async (req: Request, res: Response) => {
   }).catch(() => {});
 
   res.status(201).json(reloan);
+}));
+
+// POST /api/portal/applications/:appId/pay — submit payment proof
+router.post("/:appId/pay", wrap(async (req: Request, res: Response) => {
+  const accountId = (req as Request & { portalAccountId: string }).portalAccountId;
+  const app = await prisma.portalLoanApplication.findFirst({
+    where: { id: req.params.appId, accountId },
+  });
+  if (!app) throw new AppError("Application not found", 404);
+  if (app.status !== "DISBURSED") throw new AppError("Only disbursed loans can have payment submitted", 400);
+
+  const { amount, paymentMethod, provider, reference, screenshotData, notes } = req.body as {
+    amount?: number; paymentMethod?: string; provider?: string;
+    reference?: string; screenshotData?: string; notes?: string;
+  };
+
+  const submission = await (prisma as any).loanPaymentSubmission.create({
+    data: {
+      applicationId: app.id,
+      accountId,
+      amount: amount ? parseFloat(String(amount)) : null,
+      paymentMethod: paymentMethod || null,
+      provider: provider || null,
+      reference: reference || null,
+      screenshotData: screenshotData || null,
+      notes: notes || null,
+      status: "PENDING",
+    },
+  });
+
+  res.status(201).json(submission);
+}));
+
+// GET /api/portal/applications/:appId/payments — client sees their submissions
+router.get("/:appId/payments", wrap(async (req: Request, res: Response) => {
+  const accountId = (req as Request & { portalAccountId: string }).portalAccountId;
+  const app = await prisma.portalLoanApplication.findFirst({
+    where: { id: req.params.appId, accountId },
+  });
+  if (!app) throw new AppError("Application not found", 404);
+
+  const submissions = await (prisma as any).loanPaymentSubmission.findMany({
+    where: { applicationId: app.id, accountId },
+    orderBy: { createdAt: "desc" },
+  });
+  res.json(submissions);
 }));
 
 export default router;

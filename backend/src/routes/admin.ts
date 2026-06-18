@@ -342,4 +342,39 @@ router.post("/wipe-demo-data", wrap(async (req: Request, res: Response) => {
   });
 }));
 
+// GET /api/admin/payment-submissions — list all payment proofs for staff review
+router.get("/payment-submissions", wrap(async (_req: Request, res: Response) => {
+  const submissions = await (prisma as any).loanPaymentSubmission.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      application: {
+        select: {
+          reference: true, productType: true, amountRequested: true,
+          account: { select: { firstName: true, lastName: true, clientNumber: true, email: true } },
+        },
+      },
+    },
+  });
+  res.json(submissions);
+}));
+
+// PATCH /api/admin/payment-submissions/:id — approve or reject
+router.patch("/payment-submissions/:id", wrap(async (req: Request, res: Response) => {
+  const user = (req as any).user;
+  const { status, rejectedReason } = req.body as { status: string; rejectedReason?: string };
+  if (!["APPROVED", "REJECTED"].includes(status)) {
+    return res.status(400).json({ error: "status must be APPROVED or REJECTED" });
+  }
+  const updated = await (prisma as any).loanPaymentSubmission.update({
+    where: { id: req.params.id },
+    data: {
+      status,
+      reviewedBy: `${user.firstName} ${user.lastName}`,
+      reviewedAt: new Date(),
+      rejectedReason: rejectedReason || null,
+    },
+  });
+  res.json(updated);
+}));
+
 export default router;

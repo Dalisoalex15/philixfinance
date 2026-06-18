@@ -53,6 +53,7 @@ const navGroups: NavGroup[] = [
       { href: "/kyc",                  icon: ScanFace,     label: "KYC Verification" },
       { href: "/client-timeline",      icon: Clock,        label: "Client Timeline" },
       { href: "/document-expiry",      icon: FileWarning,  label: "Document Expiry" },
+      { href: "/payment-submissions",  icon: Receipt,      label: "Payment Proofs" },
     ],
   },
   {

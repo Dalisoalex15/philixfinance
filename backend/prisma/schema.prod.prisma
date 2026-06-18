@@ -149,6 +149,8 @@ model PortalLoanApplication {
   linkedLoanId    String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  paymentSubmissions LoanPaymentSubmission[]
 }
 
 model ClientNotification {
@@ -189,4 +191,23 @@ model CapitalEntry {
   addedBy     String   // staff name or ID
   entryDate   DateTime @default(now())
   createdAt   DateTime @default(now())
+}
+
+model LoanPaymentSubmission {
+  id             String   @id @default(uuid())
+  applicationId  String
+  application    PortalLoanApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  accountId      String
+  amount         Float?
+  paymentMethod  String?
+  provider       String?
+  reference      String?
+  screenshotData String?
+  notes          String?
+  status         String   @default("PENDING")
+  reviewedBy     String?
+  reviewedAt     DateTime?
+  rejectedReason String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }

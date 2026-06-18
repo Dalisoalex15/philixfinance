@@ -206,6 +206,119 @@ function ReloanModal({
   );
 }
 
+function PaymentModal({
+  app, onClose, onDone, token,
+}: { app: LoanApp; onClose: () => void; onDone: () => void; token: string | null }) {
+  const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState("MOBILE_MONEY");
+  const [provider, setProvider] = useState("");
+  const [reference, setReference] = useState("");
+  const [notes, setNotes] = useState("");
+  const [screenshot, setScreenshot] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { setError("Screenshot must be under 5MB"); return; }
+    const reader = new FileReader();
+    reader.onload = () => setScreenshot(reader.result as string);
+    reader.readAsDataURL(file);
+  }
+
+  async function submit() {
+    if (!amount) { setError("Enter the amount you paid"); return; }
+    setLoading(true);
+    setError("");
+    try {
+      const r = await fetch(`${API}/portal/applications/${app.id}/pay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ amount: parseFloat(amount), paymentMethod: method, provider, reference, screenshotData: screenshot, notes }),
+      });
+      if (r.ok) { onDone(); onClose(); }
+      else { const d = await r.json(); setError(d.error || "Failed to submit"); }
+    } finally { setLoading(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b border-slate-800">
+          <div>
+            <h3 className="font-bold text-slate-200">Submit Payment Proof</h3>
+            <p className="text-xs text-slate-500 mt-0.5">{app.reference} — {K(app.amountRequested)}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-300"><X size={18} /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1.5">Amount Paid (ZMW) *</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-semibold text-sm">K</span>
+              <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00"
+                className="w-full pl-8 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1.5">Payment Method</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[["MOBILE_MONEY","Mobile Money"],["BANK_TRANSFER","Bank Transfer"],["CASH","Cash"]].map(([v,l]) => (
+                <button key={v} onClick={() => setMethod(v)}
+                  className={`py-2 text-xs font-semibold rounded-xl border transition-colors ${method === v ? "bg-indigo-600 text-white border-indigo-600" : "bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-600"}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1.5">Provider / Bank</label>
+            <input type="text" value={provider} onChange={e => setProvider(e.target.value)} placeholder="e.g. Airtel Money, Zanaco"
+              className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1.5">Transaction Reference</label>
+            <input type="text" value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. TXN123456"
+              className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1.5">Screenshot of Transaction *</label>
+            <label className={`flex flex-col items-center gap-2 p-4 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${screenshot ? "border-emerald-700 bg-emerald-900/10" : "border-slate-700 hover:border-indigo-600"}`}>
+              <input type="file" accept="image/*" onChange={handleFile} className="hidden" />
+              {screenshot ? (
+                <><img src={screenshot} alt="preview" className="max-h-32 rounded-lg object-cover" /><span className="text-xs text-emerald-400">Screenshot attached ✓ (tap to change)</span></>
+              ) : (
+                <><Receipt size={24} className="text-slate-600" /><span className="text-xs text-slate-500">Tap to attach screenshot</span><span className="text-[10px] text-slate-700">JPG, PNG — max 5MB</span></>
+              )}
+            </label>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1.5">Notes (optional)</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any additional notes…" rows={2}
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500 resize-none" />
+          </div>
+
+          {error && <div className="text-xs text-red-400 bg-red-900/20 border border-red-800/40 rounded-xl px-3 py-2">{error}</div>}
+
+          <div className="flex gap-3">
+            <button onClick={onClose} className="flex-1 py-2.5 text-sm font-semibold text-slate-400 border border-slate-700 rounded-xl hover:bg-slate-800">Cancel</button>
+            <button onClick={submit} disabled={loading || !amount}
+              className="flex-1 py-2.5 text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl disabled:opacity-50">
+              {loading ? "Submitting…" : "Submit Payment"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function MyLoansPage() {
   const token = useClientAuthStore(s => s.accessToken);
   const [apps, setApps] = useState<LoanApp[]>([]);
@@ -214,6 +327,7 @@ export default function MyLoansPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [upgradeTarget, setUpgradeTarget] = useState<LoanApp | null>(null);
   const [reloanTarget, setReloanTarget] = useState<LoanApp | null>(null);
+  const [payApp, setPayApp] = useState<LoanApp | null>(null);
   const [successMsg, setSuccessMsg] = useState("");
 
   const authHeader = { Authorization: `Bearer ${token}` };
@@ -276,6 +390,14 @@ export default function MyLoansPage() {
       {reloanTarget && (
         <ReloanModal app={reloanTarget} token={token}
           onClose={() => setReloanTarget(null)} onDone={handleReloanDone} />
+      )}
+      {payApp && (
+        <PaymentModal
+          app={payApp}
+          token={token}
+          onClose={() => setPayApp(null)}
+          onDone={load}
+        />
       )}
 
       {/* Header */}
@@ -445,6 +567,15 @@ export default function MyLoansPage() {
                       <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-800/40 border border-slate-700 rounded-xl px-3 py-2">
                         <Info size={11} className="text-slate-600" /> At maximum 4-week term. No further upgrade available.
                       </div>
+                    )}
+
+                    {app.status === "DISBURSED" && (
+                      <button
+                        onClick={() => setPayApp(app)}
+                        className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-emerald-900/30 border border-emerald-700/50 text-emerald-400 hover:bg-emerald-900/50 rounded-xl transition-colors"
+                      >
+                        <Receipt size={13} /> Mark as Paid
+                      </button>
                     )}
 
                     <div className="text-xs text-slate-600">

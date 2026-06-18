@@ -83,6 +83,7 @@ import APIManagementPage from "./pages/APIManagementPage";
 import DefaultRiskPage from "./pages/DefaultRiskPage";
 import PortalClientsPage from "./pages/PortalClientsPage";
 import CapitalPage from "./pages/CapitalPage";
+import PaymentSubmissionsPage from "./pages/PaymentSubmissionsPage";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
@@ -188,6 +189,7 @@ export default function App() {
           <Route path="default-risk" element={<DefaultRiskPage />} />
           <Route path="portal-clients" element={<PortalClientsPage />} />
           <Route path="capital" element={<CapitalPage />} />
+          <Route path="payment-submissions" element={<PaymentSubmissionsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
