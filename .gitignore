@@ -41,6 +41,7 @@ Thumbs.db
 # Prisma
 backend/prisma/*.db
 backend/prisma/*.db-journal
+backend/generated/
 
 # Coverage
 coverage/
