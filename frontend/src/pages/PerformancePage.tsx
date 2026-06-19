@@ -1,134 +1,177 @@
-import { Activity, TrendingUp, CreditCard, AlertTriangle } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { mockPerformance, formatKwacha } from "../lib/mock-data";
+import { useEffect } from "react";
+import { Activity, TrendingUp, CreditCard, Users, RefreshCw } from "lucide-react";
+import { useLoanApplicationStore } from "../store/loanApplicationStore";
+import { formatKwacha } from "../lib/mock-data";
 
 export default function PerformancePage() {
+  const { applications, syncFromApi } = useLoanApplicationStore();
+  useEffect(() => { syncFromApi(); }, []);
+
+  // Summary stats derived from real portal applications
+  const total = applications.length;
+  const disbursed = applications.filter(a => a.status === "DISBURSED");
+  const approved = applications.filter(a => a.status === "APPROVED");
+  const pending = applications.filter(a => a.status === "PENDING" || a.status === "UNDER_REVIEW");
+  const rejected = applications.filter(a => a.status === "REJECTED");
+  const totalDisbursedAmt = disbursed.reduce((s, a) => s + a.amount, 0);
+  const totalInterest = disbursed.reduce((s, a) => s + (a.totalRepayable - a.amount), 0);
+  const approvalRate = total > 0 ? Math.round(((disbursed.length + approved.length) / total) * 100) : 0;
+
+  // Monthly breakdown
+  const monthlyMap: Record<string, { count: number; total: number }> = {};
+  disbursed.forEach(a => {
+    const m = new Date(a.submittedAt).toLocaleString("en-GB", { month: "short", year: "2-digit" });
+    if (!monthlyMap[m]) monthlyMap[m] = { count: 0, total: 0 };
+    monthlyMap[m].count++;
+    monthlyMap[m].total += a.amount;
+  });
+
+  const monthlyData = Object.entries(monthlyMap)
+    .slice(-6)
+    .map(([month, d]) => ({ month, ...d }));
+
+  // Product breakdown
+  const productMap: Record<string, number> = {};
+  applications.forEach(a => {
+    const name = a.productName || "Unknown";
+    productMap[name] = (productMap[name] || 0) + 1;
+  });
+  const topProducts = Object.entries(productMap).sort(([, a], [, b]) => b - a).slice(0, 5);
+
+  const stats = [
+    { label: "Total Applications", value: total, icon: Activity, color: "indigo" },
+    { label: "Disbursed Loans", value: disbursed.length, icon: CreditCard, color: "emerald" },
+    { label: "Total Disbursed", value: formatKwacha(totalDisbursedAmt), icon: TrendingUp, color: "blue" },
+    { label: "Interest Earned", value: formatKwacha(totalInterest), icon: Users, color: "amber" },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Staff Performance</h1>
-          <p className="page-subtitle">Track and compare loan officer and collections performance</p>
+          <h1 className="page-title">Performance Analytics</h1>
+          <p className="page-subtitle">Portfolio performance metrics from real loan data</p>
+        </div>
+        <button onClick={() => syncFromApi()} className="btn-secondary text-xs py-1.5">
+          <RefreshCw size={12} /> Refresh
+        </button>
+      </div>
+
+      {/* KPI Row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map(s => (
+          <div key={s.label} className="philix-card p-4 flex items-center gap-3">
+            <div className={`p-2 rounded-lg bg-${s.color}-600/20 text-${s.color}-400`}>
+              <s.icon size={18} />
+            </div>
+            <div>
+              <div className="text-xl font-bold text-slate-100">{s.value}</div>
+              <div className="text-xs text-slate-400">{s.label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Pipeline breakdown */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="philix-card p-5">
+          <h3 className="section-title mb-4">Application Pipeline</h3>
+          <div className="space-y-3">
+            {[
+              { label: "Disbursed", count: disbursed.length, total, color: "bg-emerald-500" },
+              { label: "Approved", count: approved.length, total, color: "bg-indigo-500" },
+              { label: "Under Review", count: pending.length, total, color: "bg-amber-500" },
+              { label: "Rejected", count: rejected.length, total, color: "bg-red-500" },
+            ].map(row => (
+              <div key={row.label}>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-slate-400">{row.label}</span>
+                  <span className="text-slate-300 font-semibold">{row.count}</span>
+                </div>
+                <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${row.color} transition-all`}
+                    style={{ width: total > 0 ? `${Math.round((row.count / total) * 100)}%` : "0%" }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 pt-4 border-t border-slate-800">
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Overall Approval Rate</span>
+              <span className={`font-bold ${approvalRate >= 70 ? "text-emerald-400" : approvalRate >= 50 ? "text-amber-400" : "text-red-400"}`}>
+                {approvalRate}%
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Top products */}
+        <div className="philix-card p-5">
+          <h3 className="section-title mb-4">Most Popular Products</h3>
+          {topProducts.length === 0 ? (
+            <div className="py-10 text-center text-slate-600 text-sm">
+              No loan data yet
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {topProducts.map(([name, count], i) => (
+                <div key={name}>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-slate-300 font-medium">
+                      <span className="text-slate-600 mr-2">#{i + 1}</span>
+                      {name}
+                    </span>
+                    <span className="text-slate-400">{count} app{count !== 1 ? "s" : ""}</span>
+                  </div>
+                  <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-indigo-500 transition-all"
+                      style={{ width: total > 0 ? `${Math.round((count / total) * 100)}%` : "0%" }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Leaderboard */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 philix-card overflow-hidden">
-          <div className="p-4 border-b border-slate-800">
-            <h3 className="section-title">Performance Leaderboard</h3>
-          </div>
+      {/* Monthly disbursements */}
+      <div className="philix-card p-5">
+        <h3 className="section-title mb-4">Monthly Disbursements (Last 6 Months)</h3>
+        {monthlyData.length === 0 ? (
+          <div className="py-10 text-center text-slate-600 text-sm">No disbursed loans yet</div>
+        ) : (
           <div className="overflow-x-auto">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Rank</th>
-                  <th>Officer</th>
-                  <th>Role</th>
-                  <th>Loans Issued</th>
-                  <th>Active</th>
-                  <th>Defaults</th>
-                  <th>Collection Rate</th>
-                  <th>Disbursed</th>
-                  <th>Collected</th>
+                  <th>Month</th>
+                  <th>Loans</th>
+                  <th>Total Disbursed</th>
+                  <th>Avg Loan Size</th>
                 </tr>
               </thead>
               <tbody>
-                {mockPerformance.map((p, i) => (
-                  <tr key={p.id} className="table-row-hover">
-                    <td>
-                      <span className={`font-bold text-sm ${
-                        i === 0 ? "text-amber-400" : i === 1 ? "text-slate-400" : i === 2 ? "text-orange-700" : "text-slate-600"
-                      }`}>
-                        #{i + 1}
-                      </span>
-                    </td>
-                    <td className="font-medium text-slate-200">{p.name}</td>
-                    <td><span className="badge-blue text-[10px]">{p.role.replace("_", " ")}</span></td>
-                    <td className="font-medium text-slate-200">{p.loansIssued}</td>
-                    <td className="text-slate-300">{p.activeLoans}</td>
-                    <td className={p.defaults > 3 ? "text-red-400" : "text-slate-300"}>{p.defaults}</td>
-                    <td>
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-1.5 bg-slate-800 rounded-full">
-                          <div
-                            className={`h-full rounded-full ${p.collectionRate > 90 ? "bg-emerald-500" : p.collectionRate > 80 ? "bg-amber-500" : "bg-red-500"}`}
-                            style={{ width: `${p.collectionRate}%` }}
-                          />
-                        </div>
-                        <span className={`text-xs font-medium ${p.collectionRate > 90 ? "text-emerald-400" : p.collectionRate > 80 ? "text-amber-400" : "text-red-400"}`}>
-                          {p.collectionRate}%
-                        </span>
-                      </div>
-                    </td>
-                    <td className="text-slate-300">{formatKwacha(p.totalDisbursed)}</td>
-                    <td className="text-emerald-400">{formatKwacha(p.totalCollected)}</td>
+                {monthlyData.map(row => (
+                  <tr key={row.month} className="table-row-hover">
+                    <td className="font-medium text-slate-200">{row.month}</td>
+                    <td className="text-slate-300">{row.count}</td>
+                    <td className="text-indigo-400 font-medium">{formatKwacha(row.total)}</td>
+                    <td className="text-slate-400">{formatKwacha(row.count > 0 ? row.total / row.count : 0)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
-
-        {/* Top Performers */}
-        <div className="philix-card p-5">
-          <h3 className="section-title mb-4">Collection Rate Comparison</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={mockPerformance} layout="vertical" margin={{ left: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis type="number" domain={[0, 100]} tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={(v) => `${v}%`} />
-              <YAxis type="category" dataKey="name" tick={{ fill: "#94a3b8", fontSize: 10 }} width={80} />
-              <Tooltip formatter={(v: number) => `${v}%`} />
-              <Bar dataKey="collectionRate" name="Collection Rate" fill="#6366f1" radius={[0, 3, 3, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        )}
       </div>
 
-      {/* Individual Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {mockPerformance.slice(0, 3).map((p, i) => (
-          <div key={p.id} className="philix-card p-5">
-            <div className="flex items-center gap-3 mb-4">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${
-                i === 0 ? "bg-amber-400 text-amber-900" : i === 1 ? "bg-slate-500 text-slate-100" : "bg-orange-800 text-orange-100"
-              }`}>
-                #{i + 1}
-              </div>
-              <div>
-                <div className="font-semibold text-slate-100">{p.name}</div>
-                <div className="text-xs text-slate-500">{p.role.replace("_", " ")}</div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: "Loans Issued", value: p.loansIssued, icon: CreditCard },
-                { label: "Collection Rate", value: `${p.collectionRate}%`, icon: TrendingUp },
-                { label: "Active Loans", value: p.activeLoans, icon: Activity },
-                { label: "Defaults", value: p.defaults, icon: AlertTriangle },
-              ].map((m) => (
-                <div key={m.label} className="bg-slate-800/50 rounded-lg p-2.5">
-                  <div className="text-lg font-bold text-slate-100">{m.value}</div>
-                  <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                    <m.icon size={10} />
-                    {m.label}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 pt-3 border-t border-slate-800">
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-400">Total Disbursed</span>
-                <span className="text-slate-200 font-medium">{formatKwacha(p.totalDisbursed)}</span>
-              </div>
-              <div className="flex justify-between text-xs mt-1">
-                <span className="text-slate-400">Total Collected</span>
-                <span className="text-emerald-400 font-medium">{formatKwacha(p.totalCollected)}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      {total === 0 && (
+        <div className="philix-card p-12 text-center">
+          <Activity size={36} className="text-slate-700 mx-auto mb-3" />
+          <p className="text-slate-500 font-medium">No loan data yet</p>
+          <p className="text-slate-700 text-sm mt-1">Performance metrics will appear here as clients submit loan applications</p>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Search, CreditCard, TrendingUp, AlertTriangle, Clock, ExternalLink } from "lucide-react";
-import { mockLoans, formatKwacha, formatDate, getStatusColor } from "../lib/mock-data";
+import { formatKwacha, formatDate, getStatusColor } from "../lib/mock-data";
 import { useLoanApplicationStore, type LoanApplication } from "../store/loanApplicationStore";
 
 const STATUSES = ["ALL", "ACTIVE", "OVERDUE", "DEFAULTED", "PAID", "PENDING_APPROVAL", "PORTAL"];
@@ -42,22 +42,7 @@ export default function LoansPage() {
     portalApp?: LoanApplication;
   };
 
-  const mockRows: Row[] = mockLoans.map(l => ({
-    _type: "mock",
-    id: l.id,
-    loanNumber: l.loanNumber,
-    clientName: `${l.client.firstName} ${l.client.lastName}`,
-    clientPhone: l.client.phone,
-    collateral: [l.collateral?.brand, l.collateral?.model].filter(Boolean).join(" ") || "—",
-    principal: l.principal,
-    totalDue: l.totalDue,
-    totalPaid: l.totalPaid,
-    outstanding: l.outstandingBalance,
-    installment: l.installmentAmount,
-    daysLate: l.daysLate,
-    status: l.status,
-    disbursedAt: l.disbursementDate ?? null,
-  }));
+  const mockRows: Row[] = [];
 
   const portalRows: Row[] = portalApps.map(a => ({
     _type: "portal",
