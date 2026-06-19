@@ -18,22 +18,43 @@ export default function ClientProfilePage() {
   const [passError, setPassError] = useState("");
   const [passSaved, setPassSaved] = useState(false);
 
-  const save = () => {
-    setTimeout(() => {
-      setEditMode(false);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    }, 600);
+  const save = async () => {
+    const token = localStorage.getItem("philix_portal_token");
+    try {
+      const r = await fetch("/api/portal/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(form),
+      });
+      if (r.ok) {
+        setEditMode(false);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      }
+    } catch {
+      // ignore — show no error, form still shows
+    }
   };
 
-  const changePass = () => {
+  const changePass = async () => {
     setPassError("");
-    if (passForm.current !== "client123") { setPassError("Current password is incorrect"); return; }
     if (passForm.newPass.length < 8) { setPassError("New password must be at least 8 characters"); return; }
     if (passForm.newPass !== passForm.confirm) { setPassError("Passwords do not match"); return; }
-    setPassSaved(true);
-    setPassForm({ current: "", newPass: "", confirm: "" });
-    setTimeout(() => setPassSaved(false), 3000);
+    const token = localStorage.getItem("philix_portal_token");
+    try {
+      const r = await fetch("/api/portal/me/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ currentPassword: passForm.current, newPassword: passForm.newPass }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) { setPassError(data.error || data.message || "Failed to change password"); return; }
+      setPassSaved(true);
+      setPassForm({ current: "", newPass: "", confirm: "" });
+      setTimeout(() => setPassSaved(false), 3000);
+    } catch {
+      setPassError("Network error — please try again");
+    }
   };
 
   return (
@@ -185,7 +206,7 @@ export default function ClientProfilePage() {
           className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold px-5 py-2.5 rounded-xl text-sm border border-slate-700 transition-all">
           Update Password
         </button>
-        <p className="text-xs text-slate-600">Demo current password: <span className="text-slate-500 font-mono">client123</span></p>
+        <p className="text-xs text-slate-600">Password must be at least 8 characters</p>
       </div>
 
       {/* Danger zone */}

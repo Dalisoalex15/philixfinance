@@ -17,7 +17,6 @@ import ClientProfilePage from "./pages/portal/ClientProfilePage";
 import ClientNotificationsPage from "./pages/portal/ClientNotificationsPage";
 import ClientLoanCalculatorPage from "./pages/portal/ClientLoanCalculatorPage";
 import EmailComposerPage from "./pages/EmailComposerPage";
-import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import CEODashboardPage from "./pages/CEODashboardPage";
 import ClientsPage from "./pages/ClientsPage";

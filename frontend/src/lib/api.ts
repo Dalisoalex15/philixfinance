@@ -97,6 +97,18 @@ export const staffApi = {
     staffRequest("/admin/wipe-demo-data", {
       method: "POST", body: JSON.stringify({ confirm: "WIPE_ALL_DEMO_DATA" }),
     }),
+
+  getPortalAccounts: () =>
+    staffRequest<PortalAccount[]>("/admin/portal-accounts"),
+
+  getPortalAccount: (id: string) =>
+    staffRequest<PortalAccount & { portalLoans: unknown[] }>(`/admin/portal-accounts/${id}`),
+
+  updatePortalAccountStatus: (id: string, status: string) =>
+    staffRequest(`/admin/portal-accounts/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+
+  updatePortalAccountKyc: (id: string, kycStatus: string) =>
+    staffRequest(`/admin/portal-accounts/${id}/kyc`, { method: "PATCH", body: JSON.stringify({ kycStatus }) }),
 };
 
 export interface ActivityEvent {
@@ -116,6 +128,34 @@ export interface AdminSummary {
   approvedToday: number;
   submittedToday: number;
   totalApplications: number;
+  totalDisbursedAmount?: number;
+  totalInterestEarned?: number;
+  totalRepayable?: number;
+  totalLoanedOut?: number;
+}
+
+export interface PortalAccount {
+  id: string;
+  clientNumber: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  dateOfBirth?: string;
+  gender?: string;
+  address?: string;
+  city?: string;
+  occupation?: string;
+  employer?: string;
+  monthlyIncome?: number;
+  nrcNumber?: string;
+  kycStatus: "NOT_STARTED" | "SUBMITTED" | "IN_REVIEW" | "VERIFIED" | "REJECTED";
+  status: "ACTIVE" | "PENDING_KYC" | "SUSPENDED" | "BLACKLISTED";
+  emailVerified: boolean;
+  lastLoginAt?: string;
+  failedLoginCount?: number;
+  createdAt: string;
+  _count: { loanApplications: number };
 }
 
 export interface FraudAlert {

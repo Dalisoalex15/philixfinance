@@ -48,10 +48,10 @@ export default function MobileMoneyPage() {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Received Today", value: K(3050), icon: DollarSign, color: "emerald" },
+          { label: "Received Today", value: K(totalReceived), icon: DollarSign, color: "emerald" },
           { label: "Matched", value: matched.length.toString(), icon: CheckCircle, color: "indigo" },
           { label: "Unmatched", value: unmatched.length.toString(), icon: AlertTriangle, color: "amber" },
-          { label: "Total (Period)", value: K(totalReceived), icon: Smartphone, color: "blue" },
+          { label: "Total Transactions", value: payments.length.toString(), icon: Smartphone, color: "blue" },
         ].map(k => (
           <div key={k.label} className="stat-card">
             <k.icon size={16} className={`text-${k.color}-400 mb-2`} />

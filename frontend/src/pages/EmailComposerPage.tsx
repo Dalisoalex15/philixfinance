@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Send, Mail, Users, ChevronDown, CheckCircle, AlertCircle, Eye, X } from "lucide-react";
 import { EMAIL_TEMPLATES, EmailTemplate } from "../lib/emailTemplates";
-import { mockClients } from "../lib/mock-data";
+import { staffApi, type PortalAccount } from "../lib/api";
 
 type SendStatus = "idle" | "sending" | "sent" | "error";
 
@@ -15,8 +15,13 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export default function EmailComposerPage() {
+  const [portalAccounts, setPortalAccounts] = useState<PortalAccount[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
   const [recipients, setRecipients] = useState<string[]>([]);
+
+  useEffect(() => {
+    staffApi.getPortalAccounts().then(setPortalAccounts).catch(() => {});
+  }, []);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [status, setStatus] = useState<SendStatus>("idle");
@@ -55,7 +60,7 @@ export default function EmailComposerPage() {
   };
 
   const finalRecipients = recipientMode === "all"
-    ? mockClients.map(c => c.email)
+    ? portalAccounts.map(c => c.email).filter(Boolean)
     : recipientMode === "manual" && manualEmail
       ? [manualEmail]
       : recipients;
@@ -142,7 +147,7 @@ export default function EmailComposerPage() {
             <div className="space-y-2 mb-3">
               {[
                 { v: "select", label: "Select individual clients" },
-                { v: "all", label: `All clients (${mockClients.length})` },
+                { v: "all", label: `All clients (${portalAccounts.length})` },
                 { v: "manual", label: "Enter email manually" },
               ].map(o => (
                 <label key={o.v} className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer transition-all ${recipientMode === o.v ? "border-indigo-600 bg-indigo-600/10" : "border-slate-800 hover:border-slate-700"}`}>
@@ -159,8 +164,8 @@ export default function EmailComposerPage() {
                   <select onChange={e => { if (e.target.value) addRecipient(e.target.value); e.target.value = ""; }}
                     className="w-full bg-slate-800 border border-slate-700 text-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none">
                     <option value="">+ Add client...</option>
-                    {mockClients.filter(c => c.email).map(c => (
-                      <option key={c.id} value={c.email ?? ""}>{c.firstName} {c.lastName} — {c.email}</option>
+                    {portalAccounts.map(c => (
+                      <option key={c.id} value={c.email}>{c.firstName} {c.lastName} — {c.email}</option>
                     ))}
                   </select>
                   <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />

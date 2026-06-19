@@ -120,9 +120,16 @@ export default function QRReceiptPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Receipt List */}
         <div className="space-y-2">
+          {filtered.length === 0 && (
+            <div className="philix-card p-10 text-center text-navy-500">
+              <QrCode size={32} className="mx-auto mb-3 text-navy-400 opacity-40" />
+              <p className="font-semibold text-navy-700">No receipts yet</p>
+              <p className="text-xs mt-1 text-navy-500">Approved payment submissions will appear here as QR receipts</p>
+            </div>
+          )}
           {filtered.map(r => (
             <button key={r.id} onClick={() => setSelected(r)}
-              className={`w-full text-left philix-card p-4 transition-all hover:border-indigo-700 ${selected.id === r.id ? "border border-indigo-600" : ""}`}>
+              className={`w-full text-left philix-card p-4 transition-all hover:border-indigo-700 ${selected?.id === r.id ? "border border-indigo-600" : ""}`}>
               <div className="flex items-center gap-3">
                 <QrCode size={20} className="text-indigo-700 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -143,46 +150,55 @@ export default function QRReceiptPage() {
 
         {/* Receipt Preview */}
         <div>
-          <div id="receipt-print" className="bg-white rounded-2xl p-6 text-gray-900 shadow-xl">
-            <div className="text-center mb-4 border-b border-gray-100 pb-4">
-              <div className="font-black text-lg text-navy-900">PHILIX FINANCE LIMITED</div>
-              <div className="text-xs text-amber-700 font-semibold tracking-widest">Creating A Future Together</div>
-              <div className="text-xs text-gray-400 mt-1">Payment Receipt</div>
-            </div>
+          {selected ? (
+            <>
+              <div id="receipt-print" className="bg-white rounded-2xl p-6 text-gray-900 shadow-xl">
+                <div className="text-center mb-4 border-b border-gray-100 pb-4">
+                  <div className="font-black text-lg text-navy-900">PHILIX FINANCE LIMITED</div>
+                  <div className="text-xs text-amber-700 font-semibold tracking-widest">Creating A Future Together</div>
+                  <div className="text-xs text-gray-400 mt-1">Payment Receipt</div>
+                </div>
 
-            <div className="flex justify-between items-start gap-4 mb-4">
-              <div className="space-y-2 text-sm flex-1">
-                {[
-                  ["Receipt No.", selected.paymentRef],
-                  ["Loan Ref.", selected.loanRef],
-                  ["Client", selected.client],
-                  ["Amount Paid", K(selected.amount)],
-                  ["Payment Method", selected.method],
-                  ["Date & Time", selected.date],
-                  ["Recorded By", selected.officer],
-                ].map(([l, v]) => (
-                  <div key={l} className="flex justify-between">
-                    <span className="text-gray-500 text-xs">{l}</span>
-                    <span className="font-semibold text-gray-900 text-xs">{v}</span>
+                <div className="flex justify-between items-start gap-4 mb-4">
+                  <div className="space-y-2 text-sm flex-1">
+                    {[
+                      ["Receipt No.", selected.paymentRef],
+                      ["Loan Ref.", selected.loanRef],
+                      ["Client", selected.client],
+                      ["Amount Paid", K(selected.amount)],
+                      ["Payment Method", selected.method],
+                      ["Date & Time", selected.date],
+                      ["Recorded By", selected.officer],
+                    ].map(([l, v]) => (
+                      <div key={l} className="flex justify-between">
+                        <span className="text-gray-500 text-xs">{l}</span>
+                        <span className="font-semibold text-gray-900 text-xs">{v}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              <div className="flex-shrink-0 text-center">
-                <QRCodeImg value={`PHILIX:${selected.paymentRef}:${selected.loanRef}:${selected.amount}`} size={100} />
-                <div className="text-xs text-gray-400 mt-1">Scan to verify</div>
-              </div>
-            </div>
+                  <div className="flex-shrink-0 text-center">
+                    <QRCodeImg value={`PHILIX:${selected.paymentRef}:${selected.loanRef}:${selected.amount}`} size={100} />
+                    <div className="text-xs text-gray-400 mt-1">Scan to verify</div>
+                  </div>
+                </div>
 
-            <div className="border-t border-gray-100 pt-3 mt-3 text-center text-xs text-gray-400">
-              Scan QR code at philixfinance.com/verify to confirm this receipt
-              <div className="mt-1 font-semibold text-gray-600">Philix Finance Ltd · BoZ Licensed · Lusaka, Zambia</div>
-            </div>
-          </div>
+                <div className="border-t border-gray-100 pt-3 mt-3 text-center text-xs text-gray-400">
+                  Scan QR code at philixfinance.com/verify to confirm this receipt
+                  <div className="mt-1 font-semibold text-gray-600">Philix Finance Ltd · BoZ Licensed · Lusaka, Zambia</div>
+                </div>
+              </div>
 
-          <div className="flex gap-2 mt-3">
-            <button onClick={handlePrint} className="btn-secondary flex-1 text-xs py-2"><Printer size={12} /> Print Receipt</button>
-            <button onClick={handleDownloadPDF} className="btn-primary flex-1 text-xs py-2"><Download size={12} /> Download PDF</button>
-          </div>
+              <div className="flex gap-2 mt-3">
+                <button onClick={handlePrint} className="btn-secondary flex-1 text-xs py-2"><Printer size={12} /> Print Receipt</button>
+                <button onClick={handleDownloadPDF} className="btn-primary flex-1 text-xs py-2"><Download size={12} /> Download PDF</button>
+              </div>
+            </>
+          ) : (
+            <div className="philix-card p-10 text-center text-navy-500 flex flex-col items-center justify-center h-full min-h-48">
+              <QrCode size={32} className="mb-3 text-navy-400 opacity-40" />
+              <p className="text-sm font-medium text-navy-600">Select a receipt to preview</p>
+            </div>
+          )}
         </div>
       </div>
 

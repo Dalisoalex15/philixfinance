@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Search, CreditCard, TrendingUp, AlertTriangle, Clock, ExternalLink } from "lucide-react";
-import { mockLoans, mockKPIs, formatKwacha, formatDate, getStatusColor } from "../lib/mock-data";
+import { mockLoans, formatKwacha, formatDate, getStatusColor } from "../lib/mock-data";
 import { useLoanApplicationStore, type LoanApplication } from "../store/loanApplicationStore";
 
 const STATUSES = ["ALL", "ACTIVE", "OVERDUE", "DEFAULTED", "PAID", "PENDING_APPROVAL", "PORTAL"];
@@ -93,6 +93,14 @@ export default function LoansPage() {
   });
 
   const pendingPortal = portalApps.filter(a => a.status === "PENDING" || a.status === "UNDER_REVIEW").length;
+  const disbursedApps = portalApps.filter(a => a.status === "DISBURSED");
+  const now = Date.now();
+  const overdueCount = disbursedApps.filter(a => {
+    const termWeeks = a.termMonths ?? 1;
+    const dueMs = new Date(a.submittedAt).getTime() + termWeeks * 7 * 86400000;
+    return now > dueMs;
+  }).length;
+  const totalOutstanding = disbursedApps.reduce((s, a) => s + (a.totalRepayable || a.amount), 0);
 
   return (
     <div className="space-y-6">
@@ -110,9 +118,9 @@ export default function LoansPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Active Loans", value: mockKPIs.activeLoans, icon: CreditCard, color: "indigo" },
-          { label: "Total Outstanding", value: formatKwacha(mockKPIs.totalOutstanding), icon: TrendingUp, color: "blue" },
-          { label: "Overdue", value: mockKPIs.overdueLoans, icon: AlertTriangle, color: "amber" },
+          { label: "Active Loans", value: disbursedApps.length, icon: CreditCard, color: "indigo" },
+          { label: "Total Outstanding", value: formatKwacha(totalOutstanding), icon: TrendingUp, color: "blue" },
+          { label: "Overdue", value: overdueCount, icon: AlertTriangle, color: "amber" },
           { label: "Portal Pending", value: pendingPortal, icon: Clock, color: "emerald" },
         ].map((s) => (
           <div key={s.label} className="philix-card p-4 flex items-center gap-3">
