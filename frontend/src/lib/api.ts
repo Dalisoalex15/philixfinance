@@ -145,6 +145,7 @@ export interface StaffPortalApplication {
   productType: string;
   amountRequested: number;
   termMonths: number;
+  interestRate: number;
   purpose: string;
   description?: string;
   occupation?: string;

@@ -42,7 +42,31 @@ export interface LoanApplication {
   submittedAt: string;
 }
 
+// Flat interest rates per product ID + term weeks — must match backend PRODUCT_RATES
+const PRODUCT_RATES: Record<string, Record<number, number>> = {
+  "prod-001": { 1: 10, 2: 20, 3: 30, 4: 35 },
+  "prod-002": { 1: 10, 2: 20, 3: 30, 4: 35 },
+  "prod-003": { 1: 10, 2: 20, 3: 30, 4: 35 },
+  "prod-004": { 1: 10, 2: 20, 3: 30, 4: 35 },
+  "prod-005": { 1:  8, 2: 16, 3: 24, 4: 30 },
+  "prod-006": { 1:  7, 2: 14, 3: 21, 4: 28 },
+};
+
+const PRODUCT_NAMES: Record<string, string> = {
+  "prod-001": "Student Emergency Loan",
+  "prod-002": "Salary Advance Loan",
+  "prod-003": "Business Working Capital Loan",
+  "prod-004": "Electronics Equity Loan",
+  "prod-005": "Repeat Customer Loyalty Loan",
+  "prod-006": "Premium Client Loan",
+};
+
 function fromApiApp(a: StaffPortalApplication): LoanApplication {
+  const ratePct = a.interestRate > 0
+    ? a.interestRate
+    : (PRODUCT_RATES[a.productType]?.[a.termMonths] ?? 35);
+  const interest = a.amountRequested * (ratePct / 100);
+  const totalRepayable = a.amountRequested + interest;
   return {
     id: a.id,
     ref: a.reference,
@@ -52,13 +76,13 @@ function fromApiApp(a: StaffPortalApplication): LoanApplication {
     clientPhone: a.account?.phone ?? "",
     clientNumber: a.account?.clientNumber,
     productId: a.productType,
-    productName: a.productType.replace(/_/g, " "),
-    rateDuration: `${a.termMonths} months`,
+    productName: PRODUCT_NAMES[a.productType] ?? a.productType.replace(/_/g, " "),
+    rateDuration: `${a.termMonths} week${a.termMonths !== 1 ? "s" : ""}`,
     termMonths: a.termMonths,
-    interestRate: 0,
+    interestRate: ratePct,
     amount: a.amountRequested,
-    totalRepayable: a.amountRequested,
-    weeklyPayment: 0,
+    totalRepayable,
+    weeklyPayment: totalRepayable / (a.termMonths || 1),
     purpose: a.purpose,
     description: a.description,
     occupation: a.occupation ?? "",
