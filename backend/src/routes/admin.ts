@@ -147,6 +147,9 @@ router.get("/summary", wrap(async (_req: Request, res: Response) => {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
+  // Interest rates by term weeks (matches frontend TERM_RATES)
+  const RATES: Record<number, number> = { 1: 0.10, 2: 0.20, 3: 0.30, 4: 0.35 };
+
   const [
     totalAccounts,
     pendingApplications,
@@ -155,6 +158,7 @@ router.get("/summary", wrap(async (_req: Request, res: Response) => {
     totalApplications,
     disbursedAgg,
     activeAgg,
+    disbursedLoans,
   ] = await Promise.all([
     prisma.clientPortalAccount.count(),
     prisma.portalLoanApplication.count({ where: { status: { in: ["SUBMITTED", "UNDER_REVIEW"] } } }),
@@ -163,7 +167,19 @@ router.get("/summary", wrap(async (_req: Request, res: Response) => {
     prisma.portalLoanApplication.count(),
     prisma.portalLoanApplication.aggregate({ _sum: { amountRequested: true }, where: { status: "DISBURSED" } }),
     prisma.portalLoanApplication.aggregate({ _sum: { amountRequested: true }, where: { status: { in: ["APPROVED", "DISBURSED"] } } }),
+    prisma.portalLoanApplication.findMany({
+      where: { status: "DISBURSED" },
+      select: { amountRequested: true, termMonths: true },
+    }),
   ]);
+
+  // Calculate total interest earned on all disbursed loans
+  const totalInterestEarned = disbursedLoans.reduce((sum: number, loan: { amountRequested: number; termMonths: number }) => {
+    const rate = RATES[loan.termMonths] ?? 0.35;
+    return sum + loan.amountRequested * rate;
+  }, 0);
+
+  const totalDisbursedAmount = disbursedAgg._sum.amountRequested ?? 0;
 
   res.json({
     totalPortalAccounts: totalAccounts,
@@ -171,8 +187,10 @@ router.get("/summary", wrap(async (_req: Request, res: Response) => {
     approvedToday,
     submittedToday,
     totalApplications,
-    totalDisbursedAmount: disbursedAgg._sum.amountRequested ?? 0,
+    totalDisbursedAmount,
     totalLoanedOut: activeAgg._sum.amountRequested ?? 0,
+    totalInterestEarned,
+    totalRepayable: totalDisbursedAmount + totalInterestEarned,
   });
 }));
 

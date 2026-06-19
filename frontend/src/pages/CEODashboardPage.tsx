@@ -62,6 +62,8 @@ export default function CEODashboardPage() {
     totalApplications: 0,
     totalDisbursedAmount: 0,
     totalLoanedOut: 0,
+    totalInterestEarned: 0,
+    totalRepayable: 0,
   });
   const [accountActionLoading, setAccountActionLoading] = useState<string | null>(null);
   const [portalAccounts, setPortalAccounts] = useState<PortalAccount[]>([]);
@@ -239,29 +241,53 @@ export default function CEODashboardPage() {
       </div>
 
       {/* Financial totals */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="philix-card p-5 flex items-center gap-4">
           <div className="p-3 rounded-xl bg-emerald-100 text-emerald-700 flex-shrink-0">
-            <Banknote size={22} />
+            <Banknote size={20} />
           </div>
-          <div>
-            <div className="text-2xl font-bold font-mono text-navy-900">
+          <div className="min-w-0">
+            <div className="text-xl font-bold font-mono text-navy-900 truncate">
               {formatKwacha(portalSummary.totalDisbursedAmount)}
             </div>
             <div className="text-xs font-semibold text-navy-600 mt-0.5">Total Disbursed</div>
-            <div className="text-xs text-navy-500">Loans paid out to clients</div>
+            <div className="text-xs text-navy-500">Principal paid out</div>
+          </div>
+        </div>
+        <div className="philix-card p-5 flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-amber-100 text-amber-700 flex-shrink-0">
+            <TrendingUp size={20} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xl font-bold font-mono text-amber-700 truncate">
+              {formatKwacha(portalSummary.totalInterestEarned)}
+            </div>
+            <div className="text-xs font-semibold text-navy-600 mt-0.5">Interest Earned</div>
+            <div className="text-xs text-navy-500">Revenue from loans</div>
           </div>
         </div>
         <div className="philix-card p-5 flex items-center gap-4">
           <div className="p-3 rounded-xl bg-indigo-100 text-indigo-700 flex-shrink-0">
-            <DollarSign size={22} />
+            <DollarSign size={20} />
           </div>
-          <div>
-            <div className="text-2xl font-bold font-mono text-navy-900">
+          <div className="min-w-0">
+            <div className="text-xl font-bold font-mono text-navy-900 truncate">
+              {formatKwacha(portalSummary.totalRepayable)}
+            </div>
+            <div className="text-xs font-semibold text-navy-600 mt-0.5">Total Repayable</div>
+            <div className="text-xs text-navy-500">Principal + interest</div>
+          </div>
+        </div>
+        <div className="philix-card p-5 flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-violet-100 text-violet-700 flex-shrink-0">
+            <Activity size={20} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xl font-bold font-mono text-navy-900 truncate">
               {formatKwacha(portalSummary.totalLoanedOut)}
             </div>
-            <div className="text-xs font-semibold text-navy-600 mt-0.5">Total Loaned Out</div>
-            <div className="text-xs text-navy-500">Approved + disbursed combined</div>
+            <div className="text-xs font-semibold text-navy-600 mt-0.5">Active Book</div>
+            <div className="text-xs text-navy-500">Approved + disbursed</div>
           </div>
         </div>
       </div>
