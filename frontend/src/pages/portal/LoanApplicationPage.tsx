@@ -142,7 +142,8 @@ export default function LoanApplicationPage() {
         await portalApi.submitApplication({
           productType: selectedProduct?.id ?? selectedProduct?.name ?? "",
           amountRequested: loanAmount,
-          termMonths: selectedRate ? parseInt(selectedRate.displayLabel) || 1 : 1,
+          termMonths: selectedRate?.durationValue ?? 1,
+          interestRate: selectedRate?.interestRate ?? 35,
           purpose: form.purpose,
           occupation: form.occupation,
           employer: form.employer,

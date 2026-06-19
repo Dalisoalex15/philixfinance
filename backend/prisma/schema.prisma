@@ -127,6 +127,7 @@ model PortalLoanApplication {
   productType     String
   amountRequested Float
   termMonths      Int
+  interestRate    Float    @default(0)
   purpose         String
   description     String?
   occupation      String?

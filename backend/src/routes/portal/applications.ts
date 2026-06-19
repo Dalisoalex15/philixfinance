@@ -97,7 +97,7 @@ router.post("/", wrap(async (req: Request, res: Response) => {
   if (!account) throw new AppError("Account not found", 404);
 
   const {
-    productType, amountRequested, termMonths, purpose, description,
+    productType, amountRequested, termMonths, interestRate, purpose, description,
     occupation, employer, employerPhone, monthlyIncome, payDate,
     collateralType, collateralDesc, collateralValue, collateralPhotos,
     ref1Name, ref1Phone, ref1Relation, ref2Name, ref2Phone, ref2Relation,
@@ -107,6 +107,20 @@ router.post("/", wrap(async (req: Request, res: Response) => {
     throw new AppError("Product, amount, term and purpose are required", 400);
   }
 
+  // Fallback rates by product ID + term weeks (used only when interestRate not sent)
+  const PRODUCT_RATES: Record<string, Record<number, number>> = {
+    "prod-001": { 1: 10, 2: 20, 3: 30, 4: 35 },
+    "prod-002": { 1: 10, 2: 20, 3: 30, 4: 35 },
+    "prod-003": { 1: 10, 2: 20, 3: 30, 4: 35 },
+    "prod-004": { 1: 10, 2: 20, 3: 30, 4: 35 },
+    "prod-005": { 1:  8, 2: 16, 3: 24, 4: 30 },
+    "prod-006": { 1:  7, 2: 14, 3: 21, 4: 28 },
+  };
+  const termWeeks = parseInt(termMonths);
+  const resolvedRate = interestRate != null
+    ? parseFloat(interestRate)
+    : (PRODUCT_RATES[productType]?.[termWeeks] ?? 35);
+
   const reference = genRef();
   const application = await prisma.portalLoanApplication.create({
     data: {
@@ -114,7 +128,8 @@ router.post("/", wrap(async (req: Request, res: Response) => {
       accountId: id,
       productType,
       amountRequested: parseFloat(amountRequested),
-      termMonths: parseInt(termMonths),
+      termMonths: termWeeks,
+      interestRate: resolvedRate,
       purpose,
       description,
       occupation,

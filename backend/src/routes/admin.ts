@@ -147,8 +147,16 @@ router.get("/summary", wrap(async (_req: Request, res: Response) => {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-  // Interest rates by term weeks (matches frontend TERM_RATES)
-  const RATES: Record<number, number> = { 1: 0.10, 2: 0.20, 3: 0.30, 4: 0.35 };
+  // Fallback rates keyed by product ID + term weeks (for loans without a stored interestRate)
+  // prod-001..004 = 10/20/30/35%, prod-005 = 8/16/24/30%, prod-006 = 7/14/21/28%
+  const PRODUCT_RATES: Record<string, Record<number, number>> = {
+    "prod-001": { 1: 10, 2: 20, 3: 30, 4: 35 },
+    "prod-002": { 1: 10, 2: 20, 3: 30, 4: 35 },
+    "prod-003": { 1: 10, 2: 20, 3: 30, 4: 35 },
+    "prod-004": { 1: 10, 2: 20, 3: 30, 4: 35 },
+    "prod-005": { 1:  8, 2: 16, 3: 24, 4: 30 },
+    "prod-006": { 1:  7, 2: 14, 3: 21, 4: 28 },
+  };
 
   const [
     totalAccounts,
@@ -169,14 +177,18 @@ router.get("/summary", wrap(async (_req: Request, res: Response) => {
     prisma.portalLoanApplication.aggregate({ _sum: { amountRequested: true }, where: { status: { in: ["APPROVED", "DISBURSED"] } } }),
     prisma.portalLoanApplication.findMany({
       where: { status: "DISBURSED" },
-      select: { amountRequested: true, termMonths: true },
+      select: { amountRequested: true, termMonths: true, interestRate: true, productType: true },
     }),
   ]);
 
-  // Calculate total interest earned on all disbursed loans
-  const totalInterestEarned = disbursedLoans.reduce((sum: number, loan: { amountRequested: number; termMonths: number }) => {
-    const rate = RATES[loan.termMonths] ?? 0.35;
-    return sum + loan.amountRequested * rate;
+  // Use the rate stored at application time; fall back to product+term table for legacy records
+  const totalInterestEarned = disbursedLoans.reduce((sum: number, loan: {
+    amountRequested: number; termMonths: number; interestRate: number; productType: string;
+  }) => {
+    const ratePct = loan.interestRate > 0
+      ? loan.interestRate
+      : (PRODUCT_RATES[loan.productType]?.[loan.termMonths] ?? 35);
+    return sum + loan.amountRequested * (ratePct / 100);
   }, 0);
 
   const totalDisbursedAmount = disbursedAgg._sum.amountRequested ?? 0;
