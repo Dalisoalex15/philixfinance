@@ -5,7 +5,7 @@ import {
   CreditCard, FileText, Shield, ChevronRight, TrendingUp, Clock,
   CheckCircle, Bell, Wallet, Zap, Phone, Calculator, BadgeCheck,
   ListChecks, Gift, Star, AlertCircle, ArrowRight, Sparkles,
-  ShieldCheck, Receipt, RefreshCw,
+  ShieldCheck, Receipt, RefreshCw, Quote,
 } from "lucide-react";
 import { mockLoanProducts } from "../../lib/mock-data";
 
@@ -167,14 +167,20 @@ export default function ClientDashboardPage() {
   const accessToken = useClientAuthStore(s => s.accessToken);
   const [myApplications, setMyApplications] = useState<PortalApplication[]>([]);
   const [loading, setLoading] = useState(true);
+  const [announcements, setAnnouncements] = useState<{ id: string; subject: string; body: string; createdAt: string }[]>([]);
+  const [annIdx, setAnnIdx] = useState(0);
 
   useEffect(() => {
     if (!accessToken) { setLoading(false); return; }
-    fetch("/api/portal/applications", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-      .then(r => r.ok ? r.json() : [])
-      .then(data => setMyApplications(Array.isArray(data) ? data : []))
+    const h = { Authorization: `Bearer ${accessToken}` };
+    Promise.all([
+      fetch("/api/portal/applications", { headers: h }).then(r => r.ok ? r.json() : []),
+      fetch("/api/portal/notifications/announcements", { headers: h }).then(r => r.ok ? r.json() : []),
+    ])
+      .then(([apps, anns]) => {
+        setMyApplications(Array.isArray(apps) ? apps : []);
+        setAnnouncements(Array.isArray(anns) ? anns : []);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [accessToken]);
@@ -373,6 +379,64 @@ export default function ClientDashboardPage() {
             style={{ background: "#F5A623", color: "#0B1F3A" }}>
             <FileText size={14} /> Apply for a Loan
           </Link>
+        </div>
+      )}
+
+      {/* ── ANNOUNCEMENTS FROM PHILIX ── */}
+      {announcements.length > 0 && (
+        <div>
+          <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">From Philix Finance</h2>
+          <div className="relative overflow-hidden rounded-2xl"
+            style={{ background: "linear-gradient(135deg, #0B1F3A 0%, #0f1f40 60%, #1a1155 100%)", border: "1px solid rgba(245,166,35,0.22)" }}>
+            {/* Gold glow */}
+            <div className="absolute top-0 right-0 w-48 h-48 opacity-15 pointer-events-none"
+              style={{ background: "radial-gradient(circle at 90% 10%, #F5A623 0%, transparent 65%)" }} />
+            <div className="relative p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: "rgba(245,166,35,0.15)" }}>
+                  <Sparkles size={14} style={{ color: "#F5A623" }} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500">From Philix Finance</p>
+                  <p className="text-xs font-bold text-white">{announcements[annIdx].subject}</p>
+                </div>
+                <div className="text-[9px] text-slate-600">
+                  {new Date(announcements[annIdx].createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                </div>
+              </div>
+
+              {/* Quote body */}
+              <div className="flex gap-3 mb-4">
+                <Quote size={20} className="flex-shrink-0 mt-0.5 opacity-20" style={{ color: "#F5A623" }} />
+                <p className="text-sm text-slate-300 leading-relaxed italic">{announcements[annIdx].body}</p>
+              </div>
+
+              {/* Navigation dots */}
+              {announcements.length > 1 && (
+                <div className="flex items-center gap-2">
+                  {announcements.map((_, i) => (
+                    <button key={i} onClick={() => setAnnIdx(i)}
+                      className="transition-all rounded-full"
+                      style={{
+                        width: i === annIdx ? 20 : 6, height: 6,
+                        background: i === annIdx ? "#F5A623" : "rgba(255,255,255,0.15)",
+                      }} />
+                  ))}
+                  <div className="ml-auto flex gap-1.5">
+                    <button onClick={() => setAnnIdx(i => Math.max(0, i - 1))}
+                      disabled={annIdx === 0}
+                      className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-300 disabled:opacity-30 transition-all"
+                      style={{ background: "rgba(255,255,255,0.06)" }}>‹</button>
+                    <button onClick={() => setAnnIdx(i => Math.min(announcements.length - 1, i + 1))}
+                      disabled={annIdx === announcements.length - 1}
+                      className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-300 disabled:opacity-30 transition-all"
+                      style={{ background: "rgba(255,255,255,0.06)" }}>›</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

@@ -377,4 +377,43 @@ router.patch("/payment-submissions/:id", wrap(async (req: Request, res: Response
   res.json(updated);
 }));
 
+// POST /api/admin/broadcast — send message to all clients or a specific client
+router.post("/broadcast", wrap(async (req: Request, res: Response) => {
+  const { subject, body, category = "ANNOUNCEMENT", targetAccountId } = req.body as {
+    subject: string; body: string; category?: string; targetAccountId?: string;
+  };
+  if (!subject || !body) return res.status(400).json({ error: "subject and body are required" });
+
+  let accounts: { id: string }[];
+  if (targetAccountId) {
+    accounts = [{ id: targetAccountId }];
+  } else {
+    accounts = await prisma.clientPortalAccount.findMany({ select: { id: true } });
+  }
+
+  await prisma.clientNotification.createMany({
+    data: accounts.map(a => ({
+      accountId: a.id,
+      subject,
+      body,
+      category,
+      sentViaEmail: false,
+    })),
+  });
+
+  res.json({ sent: accounts.length });
+}));
+
+// GET /api/admin/broadcasts — history of announcement notifications
+router.get("/broadcasts", wrap(async (_req: Request, res: Response) => {
+  const rows = await prisma.clientNotification.findMany({
+    where: { category: "ANNOUNCEMENT" },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+    distinct: ["subject", "body"],
+    select: { id: true, subject: true, body: true, category: true, createdAt: true },
+  });
+  res.json(rows);
+}));
+
 export default router;

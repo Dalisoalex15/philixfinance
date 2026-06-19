@@ -40,6 +40,17 @@ router.post("/mark-read", wrap(async (req: Request, res: Response) => {
   res.json({ message: "Marked as read" });
 }));
 
+// GET /api/portal/announcements — latest ANNOUNCEMENT notifications for dashboard banner
+router.get("/announcements", wrap(async (req: Request, res: Response) => {
+  const id = (req as Request & { portalAccountId: string }).portalAccountId;
+  const rows = await prisma.clientNotification.findMany({
+    where: { accountId: id, category: "ANNOUNCEMENT" },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+  });
+  res.json(rows);
+}));
+
 // DELETE /api/portal/notifications/:notifId
 router.delete("/:notifId", wrap(async (req: Request, res: Response) => {
   const id = (req as Request & { portalAccountId: string }).portalAccountId;

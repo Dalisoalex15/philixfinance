@@ -83,6 +83,7 @@ import GroupLendingPage from "./pages/GroupLendingPage";
 import APIManagementPage from "./pages/APIManagementPage";
 import DefaultRiskPage from "./pages/DefaultRiskPage";
 import PortalClientsPage from "./pages/PortalClientsPage";
+import ClientBroadcastPage from "./pages/ClientBroadcastPage";
 import CapitalPage from "./pages/CapitalPage";
 import PaymentSubmissionsPage from "./pages/PaymentSubmissionsPage";
 
@@ -250,6 +251,7 @@ export default function App() {
           <Route path="portal-clients" element={<PortalClientsPage />} />
           <Route path="capital" element={<CapitalPage />} />
           <Route path="payment-submissions" element={<PaymentSubmissionsPage />} />
+          <Route path="client-broadcasts" element={<ClientBroadcastPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

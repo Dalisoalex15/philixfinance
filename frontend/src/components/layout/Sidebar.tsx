@@ -10,7 +10,7 @@ import {
   Calendar, Users2, FileText, ShoppingBag, Mail, Upload, Download,
   Search, Percent, Wallet, Scale,
   MessageSquare, Smartphone, MessageCircle, FileSignature, QrCode,
-  Brain, ShieldAlert, Gift, UsersRound, Webhook, TrendingDown,
+  Brain, ShieldAlert, Gift, UsersRound, Webhook, TrendingDown, Radio,
 } from "lucide-react";
 import { useAuthStore } from "../../store/auth";
 import { useLoanApplicationStore } from "../../store/loanApplicationStore";
@@ -107,8 +107,9 @@ const navGroups: NavGroup[] = [
       { href: "/procurement",   icon: ShoppingBag, label: "Procurement" },
       { href: "/assets",        icon: MonitorDot,  label: "Asset Register" },
       { href: "/email-logs",    icon: Mail,        label: "Email Logs" },
-      { href: "/email-composer",icon: Mail,        label: "Email Clients" },
-      { href: "/announcements", icon: Megaphone,   label: "Announcements" },
+      { href: "/email-composer",     icon: Mail,     label: "Email Clients" },
+      { href: "/announcements",      icon: Megaphone, label: "Announcements" },
+      { href: "/client-broadcasts",  icon: Radio,    label: "Client Broadcasts" },
       { href: "/wiki",          icon: BookOpen,    label: "Knowledge Base" },
     ],
   },
