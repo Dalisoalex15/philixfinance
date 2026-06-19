@@ -1,6 +1,6 @@
 import {
   Users, CheckCircle, Clock, ArrowUpRight, ArrowDownRight,
-  Download, Zap, CreditCard, TrendingUp, BarChart2,
+  Download, Zap, CreditCard, TrendingUp, BarChart2, Banknote, DollarSign,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLoanApplicationStore } from "../store/loanApplicationStore";
@@ -13,6 +13,9 @@ interface AdminSummary {
   approvedToday: number;
   submittedToday: number;
   totalApplications: number;
+  totalDisbursedAmount: number;
+  totalInterestEarned: number;
+  totalRepayable: number;
 }
 
 function KPICard({
@@ -86,6 +89,9 @@ export default function DashboardPage() {
     approvedToday: 0,
     submittedToday: 0,
     totalApplications: 0,
+    totalDisbursedAmount: 0,
+    totalInterestEarned: 0,
+    totalRepayable: 0,
   });
 
   const pendingApps = applications.filter(a => a.status === "PENDING" || a.status === "UNDER_REVIEW");
@@ -170,6 +176,46 @@ export default function DashboardPage() {
           icon={TrendingUp}
           color="emerald"
         />
+      </div>
+
+      {/* Financial totals */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="stat-card flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-emerald-100 text-emerald-700 flex-shrink-0">
+            <Banknote size={20} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xl font-bold font-mono text-navy-900 truncate">
+              {formatKwacha(summary.totalDisbursedAmount)}
+            </div>
+            <div className="text-xs font-semibold text-navy-600 mt-0.5">Total Loans Disbursed</div>
+            <div className="text-xs text-navy-500">Principal paid out to clients</div>
+          </div>
+        </div>
+        <div className="stat-card flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-amber-100 text-amber-700 flex-shrink-0">
+            <TrendingUp size={20} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xl font-bold font-mono text-amber-700 truncate">
+              {formatKwacha(summary.totalInterestEarned)}
+            </div>
+            <div className="text-xs font-semibold text-navy-600 mt-0.5">Total Interest Earned</div>
+            <div className="text-xs text-navy-500">Revenue from all disbursed loans</div>
+          </div>
+        </div>
+        <div className="stat-card flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-indigo-100 text-indigo-700 flex-shrink-0">
+            <DollarSign size={20} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xl font-bold font-mono text-navy-900 truncate">
+              {formatKwacha(summary.totalRepayable)}
+            </div>
+            <div className="text-xs font-semibold text-navy-600 mt-0.5">Total Amount Repayable</div>
+            <div className="text-xs text-navy-500">Principal + interest combined</div>
+          </div>
+        </div>
       </div>
 
       {/* Officer work-queue panel — only shown to non-CEO staff */}
