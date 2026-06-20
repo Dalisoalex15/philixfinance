@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import PhilixLogo from "../ui/PhilixLogo";
+import PortalChatbot from "./PortalChatbot";
 
 const navItems = [
   { href: "/portal/dashboard", icon: LayoutDashboard, label: "Dashboard", color: "text-indigo-400" },
@@ -221,6 +222,9 @@ export default function ClientPortalLayout() {
         <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-20 lg:pb-6">
           <Outlet />
         </main>
+
+        {/* AI Chatbot */}
+        <PortalChatbot />
 
         {/* Mobile bottom nav */}
         <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-slate-900/95 backdrop-blur border-t border-slate-800/60 px-2 py-2 flex items-center justify-around">

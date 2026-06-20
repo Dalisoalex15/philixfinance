@@ -84,6 +84,7 @@ export default function LoanApplicationPage() {
     collateralType: "", collateralDescription: "", collateralValue: "",
     collateralCondition: "", collateralYear: "", collateralSerial: "",
     collateralOwner: "SELF", collateralOwnerName: "",
+    collateralStorage: "",
     hasOwnershipDocs: false, hasInsurance: false,
     collateralPhotos: [] as File[],
     // Step 4: Guarantor & References
@@ -114,7 +115,21 @@ export default function LoanApplicationPage() {
       const clamped = Math.min(Math.max(loanAmount || p.minAmount, p.minAmount), p.maxAmount);
       set("amount", clamped.toString());
     }
+    // Auto-advance to next step after brief visual feedback
+    setTimeout(() => setStep(1), 280);
   };
+
+  // Electronics that need a storage capacity field
+  const ELECTRONICS_WITH_STORAGE = ["smartphone", "laptop", "tablet", "desktop", "gaming console", "other electronic"];
+  const needsStorage = ELECTRONICS_WITH_STORAGE.some(e => form.collateralType.toLowerCase().includes(e));
+  const STORAGE_OPTIONS =
+    form.collateralType.toLowerCase().includes("smartphone")
+      ? ["16GB", "32GB", "64GB", "128GB", "256GB", "512GB"]
+      : form.collateralType.toLowerCase().includes("laptop") || form.collateralType.toLowerCase().includes("desktop")
+      ? ["128GB SSD", "256GB SSD", "512GB SSD", "1TB SSD", "2TB SSD", "256GB HDD", "500GB HDD", "1TB HDD", "2TB HDD"]
+      : form.collateralType.toLowerCase().includes("tablet")
+      ? ["32GB", "64GB", "128GB", "256GB", "512GB"]
+      : ["16GB", "32GB", "64GB", "128GB", "256GB", "512GB", "1TB"];
 
   // Real-time risk assessment (preview before submission)
   const assessment = useMemo(() => {
@@ -227,7 +242,7 @@ export default function LoanApplicationPage() {
           monthlyIncome: Number(form.monthlyIncome) || undefined,
           payDate: form.payDate || undefined,
           collateralType: form.collateralType || undefined,
-          collateralDesc: form.collateralDescription || undefined,
+          collateralDesc: [form.collateralDescription, form.collateralStorage ? `Storage: ${form.collateralStorage}` : ""].filter(Boolean).join(" — ") || undefined,
           collateralValue: Number(form.collateralValue) || undefined,
           collateralCondition: form.collateralCondition || undefined,
           collateralPhotos: photoBase64.length > 0 ? photoBase64 : undefined,
@@ -627,6 +642,22 @@ export default function LoanApplicationPage() {
                 <input type="number" className={inputCls} placeholder="Current market price"
                   value={form.collateralValue} onChange={e => set("collateralValue", e.target.value)} />
               </Field>
+              {needsStorage && (
+                <Field label="Storage Capacity *">
+                  <div className="flex flex-wrap gap-2">
+                    {STORAGE_OPTIONS.map(s => (
+                      <button key={s} type="button" onClick={() => set("collateralStorage", s)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                          form.collateralStorage === s
+                            ? "bg-indigo-600 border-indigo-500 text-white"
+                            : "bg-slate-800 border-slate-700 text-slate-400 hover:border-indigo-600"
+                        }`}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+              )}
             </div>
 
             {/* Real-time valuation preview */}
@@ -938,16 +969,18 @@ export default function LoanApplicationPage() {
               <AlertCircle size={14} className="flex-shrink-0" /> {submitError}
             </div>
           )}
-          <button onClick={next} disabled={submitting}
-            className="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl text-sm transition-all flex items-center justify-center gap-2">
-            {submitting ? <><Loader2 size={14} className="animate-spin" /> Submitting…</> :
-              step === STEPS.length - 1 ? "Submit Application →" :
-              step === 3 ? "Continue (skip if no collateral yet)" : "Continue →"}
-          </button>
+          {step > 0 && (
+            <button onClick={next} disabled={submitting}
+              className="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl text-sm transition-all flex items-center justify-center gap-2">
+              {submitting ? <><Loader2 size={14} className="animate-spin" /> Submitting…</> :
+                step === STEPS.length - 1 ? "Submit Application →" :
+                step === 3 ? "Continue →" : "Continue →"}
+            </button>
+          )}
         </div>
         {step === 3 && (
           <button onClick={() => setStep(4)} className="w-full mt-2 text-sm text-slate-500 hover:text-slate-400 py-1">
-            Skip collateral step →
+            Skip — I'll provide collateral later
           </button>
         )}
       </div>
