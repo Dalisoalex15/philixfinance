@@ -1,116 +1,202 @@
-import { Shield, TrendingDown, AlertTriangle, RefreshCw } from "lucide-react";
-import { mockProvisionings, mockPAR, formatKwacha, formatDate } from "../lib/mock-data";
+import { useEffect } from "react";
+import { Shield, TrendingDown, AlertTriangle, Download } from "lucide-react";
+import { useLoanApplicationStore, LoanApplication } from "../store/loanApplicationStore";
+import { formatDate } from "../lib/mock-data";
+
+const K = (n: number) => `K${Math.round(n).toLocaleString()}`;
+
+function getDaysOverdue(app: LoanApplication): number {
+  const due = new Date(app.submittedAt).getTime() + (app.termMonths ?? 1) * 7 * 86400000;
+  const diff = Date.now() - due;
+  return diff > 0 ? Math.floor(diff / 86400000) : 0;
+}
+
+interface PARBand {
+  label: string;
+  minDays: number;
+  maxDays: number;
+  rate: number;
+  color: string;
+  bg: string;
+  badge: string;
+}
+
+const PAR_BANDS: PARBand[] = [
+  { label: "Current (0 days)",   minDays: 0,  maxDays: 0,  rate: 0.01, color: "text-emerald-400", bg: "bg-emerald-500/10", badge: "badge-green" },
+  { label: "PAR 1–30",           minDays: 1,  maxDays: 30, rate: 0.05, color: "text-amber-400",   bg: "bg-amber-500/10",   badge: "badge-yellow" },
+  { label: "PAR 31–60",          minDays: 31, maxDays: 60, rate: 0.25, color: "text-orange-400",  bg: "bg-orange-500/10",  badge: "badge-yellow" },
+  { label: "PAR 61–90",          minDays: 61, maxDays: 90, rate: 0.50, color: "text-red-400",     bg: "bg-red-500/10",     badge: "badge-red" },
+  { label: "PAR 90+",            minDays: 91, maxDays: Infinity, rate: 1.00, color: "text-red-600", bg: "bg-red-900/20",   badge: "badge-red" },
+];
+
+function getBand(days: number): PARBand {
+  return PAR_BANDS.find(b => days >= b.minDays && days <= b.maxDays) ?? PAR_BANDS[PAR_BANDS.length - 1];
+}
 
 export default function ProvisioningPage() {
-  const prov = mockProvisionings[0];
+  const { applications, syncFromApi } = useLoanApplicationStore();
 
-  const parBands = [
-    { label: "PAR 30 (1–30 days)", amount: prov.par30Amount, rate: prov.rate30, provision: prov.provision30, color: "text-amber-400", bg: "bg-amber-500/10" },
-    { label: "PAR 60 (31–60 days)", amount: prov.par60Amount, rate: prov.rate60, provision: prov.provision60, color: "text-orange-400", bg: "bg-orange-500/10" },
-    { label: "PAR 90 (61–90 days)", amount: prov.par90Amount, rate: prov.rate90, provision: prov.provision90, color: "text-red-400", bg: "bg-red-500/10" },
-    { label: "Default (90+ days)", amount: prov.defaultAmount, rate: prov.rateDefault, provision: prov.provisionDefault, color: "text-red-600", bg: "bg-red-600/10" },
+  useEffect(() => { syncFromApi(); }, []);
+
+  const disbursed = applications.filter(a => a.status === "DISBURSED");
+
+  // Per-loan provisioning data
+  const loanRows = disbursed.map(app => {
+    const daysOverdue = getDaysOverdue(app);
+    const band = getBand(daysOverdue);
+    const provision = app.amount * band.rate;
+    return { app, daysOverdue, band, provision };
+  });
+
+  // PAR band aggregates
+  const bandStats = PAR_BANDS.map(band => {
+    const loans = loanRows.filter(r => r.band.label === band.label);
+    const balance = loans.reduce((s, r) => s + r.app.amount, 0);
+    const provision = loans.reduce((s, r) => s + r.provision, 0);
+    return { band, count: loans.length, balance, provision };
+  });
+
+  const totalPortfolio = disbursed.reduce((s, a) => s + a.amount, 0);
+  const totalOverdue = loanRows.filter(r => r.daysOverdue > 0).reduce((s, r) => s + r.app.amount, 0);
+  const totalProvision = loanRows.reduce((s, r) => s + r.provision, 0);
+  const coverageRatio = totalOverdue > 0 ? (totalProvision / totalOverdue) * 100 : 0;
+
+  function exportCSV() {
+    const headers = ["Client", "Loan Ref", "Amount (K)", "Days Overdue", "PAR Band", "Rate %", "Provision (K)"];
+    const rows = loanRows.map(r => [
+      r.app.clientName,
+      r.app.ref,
+      Math.round(r.app.amount),
+      r.daysOverdue,
+      r.band.label,
+      `${(r.band.rate * 100).toFixed(0)}%`,
+      Math.round(r.provision),
+    ]);
+    const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `philix_provision_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const kpis = [
+    { label: "Total Portfolio", value: K(totalPortfolio), icon: <Shield size={18} className="text-indigo-400" />, color: "text-indigo-400" },
+    { label: "Total Overdue", value: K(totalOverdue), icon: <AlertTriangle size={18} className="text-amber-400" />, color: "text-amber-400" },
+    { label: "Required Provision", value: K(totalProvision), icon: <TrendingDown size={18} className="text-red-400" />, color: "text-red-400" },
+    { label: "Coverage Ratio", value: `${coverageRatio.toFixed(1)}%`, icon: <Shield size={18} className="text-emerald-400" />, color: "text-emerald-400" },
   ];
 
   return (
     <div className="space-y-6">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Bad Debt Provisioning</h1>
-          <p className="page-subtitle">IFRS 9 compliant loan loss provisioning by PAR band</p>
+          <h1 className="page-title">IFRS-9 Provisioning</h1>
+          <p className="page-subtitle">Loan loss provisioning by PAR band — real portfolio data</p>
         </div>
-        <button className="btn-secondary"><RefreshCw size={14} /> Recalculate</button>
+        <button onClick={exportCSV} className="btn-secondary">
+          <Download size={14} /> Export Provision Schedule
+        </button>
       </div>
 
+      {/* KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "Total Overdue", value: formatKwacha(prov.par30Amount + prov.par60Amount + prov.par90Amount + prov.defaultAmount), color: "text-red-400" },
-          { label: "Total Provision", value: formatKwacha(prov.totalProvision), color: "text-amber-400" },
-          { label: "Coverage Ratio", value: `${((prov.totalProvision / (prov.par30Amount + prov.par60Amount + prov.par90Amount + prov.defaultAmount)) * 100).toFixed(1)}%`, color: "text-indigo-400" },
-          { label: "Period", value: formatDate(prov.periodDate), color: "text-slate-200" },
-        ].map((s) => (
-          <div key={s.label} className="stat-card">
-            <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
-            <div className="text-xs text-slate-400 mt-1">{s.label}</div>
+        {kpis.map(k => (
+          <div key={k.label} className="philix-card p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0">{k.icon}</div>
+            <div>
+              <div className={`text-xl font-bold ${k.color}`}>{k.value}</div>
+              <div className="text-xs text-slate-500">{k.label}</div>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* PAR Bands */}
+      {/* PAR Band Summary Table */}
       <div className="philix-card overflow-hidden">
-        <div className="p-4 border-b border-slate-800">
-          <h3 className="section-title">Provision Calculation by PAR Band</h3>
-          <p className="text-xs text-slate-500 mt-1">Provision rates can be edited in Settings</p>
+        <div className="px-4 py-3 border-b border-slate-800">
+          <h3 className="text-sm font-semibold text-slate-200">PAR Band Summary</h3>
         </div>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>PAR Band</th>
-              <th className="text-right">Outstanding Amount</th>
-              <th className="text-right">Provision Rate</th>
-              <th className="text-right">Required Provision</th>
-            </tr>
-          </thead>
-          <tbody>
-            {parBands.map((band) => (
-              <tr key={band.label} className="table-row-hover">
-                <td>
-                  <span className={`text-sm font-medium ${band.color}`}>{band.label}</span>
-                </td>
-                <td className="text-right font-mono text-slate-300">{formatKwacha(band.amount)}</td>
-                <td className="text-right">
-                  <span className={`text-sm font-bold ${band.color}`}>{(band.rate * 100).toFixed(0)}%</span>
-                </td>
-                <td className="text-right font-bold font-mono text-slate-100">{formatKwacha(band.provision)}</td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="border-b border-slate-800">
+              <tr className="text-left">
+                {["Band", "# Loans", "Loan Balance", "Rate %", "Provision Required"].map(h => (
+                  <th key={h} className="px-4 py-3 text-xs text-slate-500 font-medium">{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="border-t-2 border-slate-700">
-              <td className="px-4 py-3 font-bold text-slate-200">TOTAL REQUIRED PROVISION</td>
-              <td className="text-right px-4 py-3 font-mono text-slate-300">
-                {formatKwacha(prov.par30Amount + prov.par60Amount + prov.par90Amount + prov.defaultAmount)}
-              </td>
-              <td></td>
-              <td className="text-right px-4 py-3 font-bold font-mono text-red-400 text-lg">{formatKwacha(prov.totalProvision)}</td>
-            </tr>
-          </tfoot>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-800/50">
+              {bandStats.map(({ band, count, balance, provision }) => (
+                <tr key={band.label} className={`${band.bg} hover:bg-slate-800/30`}>
+                  <td className="px-4 py-3">
+                    <span className={`font-medium ${band.color}`}>{band.label}</span>
+                  </td>
+                  <td className="px-4 py-3 text-slate-300">{count}</td>
+                  <td className="px-4 py-3 text-slate-200">{K(balance)}</td>
+                  <td className="px-4 py-3">
+                    <span className={`font-bold ${band.color}`}>{(band.rate * 100).toFixed(0)}%</span>
+                  </td>
+                  <td className="px-4 py-3 font-semibold text-slate-100">{K(provision)}</td>
+                </tr>
+              ))}
+              {/* Totals Row */}
+              <tr className="bg-slate-800/60 border-t-2 border-slate-700 font-semibold">
+                <td className="px-4 py-3 text-slate-100">TOTAL</td>
+                <td className="px-4 py-3 text-slate-100">{disbursed.length}</td>
+                <td className="px-4 py-3 text-slate-100">{K(totalPortfolio)}</td>
+                <td className="px-4 py-3 text-slate-400">—</td>
+                <td className="px-4 py-3 text-indigo-400">{K(totalProvision)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* Visual bars */}
-      <div className="philix-card p-5">
-        <h3 className="section-title mb-5">Portfolio At Risk — Visual Breakdown</h3>
-        {parBands.map((band) => {
-          const total = prov.par30Amount + prov.par60Amount + prov.par90Amount + prov.defaultAmount;
-          const pct = (band.amount / total) * 100;
-          return (
-            <div key={band.label} className="mb-4">
-              <div className="flex justify-between text-xs mb-1.5">
-                <span className={`font-medium ${band.color}`}>{band.label}</span>
-                <span className="text-slate-300">{formatKwacha(band.amount)} <span className="text-slate-500">({pct.toFixed(0)}%)</span></span>
-              </div>
-              <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
-                <div className={`h-full rounded-full transition-all ${band.bg.replace("bg-", "bg-").replace("/10", "")}`}
-                  style={{ width: `${pct}%`, background: band.color.includes("amber") ? "#f59e0b" : band.color.includes("orange") ? "#f97316" : band.color.includes("red-6") ? "#dc2626" : "#ef4444" }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="philix-card p-5 border-amber-800/30 border">
-        <div className="flex items-center gap-2 mb-3">
-          <Shield size={14} className="text-amber-400" />
-          <span className="text-sm font-semibold text-amber-400">Provisioning Policy</span>
+      {/* Per-Loan Table */}
+      <div className="philix-card overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-800">
+          <h3 className="text-sm font-semibold text-slate-200">Per-Loan Provision Detail ({disbursed.length} loans)</h3>
         </div>
-        <div className="text-xs text-slate-400 space-y-1">
-          <p>• PAR 1–30 days: 25% of outstanding balance provisioned</p>
-          <p>• PAR 31–60 days: 50% of outstanding balance provisioned</p>
-          <p>• PAR 61–90 days: 75% of outstanding balance provisioned</p>
-          <p>• PAR 90+ / Default: 100% of outstanding balance provisioned</p>
-          <p className="mt-2 text-slate-500">Provisioning is recorded monthly as a debit to Bad Debt Expense and credit to Bad Debt Provision (contra-asset).</p>
-        </div>
+        {disbursed.length === 0 ? (
+          <div className="text-center py-12 text-slate-500">
+            <Shield size={36} className="mx-auto mb-2 opacity-40" />
+            <p>No disbursed loans in portfolio.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b border-slate-800">
+                <tr className="text-left">
+                  {["Client", "Loan Ref", "Amount", "Submitted", "Days Overdue", "PAR Band", "Provision"].map(h => (
+                    <th key={h} className="px-4 py-3 text-xs text-slate-500 font-medium">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50">
+                {loanRows.map(({ app, daysOverdue, band, provision }) => (
+                  <tr key={app.id} className="hover:bg-slate-800/30">
+                    <td className="px-4 py-3 font-medium text-slate-200">{app.clientName}</td>
+                    <td className="px-4 py-3 font-mono text-indigo-400 text-xs">{app.ref}</td>
+                    <td className="px-4 py-3 text-slate-200">{K(app.amount)}</td>
+                    <td className="px-4 py-3 text-slate-500 text-xs">{formatDate(app.submittedAt)}</td>
+                    <td className="px-4 py-3">
+                      <span className={`font-semibold ${daysOverdue > 30 ? "text-red-400" : daysOverdue > 0 ? "text-amber-400" : "text-emerald-400"}`}>
+                        {daysOverdue}d
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={band.badge}>{band.label}</span>
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-orange-400">{K(provision)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
