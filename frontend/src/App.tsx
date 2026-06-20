@@ -90,6 +90,7 @@ import PortalClientsPage from "./pages/PortalClientsPage";
 import ClientBroadcastPage from "./pages/ClientBroadcastPage";
 import CapitalPage from "./pages/CapitalPage";
 import PaymentSubmissionsPage from "./pages/PaymentSubmissionsPage";
+import CollateralCommandPage from "./pages/CollateralCommandPage";
 
 class RouteErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -261,6 +262,7 @@ export default function App() {
           <Route path="capital" element={<CapitalPage />} />
           <Route path="payment-submissions" element={<PaymentSubmissionsPage />} />
           <Route path="client-broadcasts" element={<ClientBroadcastPage />} />
+          <Route path="collateral-command" element={<CollateralCommandPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

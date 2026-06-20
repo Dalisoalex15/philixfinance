@@ -145,6 +145,48 @@ model PortalLoanApplication {
   ref2Name        String?
   ref2Phone       String?
   ref2Relation    String?
+
+  // Extended borrower info
+  nrcNumber            String?
+  physicalAddress      String?
+  employmentType       String?   // PERMANENT|CONTRACT|CASUAL|SELF_EMPLOYED|STUDENT|UNEMPLOYED
+  payrollNumber        String?
+  department           String?
+  yearsInService       String?
+  netSalaryAvailable   Float?
+  existingLoanDeductions Float?
+
+  // Enhanced collateral
+  collateralCondition  String?   // excellent|good|fair|poor
+  collateralYear       String?   // year purchased e.g. "2021"
+  collateralSerial     String?   // serial/registration number
+  collateralOwner      String?   // "SELF" or owner name if third party
+  hasOwnershipDocs     Boolean   @default(false)
+  hasInsurance         Boolean   @default(false)
+  collateralConditionScore Int?  // 1-5 numeric
+
+  // Guarantor
+  guarantorName        String?
+  guarantorPhone       String?
+  guarantorEmployer    String?
+  guarantorRelation    String?
+
+  // Student-specific
+  studentInstitution   String?
+  studentSponsor       String?
+  studentGradYear      String?
+
+  // Auto-computed risk assessment (set at submission time)
+  riskScore            Float?    // 0-100 overall score
+  riskCategory         String?   // EXCELLENT|GOOD|MODERATE|REJECT
+  coverageRatio        Float?    // forcedSaleValue / loanAmount
+  marketValue          Float?    // computed market value
+  forcedSaleValue      Float?    // liquidation value
+  lendingValue         Float?    // max we can lend against this collateral
+  maxRecommendedLoan   Float?    // min(lendingValue, incomeBased)
+  repossessionScore    String?   // GREEN|AMBER|RED
+  assessmentJson       String?   // JSON blob with full breakdown
+
   status          String   @default("SUBMITTED")
   // SUBMITTED | UNDER_REVIEW | APPROVED | REJECTED | DISBURSED
   reviewedBy      String?

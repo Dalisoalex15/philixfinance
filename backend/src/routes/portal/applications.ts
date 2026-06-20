@@ -4,6 +4,7 @@ import { AppError } from "../../middleware/errorHandler";
 import { authenticatePortal } from "../../middleware/portalAuth";
 import { authenticate } from "../../middleware/auth";
 import { Mailer } from "../../lib/mailer";
+import { assessCollateral } from "../../lib/collateralEngine";
 
 const wrap = (fn: (req: Request, res: Response, next: NextFunction) => Promise<void>) =>
   (req: Request, res: Response, next: NextFunction) => fn(req, res, next).catch(next);
@@ -101,6 +102,16 @@ router.post("/", wrap(async (req: Request, res: Response) => {
     occupation, employer, employerPhone, monthlyIncome, payDate,
     collateralType, collateralDesc, collateralValue, collateralPhotos,
     ref1Name, ref1Phone, ref1Relation, ref2Name, ref2Phone, ref2Relation,
+    // Extended borrower info
+    nrcNumber, physicalAddress, employmentType, payrollNumber, department,
+    yearsInService, netSalaryAvailable, existingLoanDeductions,
+    // Enhanced collateral
+    collateralCondition, collateralYear, collateralSerial, collateralOwner,
+    hasOwnershipDocs, hasInsurance,
+    // Guarantor
+    guarantorName, guarantorPhone, guarantorEmployer, guarantorRelation,
+    // Student-specific
+    studentInstitution, studentSponsor, studentGradYear,
   } = req.body;
 
   if (!productType || !amountRequested || !termMonths || !purpose) {
@@ -121,6 +132,29 @@ router.post("/", wrap(async (req: Request, res: Response) => {
     ? parseFloat(interestRate)
     : (PRODUCT_RATES[productType]?.[termWeeks] ?? 35);
 
+  // Compute collateral risk assessment at submission time
+  const photos = Array.isArray(collateralPhotos) ? collateralPhotos : [];
+  const assessment = assessCollateral({
+    collateralType: collateralType ?? "",
+    collateralValue: collateralValue != null ? parseFloat(collateralValue) : 0,
+    collateralCondition: collateralCondition ?? "",
+    collateralYear: collateralYear ?? undefined,
+    collateralSerial: collateralSerial ?? undefined,
+    collateralOwner: collateralOwner ?? undefined,
+    hasOwnershipDocs: hasOwnershipDocs === true || hasOwnershipDocs === "true",
+    hasInsurance: hasInsurance === true || hasInsurance === "true",
+    collateralPhotos: photos,
+    amountRequested: parseFloat(amountRequested),
+    termMonths: termWeeks,
+    interestRate: resolvedRate,
+    monthlyIncome: monthlyIncome != null ? parseFloat(monthlyIncome) : 0,
+    netSalaryAvailable: netSalaryAvailable != null ? parseFloat(netSalaryAvailable) : 0,
+    employmentType: employmentType ?? "",
+    guarantorName: guarantorName ?? undefined,
+    ref1Name: ref1Name ?? undefined,
+    ref2Name: ref2Name ?? undefined,
+  });
+
   const reference = genRef();
   const application = await prisma.portalLoanApplication.create({
     data: {
@@ -131,20 +165,58 @@ router.post("/", wrap(async (req: Request, res: Response) => {
       termMonths: termWeeks,
       interestRate: resolvedRate,
       purpose,
-      description,
-      occupation,
-      employer,
-      employerPhone,
-      monthlyIncome: monthlyIncome ? parseFloat(monthlyIncome) : null,
-      payDate,
-      collateralType,
-      collateralDesc,
-      collateralValue: collateralValue ? parseFloat(collateralValue) : null,
-      collateralPhotos: Array.isArray(collateralPhotos) && collateralPhotos.length > 0
-        ? JSON.stringify(collateralPhotos)
-        : null,
-      ref1Name, ref1Phone, ref1Relation,
-      ref2Name, ref2Phone, ref2Relation,
+      description: description ?? null,
+      occupation: occupation ?? null,
+      employer: employer ?? null,
+      employerPhone: employerPhone ?? null,
+      monthlyIncome: monthlyIncome != null ? parseFloat(monthlyIncome) : null,
+      payDate: payDate ?? null,
+      collateralType: collateralType ?? null,
+      collateralDesc: collateralDesc ?? null,
+      collateralValue: collateralValue != null ? parseFloat(collateralValue) : null,
+      collateralPhotos: photos.length > 0 ? JSON.stringify(photos) : null,
+      ref1Name: ref1Name ?? null,
+      ref1Phone: ref1Phone ?? null,
+      ref1Relation: ref1Relation ?? null,
+      ref2Name: ref2Name ?? null,
+      ref2Phone: ref2Phone ?? null,
+      ref2Relation: ref2Relation ?? null,
+      // Extended borrower info
+      nrcNumber: nrcNumber ?? null,
+      physicalAddress: physicalAddress ?? null,
+      employmentType: employmentType ?? null,
+      payrollNumber: payrollNumber ?? null,
+      department: department ?? null,
+      yearsInService: yearsInService ?? null,
+      netSalaryAvailable: netSalaryAvailable != null ? parseFloat(netSalaryAvailable) : null,
+      existingLoanDeductions: existingLoanDeductions != null ? parseFloat(existingLoanDeductions) : null,
+      // Enhanced collateral
+      collateralCondition: collateralCondition ?? null,
+      collateralYear: collateralYear ?? null,
+      collateralSerial: collateralSerial ?? null,
+      collateralOwner: collateralOwner ?? null,
+      hasOwnershipDocs: hasOwnershipDocs === true || hasOwnershipDocs === "true",
+      hasInsurance: hasInsurance === true || hasInsurance === "true",
+      collateralConditionScore: null,
+      // Guarantor
+      guarantorName: guarantorName ?? null,
+      guarantorPhone: guarantorPhone ?? null,
+      guarantorEmployer: guarantorEmployer ?? null,
+      guarantorRelation: guarantorRelation ?? null,
+      // Student-specific
+      studentInstitution: studentInstitution ?? null,
+      studentSponsor: studentSponsor ?? null,
+      studentGradYear: studentGradYear ?? null,
+      // Auto-computed risk assessment
+      riskScore: assessment.overallScore,
+      riskCategory: assessment.riskCategory,
+      coverageRatio: assessment.coverageRatio,
+      marketValue: assessment.marketValue,
+      forcedSaleValue: assessment.forcedSaleValue,
+      lendingValue: assessment.lendingValue,
+      maxRecommendedLoan: assessment.maxRecommendedLoan,
+      repossessionScore: assessment.repossessionScore,
+      assessmentJson: JSON.stringify(assessment),
     },
   });
 

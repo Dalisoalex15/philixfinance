@@ -36,6 +36,40 @@ export interface LoanApplication {
   ref2Name?: string;
   ref2Phone?: string;
   ref2Relation?: string;
+  // Extended borrower info
+  nrcNumber?: string;
+  physicalAddress?: string;
+  employmentType?: string;
+  payrollNumber?: string;
+  department?: string;
+  yearsInService?: string;
+  netSalaryAvailable?: number;
+  existingLoanDeductions?: number;
+  // Enhanced collateral
+  collateralYear?: string;
+  collateralSerial?: string;
+  collateralOwner?: string;
+  hasOwnershipDocs?: boolean;
+  hasInsurance?: boolean;
+  // Guarantor
+  guarantorName?: string;
+  guarantorPhone?: string;
+  guarantorEmployer?: string;
+  guarantorRelation?: string;
+  // Student
+  studentInstitution?: string;
+  studentSponsor?: string;
+  studentGradYear?: string;
+  // Auto-computed risk assessment (populated after backend sync)
+  riskScore?: number;
+  riskCategory?: string;
+  coverageRatio?: number;
+  marketValue?: number;
+  forcedSaleValue?: number;
+  lendingValue?: number;
+  maxRecommendedLoan?: number;
+  repossessionScore?: string;
+  assessmentJson?: string;
   status: "PENDING" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "DISBURSED";
   rejectedReason?: string;
   reviewedAt?: string;
@@ -93,7 +127,7 @@ function fromApiApp(a: StaffPortalApplication): LoanApplication {
     collateralType: a.collateralType ?? "",
     collateralDescription: a.collateralDesc ?? "",
     collateralValue: a.collateralValue ?? 0,
-    collateralCondition: "",
+    collateralCondition: a.collateralCondition ?? "",
     collateralPhotos: a.collateralPhotos ?? [],
     ref1Name: a.ref1Name,
     ref1Phone: a.ref1Phone,
@@ -101,6 +135,35 @@ function fromApiApp(a: StaffPortalApplication): LoanApplication {
     ref2Name: a.ref2Name,
     ref2Phone: a.ref2Phone,
     ref2Relation: a.ref2Relation,
+    nrcNumber: a.nrcNumber,
+    physicalAddress: a.physicalAddress,
+    employmentType: a.employmentType,
+    payrollNumber: a.payrollNumber,
+    department: a.department,
+    yearsInService: a.yearsInService,
+    netSalaryAvailable: a.netSalaryAvailable,
+    existingLoanDeductions: a.existingLoanDeductions,
+    collateralYear: a.collateralYear,
+    collateralSerial: a.collateralSerial,
+    collateralOwner: a.collateralOwner,
+    hasOwnershipDocs: a.hasOwnershipDocs,
+    hasInsurance: a.hasInsurance,
+    guarantorName: a.guarantorName,
+    guarantorPhone: a.guarantorPhone,
+    guarantorEmployer: a.guarantorEmployer,
+    guarantorRelation: a.guarantorRelation,
+    studentInstitution: a.studentInstitution,
+    studentSponsor: a.studentSponsor,
+    studentGradYear: a.studentGradYear,
+    riskScore: a.riskScore,
+    riskCategory: a.riskCategory,
+    coverageRatio: a.coverageRatio,
+    marketValue: a.marketValue,
+    forcedSaleValue: a.forcedSaleValue,
+    lendingValue: a.lendingValue,
+    maxRecommendedLoan: a.maxRecommendedLoan,
+    repossessionScore: a.repossessionScore,
+    assessmentJson: a.assessmentJson,
     status: (a.status === "SUBMITTED" ? "PENDING" : a.status) as LoanApplication["status"],
     rejectedReason: a.rejectedReason,
     reviewedAt: a.reviewedAt,

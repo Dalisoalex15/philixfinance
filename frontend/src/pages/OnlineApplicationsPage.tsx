@@ -2,12 +2,16 @@ import { useEffect, useState, useMemo } from "react";
 import {
   ExternalLink, Eye, CheckCircle, XCircle, AlertCircle, Clock, Send,
   RefreshCw, User, Briefcase, Shield, Users, Square, CheckSquare,
-  Download, ChevronDown, ChevronRight, Calendar, Filter,
+  Download, ChevronDown, ChevronRight, Calendar, Filter, TrendingUp,
+  AlertTriangle,
 } from "lucide-react";
-import { formatKwacha, formatDate, getStatusColor } from "../lib/mock-data";
+import { formatKwacha, formatDate } from "../lib/mock-data";
 import { useLoanApplicationStore, type LoanApplication } from "../store/loanApplicationStore";
 import { staffApi } from "../lib/api";
 import { toast } from "../store/toastStore";
+import {
+  SCORE_LABEL, SCORE_COLOR, COVERAGE_COLOR, COVERAGE_LABEL, REPOSSESSION_COLOR, K,
+} from "../lib/collateralEngine";
 
 // ─── CSV Export ───────────────────────────────────────────────────────────────
 function exportCSV(apps: LoanApplication[]) {
@@ -437,6 +441,111 @@ export default function OnlineApplicationsPage() {
               </div>
             )}
 
+            {/* Auto Risk Assessment (populated after backend sync) */}
+            {selected.riskScore !== undefined && selected.riskScore !== null && (
+              <section>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 rounded bg-indigo-600/20 flex items-center justify-center">
+                    <TrendingUp size={12} className="text-indigo-400" />
+                  </div>
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Auto Risk Assessment</span>
+                  <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full border ${
+                    selected.riskCategory === "EXCELLENT" ? "bg-emerald-900/30 border-emerald-800/40 text-emerald-400" :
+                    selected.riskCategory === "GOOD" ? "bg-blue-900/30 border-blue-800/40 text-blue-400" :
+                    selected.riskCategory === "MODERATE" ? "bg-amber-900/30 border-amber-800/40 text-amber-400" :
+                    "bg-red-900/30 border-red-800/40 text-red-400"
+                  }`}>
+                    {SCORE_LABEL[selected.riskCategory ?? ""] ?? selected.riskCategory}
+                  </span>
+                </div>
+                <div className={`rounded-xl border p-4 space-y-3 ${
+                  selected.riskCategory === "EXCELLENT" ? "bg-emerald-900/10 border-emerald-800/30" :
+                  selected.riskCategory === "GOOD" ? "bg-blue-900/10 border-blue-800/30" :
+                  selected.riskCategory === "MODERATE" ? "bg-amber-900/10 border-amber-800/30" :
+                  "bg-red-900/10 border-red-800/30"
+                }`}>
+                  {/* Score + Recommendation */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className={`text-3xl font-black ${SCORE_COLOR[selected.riskCategory ?? "REJECT"] ?? "text-slate-400"}`}>
+                        {selected.riskScore.toFixed(0)}
+                      </span>
+                      <span className="text-slate-600 text-sm">/100</span>
+                    </div>
+                    {(() => {
+                      const assessment = selected.assessmentJson ? (() => { try { return JSON.parse(selected.assessmentJson); } catch { return null; } })() : null;
+                      const rec = assessment?.recommendation;
+                      return rec ? (
+                        <span className={`text-xs font-bold px-3 py-1.5 rounded-xl ${
+                          rec === "APPROVE" ? "bg-emerald-600 text-white" :
+                          rec === "APPROVE_WITH_CONDITIONS" ? "bg-amber-600 text-white" :
+                          "bg-red-600 text-white"
+                        }`}>
+                          {rec === "APPROVE" ? "Recommend Approve" :
+                           rec === "APPROVE_WITH_CONDITIONS" ? "Approve with Conditions" : "Recommend Reject"}
+                        </span>
+                      ) : null;
+                    })()}
+                  </div>
+
+                  {/* Key Metrics */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { label: "Market Value", value: selected.marketValue ? K(selected.marketValue) : "—" },
+                      { label: "Forced Sale Value", value: selected.forcedSaleValue ? K(selected.forcedSaleValue) : "—" },
+                      { label: "Lending Value", value: selected.lendingValue ? K(selected.lendingValue) : "—" },
+                    ].map(m => (
+                      <div key={m.label} className="bg-slate-900/60 rounded-lg p-2.5 text-center">
+                        <div className="font-bold text-sm text-slate-100">{m.value}</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">{m.label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Coverage + Repossession + Max Loan */}
+                  <div className="grid grid-cols-3 gap-3 text-xs">
+                    <div>
+                      <div className="text-slate-500 mb-0.5">Coverage Ratio</div>
+                      <div className={`font-bold ${COVERAGE_COLOR(selected.coverageRatio ?? 0)}`}>
+                        {selected.coverageRatio ? `${(selected.coverageRatio * 100).toFixed(0)}%` : "—"}
+                        {selected.coverageRatio ? ` — ${COVERAGE_LABEL(selected.coverageRatio)}` : ""}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500 mb-0.5">Repossession Ease</div>
+                      <div className={`font-bold ${REPOSSESSION_COLOR[selected.repossessionScore ?? "RED"] ?? "text-red-400"}`}>
+                        {selected.repossessionScore ?? "—"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500 mb-0.5">Max Recommended</div>
+                      <div className="font-bold text-slate-100">{selected.maxRecommendedLoan ? K(selected.maxRecommendedLoan) : "—"}</div>
+                    </div>
+                  </div>
+
+                  {/* Warnings + Strengths from JSON */}
+                  {(() => {
+                    const assessment = selected.assessmentJson ? (() => { try { return JSON.parse(selected.assessmentJson); } catch { return null; } })() : null;
+                    if (!assessment) return null;
+                    return (
+                      <div className="space-y-1.5">
+                        {(assessment.warnings as string[])?.map((w: string, i: number) => (
+                          <div key={i} className="flex items-start gap-1.5 text-xs text-amber-300">
+                            <AlertTriangle size={11} className="flex-shrink-0 mt-0.5" /> {w}
+                          </div>
+                        ))}
+                        {(assessment.strengths as string[])?.map((s: string, i: number) => (
+                          <div key={i} className="flex items-start gap-1.5 text-xs text-emerald-400">
+                            <CheckCircle size={11} className="flex-shrink-0 mt-0.5" /> {s}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </section>
+            )}
+
             {/* Loan Details */}
             <section>
               <div className="flex items-center gap-2 mb-3">
@@ -460,7 +569,7 @@ export default function OnlineApplicationsPage() {
             </section>
 
             {/* Employment & Income */}
-            {(selected.occupation || selected.employer || selected.monthlyIncome) && (
+            {(selected.occupation || selected.employer || selected.monthlyIncome || selected.employmentType) && (
               <section>
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-6 h-6 rounded bg-emerald-600/20 flex items-center justify-center">
@@ -469,11 +578,22 @@ export default function OnlineApplicationsPage() {
                   <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Employment & Income</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
+                  <Field label="NRC Number" value={selected.nrcNumber} />
+                  <Field label="Physical Address" value={selected.physicalAddress} />
+                  <Field label="Employment Type" value={selected.employmentType} />
                   <Field label="Occupation" value={selected.occupation} />
                   <Field label="Employer" value={selected.employer} />
                   <Field label="Employer Phone" value={selected.employerPhone} />
-                  <Field label="Monthly Income" value={selected.monthlyIncome ? formatKwacha(selected.monthlyIncome) : undefined} />
+                  <Field label="Department" value={selected.department} />
+                  <Field label="Payroll Number" value={selected.payrollNumber} />
+                  <Field label="Years in Service" value={selected.yearsInService} />
+                  <Field label="Monthly Gross Income" value={selected.monthlyIncome ? formatKwacha(selected.monthlyIncome) : undefined} />
+                  <Field label="Net Salary Available" value={selected.netSalaryAvailable ? formatKwacha(selected.netSalaryAvailable) : undefined} />
+                  <Field label="Existing Deductions" value={selected.existingLoanDeductions ? formatKwacha(selected.existingLoanDeductions) : undefined} />
                   <Field label="Pay Date" value={selected.payDate} />
+                  {selected.studentInstitution && <Field label="Institution" value={selected.studentInstitution} />}
+                  {selected.studentSponsor && <Field label="Sponsor" value={selected.studentSponsor} />}
+                  {selected.studentGradYear && <Field label="Grad Year" value={selected.studentGradYear} />}
                 </div>
               </section>
             )}
@@ -490,8 +610,27 @@ export default function OnlineApplicationsPage() {
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   <Field label="Type" value={selected.collateralType} />
                   <Field label="Description" value={selected.collateralDescription} />
-                  <Field label="Estimated Value" value={selected.collateralValue ? formatKwacha(selected.collateralValue) : undefined} />
+                  <Field label="Declared Market Value" value={selected.collateralValue ? formatKwacha(selected.collateralValue) : undefined} />
                   {selected.collateralCondition && <Field label="Condition" value={selected.collateralCondition} />}
+                  <Field label="Year Purchased" value={selected.collateralYear} />
+                  <Field label="Serial / Reg Number" value={selected.collateralSerial} />
+                  <Field label="Owner" value={selected.collateralOwner} />
+                  {selected.hasOwnershipDocs !== undefined && (
+                    <div className="bg-slate-800/50 rounded-lg p-2.5">
+                      <div className="text-xs text-slate-500">Ownership Docs</div>
+                      <div className={`text-sm font-medium mt-0.5 ${selected.hasOwnershipDocs ? "text-emerald-400" : "text-red-400"}`}>
+                        {selected.hasOwnershipDocs ? "✓ Provided" : "✗ Not provided"}
+                      </div>
+                    </div>
+                  )}
+                  {selected.hasInsurance !== undefined && (
+                    <div className="bg-slate-800/50 rounded-lg p-2.5">
+                      <div className="text-xs text-slate-500">Insurance</div>
+                      <div className={`text-sm font-medium mt-0.5 ${selected.hasInsurance ? "text-emerald-400" : "text-slate-400"}`}>
+                        {selected.hasInsurance ? "✓ Insured" : "Not insured"}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {selected.collateralPhotos && selected.collateralPhotos.length > 0 && (
                   <div>
@@ -533,6 +672,24 @@ export default function OnlineApplicationsPage() {
                       <div className="text-xs text-slate-400 mt-0.5">{selected.ref2Phone}{selected.ref2Relation ? ` · ${selected.ref2Relation}` : ""}</div>
                     </div>
                   )}
+                </div>
+              </section>
+            )}
+
+            {/* Guarantor */}
+            {selected.guarantorName && (
+              <section>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 rounded bg-purple-600/20 flex items-center justify-center">
+                    <Shield size={12} className="text-purple-400" />
+                  </div>
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Guarantor</span>
+                </div>
+                <div className="bg-slate-800/50 rounded-lg p-3">
+                  <div className="text-sm font-semibold text-slate-200">{selected.guarantorName}</div>
+                  {selected.guarantorPhone && <div className="text-xs text-slate-400 mt-0.5">{selected.guarantorPhone}</div>}
+                  {selected.guarantorEmployer && <div className="text-xs text-slate-400">{selected.guarantorEmployer}</div>}
+                  {selected.guarantorRelation && <div className="text-xs text-indigo-400">{selected.guarantorRelation}</div>}
                 </div>
               </section>
             )}

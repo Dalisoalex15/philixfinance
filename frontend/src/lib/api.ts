@@ -196,6 +196,7 @@ export interface StaffPortalApplication {
   collateralType?: string;
   collateralDesc?: string;
   collateralValue?: number;
+  collateralCondition?: string;
   collateralPhotos?: string[];
   ref1Name?: string;
   ref1Phone?: string;
@@ -213,6 +214,40 @@ export interface StaffPortalApplication {
   account?: {
     firstName: string; lastName: string; email: string; phone: string; clientNumber: string;
   };
+  // Extended borrower info
+  nrcNumber?: string;
+  physicalAddress?: string;
+  employmentType?: string;
+  payrollNumber?: string;
+  department?: string;
+  yearsInService?: string;
+  netSalaryAvailable?: number;
+  existingLoanDeductions?: number;
+  // Enhanced collateral
+  collateralYear?: string;
+  collateralSerial?: string;
+  collateralOwner?: string;
+  hasOwnershipDocs?: boolean;
+  hasInsurance?: boolean;
+  // Guarantor
+  guarantorName?: string;
+  guarantorPhone?: string;
+  guarantorEmployer?: string;
+  guarantorRelation?: string;
+  // Student
+  studentInstitution?: string;
+  studentSponsor?: string;
+  studentGradYear?: string;
+  // Auto-computed risk assessment
+  riskScore?: number;
+  riskCategory?: string;
+  coverageRatio?: number;
+  marketValue?: number;
+  forcedSaleValue?: number;
+  lendingValue?: number;
+  maxRecommendedLoan?: number;
+  repossessionScore?: string;
+  assessmentJson?: string;
 }
 
 // ── Portal auth ──────────────────────────────────────────────────────────────
