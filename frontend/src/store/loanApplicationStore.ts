@@ -189,19 +189,7 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
         set(state => ({
           applications: [{ ...app, id, submittedAt }, ...state.applications],
         }));
-        // Also post to real API (fire and forget)
-        portalApi.submitApplication({
-          productType: app.productId || app.productName,
-          amountRequested: app.amount,
-          termMonths: 1,
-          purpose: app.purpose,
-          occupation: app.occupation,
-          employer: app.employer,
-          monthlyIncome: app.monthlyIncome,
-          collateralType: app.collateralType,
-          collateralDesc: app.collateralDescription,
-          collateralValue: app.collateralValue,
-        }).catch(() => {/* non-critical */});
+        // API call is handled by LoanApplicationPage before calling this method
         return id;
       },
 

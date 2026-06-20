@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  TrendingUp, Shield, AlertTriangle, CheckCircle, XCircle,
-  RefreshCw, Eye, ChevronDown, ChevronRight,
+  TrendingUp, AlertTriangle, CheckCircle, XCircle, RefreshCw,
 } from "lucide-react";
 import { useLoanApplicationStore, type LoanApplication } from "../store/loanApplicationStore";
 import { formatKwacha, formatDate } from "../lib/mock-data";
@@ -187,7 +186,7 @@ export default function CollateralCommandPage() {
           {filtered.map(app => {
             const cat = app.riskCategory ?? "NO_ASSESSMENT";
             const meta = RISK_META[cat] ?? RISK_META.NO_ASSESSMENT;
-            const initials = app.clientName.split(" ").map(p => p[0]).slice(0, 2).join("");
+            const initials = (app.clientName ?? "??").split(" ").map((p: string) => p[0]).slice(0, 2).join("");
             return (
               <div key={app.id}
                 className={`philix-card p-4 cursor-pointer transition-all ${selected?.id === app.id ? "border-indigo-600 border" : "hover:border-slate-700"}`}
@@ -230,7 +229,7 @@ export default function CollateralCommandPage() {
             {/* Client Header */}
             <div className="flex items-start gap-3">
               <div className="w-12 h-12 rounded-full bg-indigo-600/20 flex items-center justify-center font-bold text-indigo-400 text-lg flex-shrink-0">
-                {selected.clientName.split(" ").map(p => p[0]).slice(0, 2).join("")}
+                {(selected.clientName ?? "??").split(" ").map((p: string) => p[0]).slice(0, 2).join("")}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-bold text-slate-100 text-lg">{selected.clientName}</div>
