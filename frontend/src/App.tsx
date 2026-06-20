@@ -16,6 +16,11 @@ import MyLoansPage from "./pages/portal/MyLoansPage";
 import ClientProfilePage from "./pages/portal/ClientProfilePage";
 import ClientNotificationsPage from "./pages/portal/ClientNotificationsPage";
 import ClientLoanCalculatorPage from "./pages/portal/ClientLoanCalculatorPage";
+import StatementPage from "./pages/portal/StatementPage";
+import ReferralPage from "./pages/portal/ReferralPage";
+import SupportPage from "./pages/portal/SupportPage";
+import EligibilityPage from "./pages/portal/EligibilityPage";
+import CreditScorePage from "./pages/portal/CreditScorePage";
 import EmailComposerPage from "./pages/EmailComposerPage";
 import DashboardPage from "./pages/DashboardPage";
 import CEODashboardPage from "./pages/CEODashboardPage";
@@ -171,6 +176,11 @@ export default function App() {
           <Route path="notifications" element={<RouteErrorBoundary><ClientNotificationsPage /></RouteErrorBoundary>} />
           <Route path="profile" element={<RouteErrorBoundary><ClientProfilePage /></RouteErrorBoundary>} />
           <Route path="calculator" element={<RouteErrorBoundary><ClientLoanCalculatorPage /></RouteErrorBoundary>} />
+          <Route path="statement" element={<RouteErrorBoundary><StatementPage /></RouteErrorBoundary>} />
+          <Route path="referral" element={<RouteErrorBoundary><ReferralPage /></RouteErrorBoundary>} />
+          <Route path="support" element={<RouteErrorBoundary><SupportPage /></RouteErrorBoundary>} />
+          <Route path="eligibility" element={<RouteErrorBoundary><EligibilityPage /></RouteErrorBoundary>} />
+          <Route path="credit-score" element={<RouteErrorBoundary><CreditScorePage /></RouteErrorBoundary>} />
         </Route>
         <Route
           path="/"

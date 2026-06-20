@@ -4,7 +4,8 @@ import { useLoanApplicationStore } from "../../store/loanApplicationStore";
 import {
   LayoutDashboard, CreditCard, Package, FileText, User,
   LogOut, Bell, Menu, X, Shield, Phone, ChevronRight,
-  Zap, Home, Calculator
+  Zap, Home, Calculator, BarChart2, Users, HelpCircle,
+  ClipboardList, TrendingUp,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import PhilixLogo from "../ui/PhilixLogo";
@@ -14,9 +15,14 @@ const navItems = [
   { href: "/portal/apply", icon: FileText, label: "Apply for Loan", color: "text-blue-400", highlight: true },
   { href: "/portal/loans", icon: CreditCard, label: "My Loans", color: "text-emerald-400" },
   { href: "/portal/calculator", icon: Calculator, label: "Loan Calculator", color: "text-cyan-400" },
+  { href: "/portal/eligibility", icon: ClipboardList, label: "Loan Eligibility", color: "text-teal-400" },
+  { href: "/portal/credit-score", icon: BarChart2, label: "Credit Score", color: "text-violet-400" },
+  { href: "/portal/statement", icon: TrendingUp, label: "Account Statement", color: "text-sky-400" },
+  { href: "/portal/referral", icon: Users, label: "Refer & Earn", color: "text-orange-400" },
   { href: "/portal/collateral", icon: Package, label: "Submit Collateral", color: "text-amber-400" },
   { href: "/portal/kyc", icon: Shield, label: "Identity Verification", color: "text-purple-400" },
   { href: "/portal/notifications", icon: Bell, label: "Notifications", color: "text-pink-400" },
+  { href: "/portal/support", icon: HelpCircle, label: "Support Center", color: "text-slate-500" },
   { href: "/portal/profile", icon: User, label: "My Profile", color: "text-slate-400" },
 ];
 
