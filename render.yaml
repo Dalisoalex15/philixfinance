@@ -19,6 +19,8 @@ services:
         generateValue: true
       - key: FRONTEND_URL
         value: https://philixfinance.vercel.app
+      - key: ANTHROPIC_API_KEY
+        sync: false
 
 databases:
   - name: philix-finance-db

@@ -138,7 +138,7 @@ export interface LoanProduct {
   requiredDocuments: string[];
   autoRenewal: boolean;
   displayOrder: number;
-  eligibilityRules: { minRepaidLoans?: number; maxDefaultCount?: number; minCollateralCondition?: string } | null;
+  eligibilityRules: { minRepaidLoans?: number; maxDefaultCount?: number; minCollateralCondition?: string; minTrustScore?: number; isTrustedClientRequired?: boolean } | null;
   rates: LoanProductRate[];
   auditLog: { action: string; field: string; oldValue: string; newValue: string; changedBy: string; changedAt: string; reason?: string }[];
   createdAt: string;

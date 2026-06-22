@@ -24,6 +24,7 @@ import CreditScorePage from "./pages/portal/CreditScorePage";
 import EmailComposerPage from "./pages/EmailComposerPage";
 import DashboardPage from "./pages/DashboardPage";
 import CEODashboardPage from "./pages/CEODashboardPage";
+import PhilixAIPage from "./pages/PhilixAIPage";
 import ClientsPage from "./pages/ClientsPage";
 import ClientDetailPage from "./pages/ClientDetailPage";
 import NewClientPage from "./pages/NewClientPage";
@@ -195,6 +196,7 @@ export default function App() {
         >
           <Route index element={<DashboardPage />} />
           <Route path="ceo" element={<CEODashboardPage />} />
+          <Route path="philix-ai" element={<PhilixAIPage />} />
           <Route path="clients" element={<ClientsPage />} />
           <Route path="clients/new" element={<NewClientPage />} />
           <Route path="clients/:id" element={<ClientDetailPage />} />

@@ -37,6 +37,7 @@ import portalMeRoutes from "./routes/portal/me";
 import portalApplicationRoutes from "./routes/portal/applications";
 import portalKycRoutes from "./routes/portal/kyc";
 import portalNotificationRoutes from "./routes/portal/notifications";
+import aiRoutes from "./routes/ai";
 
 const app = express();
 
@@ -110,6 +111,7 @@ app.use("/api/portal/me", portalMeRoutes);
 app.use("/api/portal/applications", portalApplicationRoutes);
 app.use("/api/portal/kyc", portalKycRoutes);
 app.use("/api/portal/notifications", portalNotificationRoutes);
+app.use("/api/ai", aiRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Route not found" });

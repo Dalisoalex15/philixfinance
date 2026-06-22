@@ -27,9 +27,10 @@ const navGroups: NavGroup[] = [
   {
     label: "Overview",
     items: [
-      { href: "/",      icon: LayoutDashboard, label: "Dashboard" },
-      { href: "/ceo",   icon: Crown,           label: "CEO Dashboard",  roles: ["SUPER_ADMIN", "MANAGER"] },
-      { href: "/search",icon: Search,           label: "Global Search" },
+      { href: "/",          icon: LayoutDashboard, label: "Dashboard" },
+      { href: "/ceo",       icon: Crown,           label: "CEO Dashboard",  roles: ["SUPER_ADMIN", "MANAGER"] },
+      { href: "/philix-ai", icon: Brain,           label: "Philix Enterprise AI", badge: "NEW", badgeColor: "bg-indigo-600" },
+      { href: "/search",    icon: Search,           label: "Global Search" },
     ],
   },
   {

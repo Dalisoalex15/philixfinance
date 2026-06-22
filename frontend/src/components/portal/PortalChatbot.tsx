@@ -407,15 +407,40 @@ export default function PortalChatbot() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typing]);
 
+  const token = useClientAuthStore(s => s.accessToken);
+  const conversationRef = useRef<{ role: "user" | "assistant"; content: string }[]>([]);
+
   const send = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || !client) return;
     setInput("");
     setMessages(p => [...p, { id: Date.now().toString(), role: "user", text: trimmed, time: new Date() }]);
     setTyping(true);
-    await new Promise(r => setTimeout(r, 350 + Math.random() * 500));
-    const freshApps = useLoanApplicationStore.getState().applications.filter(a => a.clientId === client.id);
-    const reply = respond(trimmed, client, freshApps);
+
+    // Try Claude AI endpoint first; fall back to rule-based on error
+    let reply: string;
+    try {
+      conversationRef.current = [...conversationRef.current, { role: "user", content: trimmed }];
+      const r = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ messages: conversationRef.current }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        reply = data.text;
+        conversationRef.current = [...conversationRef.current, { role: "assistant", content: reply }];
+        // Keep context to last 20 messages to avoid token limits
+        if (conversationRef.current.length > 20) conversationRef.current = conversationRef.current.slice(-20);
+      } else {
+        const freshApps = useLoanApplicationStore.getState().applications.filter(a => a.clientId === client.id);
+        reply = respond(trimmed, client, freshApps);
+      }
+    } catch {
+      const freshApps = useLoanApplicationStore.getState().applications.filter(a => a.clientId === client.id);
+      reply = respond(trimmed, client, freshApps);
+    }
+
     setTyping(false);
     setMessages(p => [...p, { id: (Date.now() + 1).toString(), role: "bot", text: reply, time: new Date() }]);
     if (!open) setUnread(n => n + 1);
