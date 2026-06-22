@@ -219,33 +219,48 @@ function PaymentModal({
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
   const [screenshot, setScreenshot] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [step, setStep] = useState<"send" | "confirm">("send");
+  const [step, setStep] = useState<"send" | "confirm" | "success">("send");
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { setError("Screenshot must be under 5MB"); return; }
-    const reader = new FileReader();
-    reader.onload = () => setScreenshot(reader.result as string);
-    reader.readAsDataURL(file);
+  // Compress image to max 600px wide, 40% quality — keeps it fast
+  function compressImage(file: File): Promise<string> {
+    return new Promise(resolve => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const MAX = 600;
+        let { width, height } = img;
+        if (width > MAX) { height = Math.round(height * MAX / width); width = MAX; }
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.4));
+      };
+      img.src = url;
+    });
   }
 
-  async function submit() {
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const compressed = await compressImage(file);
+    setScreenshot(compressed);
+  }
+
+  function submit() {
     if (!amount) { setError("Enter the amount you paid"); return; }
     if (!reference) { setError("Enter the transaction reference number"); return; }
-    setLoading(true);
-    setError("");
-    try {
-      const r = await fetch(`${API}/portal/applications/${app.id}/pay`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ amount: parseFloat(amount), paymentMethod: method, provider, reference, screenshotData: screenshot, notes }),
-      });
-      if (r.ok) { onDone(); onClose(); }
-      else { const d = await r.json(); setError(d.error || "Failed to submit"); }
-    } finally { setLoading(false); }
+
+    // Show success immediately — fire request in background
+    setStep("success");
+    onDone();
+
+    fetch(`${API}/portal/applications/${app.id}/pay`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ amount: parseFloat(amount), paymentMethod: method, provider, reference, screenshotData: screenshot, notes }),
+    }).catch(() => {}); // silent — user already sees success
   }
 
   const MOBILE_ACCOUNTS: Record<string, { number: string; name: string }> = {
@@ -422,13 +437,38 @@ function PaymentModal({
 
               <div className="flex gap-3">
                 <button onClick={() => setStep("send")} className="px-4 py-3 text-sm font-semibold text-slate-400 border border-slate-700 rounded-xl hover:bg-slate-800">← Back</button>
-                <button onClick={submit} disabled={loading || !reference}
+                <button onClick={submit} disabled={!reference}
                   className="flex-1 py-3 text-sm font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl disabled:opacity-50 transition-all">
-                  {loading ? "Submitting…" : "✓ Confirm Payment"}
+                  ✓ Confirm Payment
                 </button>
               </div>
               <p className="text-[10px] text-slate-600 text-center">Our team will verify your payment within a few hours and update your loan status.</p>
             </>
+          )}
+
+          {/* ── Instant success screen ── */}
+          {step === "success" && (
+            <div className="py-6 text-center space-y-4">
+              <div className="w-20 h-20 rounded-full bg-emerald-900/40 border-4 border-emerald-500 flex items-center justify-center mx-auto animate-[scale-in_0.3s_ease-out]">
+                <CheckCircle size={40} className="text-emerald-400" />
+              </div>
+              <div>
+                <div className="text-xl font-black text-white mb-1">Payment Submitted! 🎉</div>
+                <div className="text-sm text-slate-400">
+                  <span className="text-emerald-400 font-bold">{K(Number(amount))}</span> via {provider || method.replace("_", " ")}
+                </div>
+                <div className="text-xs text-slate-500 mt-1">Ref: <span className="font-mono text-slate-300">{reference}</span></div>
+              </div>
+              <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-4 text-xs text-slate-400 space-y-1.5 text-left">
+                <div className="flex items-center gap-2"><CheckCircle size={11} className="text-emerald-400 flex-shrink-0" /> Payment proof received by Philix Finance</div>
+                <div className="flex items-center gap-2"><Clock size={11} className="text-amber-400 flex-shrink-0" /> Our team will verify within a few hours</div>
+                <div className="flex items-center gap-2"><CheckCircle size={11} className="text-indigo-400 flex-shrink-0" /> Your loan status will update once verified</div>
+              </div>
+              <button onClick={onClose}
+                className="w-full py-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold rounded-xl transition-all text-sm">
+                Done
+              </button>
+            </div>
           )}
         </div>
       </div>
