@@ -210,14 +210,18 @@ function ReloanModal({
 function PaymentModal({
   app, onClose, onDone, token,
 }: { app: LoanApp; onClose: () => void; onDone: () => void; token: string | null }) {
-  const [amount, setAmount] = useState("");
+  const totalDue = app.amountRequested * (1 + ((app as any).interestRate ?? 20) / 100);
+  const weeklyAmt = Math.ceil(totalDue / (app.termMonths || 1));
+
+  const [amount, setAmount] = useState(String(weeklyAmt));
   const [method, setMethod] = useState("MOBILE_MONEY");
-  const [provider, setProvider] = useState("");
+  const [provider, setProvider] = useState("Airtel Money");
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [step, setStep] = useState<"send" | "confirm">("send");
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -230,6 +234,7 @@ function PaymentModal({
 
   async function submit() {
     if (!amount) { setError("Enter the amount you paid"); return; }
+    if (!reference) { setError("Enter the transaction reference number"); return; }
     setLoading(true);
     setError("");
     try {
@@ -243,77 +248,188 @@ function PaymentModal({
     } finally { setLoading(false); }
   }
 
+  const MOBILE_ACCOUNTS: Record<string, { number: string; name: string }> = {
+    "Airtel Money": { number: "0977 158 901", name: "Philix Finance Ltd" },
+    "MTN MoMo":     { number: "0968 158 901", name: "Philix Finance Ltd" },
+    "Zamtel Kwacha":{ number: "0955 158 901", name: "Philix Finance Ltd" },
+  };
+  const mmAccount = MOBILE_ACCOUNTS[provider];
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-slate-800">
-          <div>
-            <h3 className="font-bold text-slate-200">Submit Payment Proof</h3>
-            <p className="text-xs text-slate-500 mt-0.5">{app.reference} — {K(app.amountRequested)}</p>
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-2xl w-full sm:max-w-md max-h-[95vh] overflow-y-auto">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-900/40 flex items-center justify-center">
+              <Receipt size={18} className="text-emerald-400" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-100 text-base">Make a Repayment</h3>
+              <p className="text-xs text-slate-500">{app.reference}</p>
+            </div>
           </div>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-300"><X size={18} /></button>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 p-1"><X size={18} /></button>
         </div>
+
         <div className="p-5 space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5">Amount Paid (ZMW) *</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-semibold text-sm">K</span>
-              <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00"
-                className="w-full pl-8 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500" />
+
+          {/* Loan summary */}
+          <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-4 grid grid-cols-3 gap-3 text-center text-xs">
+            <div>
+              <div className="text-slate-500 mb-0.5">Borrowed</div>
+              <div className="font-bold text-slate-200">{K(app.amountRequested)}</div>
+            </div>
+            <div>
+              <div className="text-slate-500 mb-0.5">Total Due</div>
+              <div className="font-bold text-amber-400">{K(Math.ceil(totalDue))}</div>
+            </div>
+            <div>
+              <div className="text-slate-500 mb-0.5">Weekly</div>
+              <div className="font-bold text-emerald-400">{K(weeklyAmt)}</div>
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5">Payment Method</label>
-            <div className="grid grid-cols-3 gap-2">
-              {[["MOBILE_MONEY","Mobile Money"],["BANK_TRANSFER","Bank Transfer"],["CASH","Cash"]].map(([v,l]) => (
-                <button key={v} onClick={() => setMethod(v)}
-                  className={`py-2 text-xs font-semibold rounded-xl border transition-colors ${method === v ? "bg-indigo-600 text-white border-indigo-600" : "bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-600"}`}>
-                  {l}
-                </button>
-              ))}
-            </div>
-          </div>
+          {step === "send" ? (
+            <>
+              {/* Amount quick-select */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-2">How much are you paying?</label>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  {[
+                    { label: `Weekly — ${K(weeklyAmt)}`,  value: weeklyAmt },
+                    { label: `Full balance — ${K(Math.ceil(totalDue))}`, value: Math.ceil(totalDue) },
+                  ].map(q => (
+                    <button key={q.label} onClick={() => setAmount(String(q.value))}
+                      className={`py-2.5 px-3 text-xs font-semibold rounded-xl border transition-all ${String(q.value) === amount ? "bg-emerald-600 text-white border-emerald-600" : "bg-slate-800 text-slate-400 border-slate-700 hover:border-emerald-700 hover:text-emerald-400"}`}>
+                      {q.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">K</span>
+                  <input type="number" value={amount} onChange={e => setAmount(e.target.value)}
+                    placeholder="Other amount"
+                    className="w-full pl-8 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-100 font-semibold focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30" />
+                </div>
+              </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5">Provider / Bank</label>
-            <input type="text" value={provider} onChange={e => setProvider(e.target.value)} placeholder="e.g. Airtel Money, Zanaco"
-              className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500" />
-          </div>
+              {/* Payment method */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-2">Payment Method</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[["MOBILE_MONEY","📱 Mobile Money"],["BANK_TRANSFER","🏦 Bank"],["CASH","💵 Cash"]].map(([v,l]) => (
+                    <button key={v} onClick={() => setMethod(v)}
+                      className={`py-2.5 text-xs font-semibold rounded-xl border transition-all ${method === v ? "bg-indigo-600 text-white border-indigo-600" : "bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-600"}`}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5">Transaction Reference</label>
-            <input type="text" value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. TXN123456"
-              className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500" />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5">Screenshot of Transaction *</label>
-            <label className={`flex flex-col items-center gap-2 p-4 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${screenshot ? "border-emerald-700 bg-emerald-900/10" : "border-slate-700 hover:border-indigo-600"}`}>
-              <input type="file" accept="image/*" onChange={handleFile} className="hidden" />
-              {screenshot ? (
-                <><img src={screenshot} alt="preview" className="max-h-32 rounded-lg object-cover" /><span className="text-xs text-emerald-400">Screenshot attached ✓ (tap to change)</span></>
-              ) : (
-                <><Receipt size={24} className="text-slate-600" /><span className="text-xs text-slate-500">Tap to attach screenshot</span><span className="text-[10px] text-slate-700">JPG, PNG — max 5MB</span></>
+              {/* Mobile money provider + account details */}
+              {method === "MOBILE_MONEY" && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-2">Select Provider</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {["Airtel Money", "MTN MoMo", "Zamtel Kwacha"].map(p => (
+                        <button key={p} onClick={() => setProvider(p)}
+                          className={`py-2 text-xs font-semibold rounded-xl border transition-all ${provider === p ? "bg-amber-600 text-white border-amber-600" : "bg-slate-800 text-slate-400 border-slate-700 hover:border-amber-700"}`}>
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {mmAccount && (
+                    <div className="bg-emerald-900/20 border border-emerald-700/40 rounded-xl p-4">
+                      <div className="text-xs font-bold text-emerald-400 mb-2">Send {K(Number(amount) || weeklyAmt)} to:</div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-lg font-black text-white tracking-widest">{mmAccount.number}</div>
+                          <div className="text-xs text-slate-400 mt-0.5">{mmAccount.name} · {provider}</div>
+                        </div>
+                        <button onClick={() => navigator.clipboard.writeText(mmAccount.number.replace(/\s/g, ""))}
+                          className="text-xs text-emerald-400 hover:text-emerald-300 border border-emerald-800/50 px-2 py-1 rounded-lg">
+                          Copy
+                        </button>
+                      </div>
+                      <div className="mt-2 text-[10px] text-slate-500">After sending, tap Continue and enter your transaction reference</div>
+                    </div>
+                  )}
+                </div>
               )}
-            </label>
-          </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5">Notes (optional)</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any additional notes…" rows={2}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500 resize-none" />
-          </div>
+              {method === "BANK_TRANSFER" && (
+                <div className="bg-blue-900/20 border border-blue-700/40 rounded-xl p-4 text-xs space-y-1">
+                  <div className="font-bold text-blue-400 mb-2">Bank Transfer Details</div>
+                  <div className="text-slate-300"><span className="text-slate-500">Bank:</span> Zanaco</div>
+                  <div className="text-slate-300"><span className="text-slate-500">Account Name:</span> Philix Finance Ltd</div>
+                  <div className="text-slate-300"><span className="text-slate-500">Account No:</span> 1234567890</div>
+                  <div className="text-slate-300"><span className="text-slate-500">Branch:</span> Cairo Road, Lusaka</div>
+                  <div className="text-slate-500 mt-2">Use your loan reference <span className="text-white font-mono font-bold">{app.reference}</span> as the payment reference</div>
+                </div>
+              )}
 
-          {error && <div className="text-xs text-red-400 bg-red-900/20 border border-red-800/40 rounded-xl px-3 py-2">{error}</div>}
+              {method === "CASH" && (
+                <div className="bg-amber-900/20 border border-amber-700/40 rounded-xl p-4 text-xs">
+                  <div className="font-bold text-amber-400 mb-1">Pay in person</div>
+                  <div className="text-slate-400">Visit our office at <span className="text-slate-200">Cairo Road, Lusaka</span>, Mon–Fri 08:00–17:00. Bring this reference: <span className="text-white font-mono font-bold">{app.reference}</span></div>
+                </div>
+              )}
 
-          <div className="flex gap-3">
-            <button onClick={onClose} className="flex-1 py-2.5 text-sm font-semibold text-slate-400 border border-slate-700 rounded-xl hover:bg-slate-800">Cancel</button>
-            <button onClick={submit} disabled={loading || !amount}
-              className="flex-1 py-2.5 text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl disabled:opacity-50">
-              {loading ? "Submitting…" : "Submit Payment"}
-            </button>
-          </div>
+              <button onClick={() => setStep("confirm")}
+                disabled={!amount || Number(amount) <= 0}
+                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed text-sm">
+                I've Sent the Payment →
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Confirm step — enter reference + screenshot */}
+              <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-900/20 border border-emerald-800/40 rounded-xl px-3 py-2">
+                <CheckCircle size={12} /> Payment of {K(Number(amount))} sent via {provider || method.replace("_", " ")}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">Transaction Reference / Receipt Number *</label>
+                <input type="text" value={reference} onChange={e => setReference(e.target.value)}
+                  placeholder="e.g. AIR123456789"
+                  className="w-full px-3 py-3 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-100 font-mono focus:outline-none focus:border-emerald-500" />
+                <p className="text-[10px] text-slate-600 mt-1">Found in your SMS or transaction history</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">Screenshot of Transaction (recommended)</label>
+                <label className={`flex flex-col items-center gap-2 p-4 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${screenshot ? "border-emerald-700 bg-emerald-900/10" : "border-slate-700 hover:border-indigo-600"}`}>
+                  <input type="file" accept="image/*" onChange={handleFile} className="hidden" />
+                  {screenshot ? (
+                    <><img src={screenshot} alt="preview" className="max-h-28 rounded-lg object-cover" /><span className="text-xs text-emerald-400">Screenshot attached ✓</span></>
+                  ) : (
+                    <><Receipt size={20} className="text-slate-600" /><span className="text-xs text-slate-500">Tap to attach screenshot</span></>
+                  )}
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">Notes (optional)</label>
+                <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any message for our team…" rows={2}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-indigo-500 resize-none" />
+              </div>
+
+              {error && <div className="text-xs text-red-400 bg-red-900/20 border border-red-800/40 rounded-xl px-3 py-2">{error}</div>}
+
+              <div className="flex gap-3">
+                <button onClick={() => setStep("send")} className="px-4 py-3 text-sm font-semibold text-slate-400 border border-slate-700 rounded-xl hover:bg-slate-800">← Back</button>
+                <button onClick={submit} disabled={loading || !reference}
+                  className="flex-1 py-3 text-sm font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl disabled:opacity-50 transition-all">
+                  {loading ? "Submitting…" : "✓ Confirm Payment"}
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-600 text-center">Our team will verify your payment within a few hours and update your loan status.</p>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -634,6 +750,25 @@ export default function MyLoansPage() {
                     <div><div className="text-slate-500 mb-0.5">Term</div><div className="font-semibold text-slate-200">{app.termMonths}W</div></div>
                     <div><div className="text-slate-500 mb-0.5">Purpose</div><div className="font-semibold text-slate-200 truncate">{app.purpose}</div></div>
                   </div>
+
+                  {/* Prominent Pay Now button — always visible for disbursed loans */}
+                  {app.status === "DISBURSED" && (
+                    <div className="mt-3 pt-3 border-t border-slate-800/60">
+                      <button
+                        onClick={e => { e.stopPropagation(); setPayApp(app); }}
+                        className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${
+                          overdue
+                            ? "bg-red-600 hover:bg-red-500 text-white animate-pulse"
+                            : nearDue
+                            ? "bg-amber-500 hover:bg-amber-400 text-white"
+                            : "bg-emerald-600 hover:bg-emerald-500 text-white"
+                        }`}
+                      >
+                        <Receipt size={15} />
+                        {overdue ? `⚠️ Pay Now — ${Math.abs(days!)} days overdue` : nearDue ? `Pay Now — Due in ${days} day${days !== 1 ? "s" : ""}` : "💳 Make a Repayment"}
+                      </button>
+                    </div>
+                  )}
                 </button>
 
                 {isOpen && (

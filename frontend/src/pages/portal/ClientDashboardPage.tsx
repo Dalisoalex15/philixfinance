@@ -278,17 +278,24 @@ export default function ClientDashboardPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-2">
               <Link to="/portal/loans"
-                className="flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-semibold text-emerald-300 transition-colors"
-                style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.18)" }}>
-                <Receipt size={12} /> Submit Payment
+                className="flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold text-white transition-all"
+                style={{ background: "linear-gradient(135deg, #16a34a, #15803d)", boxShadow: "0 4px 14px rgba(22,163,74,0.35)" }}>
+                <Receipt size={14} /> 💳 Pay Now
               </Link>
-              <Link to="/portal/loans"
-                className="flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-semibold text-slate-400 transition-colors"
-                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                <FileText size={12} /> Loan Agreement
-              </Link>
+              <div className="grid grid-cols-2 gap-2">
+                <Link to="/portal/loans"
+                  className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold text-slate-400 transition-colors"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <FileText size={11} /> Agreement
+                </Link>
+                <Link to="/portal/loans"
+                  className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold text-indigo-400 transition-colors"
+                  style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.18)" }}>
+                  <TrendingUp size={11} /> History
+                </Link>
+              </div>
             </div>
           </div>
         </div>
