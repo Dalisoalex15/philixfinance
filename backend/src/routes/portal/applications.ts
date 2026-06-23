@@ -235,9 +235,15 @@ router.post("/", wrap(async (req: Request, res: Response) => {
 // GET /api/portal/applications
 router.get("/", wrap(async (req: Request, res: Response) => {
   const id = (req as Request & { portalAccountId: string }).portalAccountId;
-  const apps = await prisma.portalLoanApplication.findMany({
+  const apps = await (prisma as any).portalLoanApplication.findMany({
     where: { accountId: id },
     orderBy: { createdAt: "desc" },
+    include: {
+      paymentSubmissions: {
+        orderBy: { createdAt: "desc" },
+        select: { id: true, amount: true, status: true, createdAt: true, reference: true, provider: true, paymentMethod: true },
+      },
+    },
   });
 
   // Auto-upgrade: DISBURSED loans < 4 weeks within 3 days of due date

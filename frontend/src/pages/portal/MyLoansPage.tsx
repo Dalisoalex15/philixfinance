@@ -11,6 +11,16 @@ import { useClientAuthStore } from "../../store/clientAuth";
 const API = "/api";
 const K = (n: number) => `K${n.toLocaleString("en-ZM", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
+interface PaymentRecord {
+  id: string;
+  amount: number | null;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  createdAt: string;
+  reference: string | null;
+  provider: string | null;
+  paymentMethod: string | null;
+}
+
 interface LoanApp {
   id: string;
   reference: string;
@@ -19,11 +29,12 @@ interface LoanApp {
   termMonths: number; // represents weeks for short-term loans
   interestRate?: number; // flat rate % stored at submission time
   purpose: string;
-  status: "SUBMITTED" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "DISBURSED";
+  status: "SUBMITTED" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "DISBURSED" | "REPAID";
   createdAt: string;
   reviewedAt: string | null;
   rejectedReason: string | null;
   autoUpgraded?: boolean;
+  paymentSubmissions?: PaymentRecord[];
 }
 
 const STATUS_STYLE: Record<string, string> = {
@@ -32,6 +43,7 @@ const STATUS_STYLE: Record<string, string> = {
   APPROVED:     "bg-emerald-900/30 text-emerald-400 border-emerald-800/40",
   REJECTED:     "bg-red-900/30 text-red-400 border-red-800/40",
   DISBURSED:    "bg-indigo-900/30 text-indigo-400 border-indigo-800/40",
+  REPAID:       "bg-emerald-900/40 text-emerald-300 border-emerald-700/60",
 };
 
 const STATUS_DESC: Record<string, string> = {
@@ -40,6 +52,7 @@ const STATUS_DESC: Record<string, string> = {
   APPROVED:     "Approved! Funds being prepared for disbursement",
   REJECTED:     "Application was not approved at this time",
   DISBURSED:    "Funds have been disbursed to you",
+  REPAID:       "Loan fully repaid — thank you!",
 };
 
 const ACTIVE = ["SUBMITTED", "UNDER_REVIEW", "APPROVED", "DISBURSED"];
@@ -211,7 +224,11 @@ function ReloanModal({
 function PaymentModal({
   app, onClose, onDone, token,
 }: { app: LoanApp; onClose: () => void; onDone: () => void; token: string | null }) {
-  const totalDue = app.amountRequested * (1 + (app.interestRate ?? 20) / 100);
+  const totalDue = Math.ceil(app.amountRequested * (1 + (app.interestRate ?? 20) / 100));
+  const totalPaid = (app.paymentSubmissions ?? [])
+    .filter(p => p.status === "APPROVED")
+    .reduce((s, p) => s + (p.amount ?? 0), 0);
+  const remaining = Math.max(0, totalDue - totalPaid);
   const weeklyAmt = Math.ceil(totalDue / (app.termMonths || 1));
 
   const [amount, setAmount] = useState(String(weeklyAmt));
@@ -296,18 +313,22 @@ function PaymentModal({
         <div className="p-5 space-y-4">
 
           {/* Loan summary */}
-          <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-4 grid grid-cols-3 gap-3 text-center text-xs">
+          <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-4 grid grid-cols-2 gap-3 text-center text-xs">
             <div>
-              <div className="text-slate-500 mb-0.5">Borrowed</div>
-              <div className="font-bold text-slate-200">{K(app.amountRequested)}</div>
+              <div className="text-slate-500 mb-0.5">Total Loan</div>
+              <div className="font-bold text-slate-200">{K(totalDue)}</div>
             </div>
             <div>
-              <div className="text-slate-500 mb-0.5">Total Due</div>
-              <div className="font-bold text-amber-400">{K(Math.ceil(totalDue))}</div>
+              <div className="text-slate-500 mb-0.5">Remaining Balance</div>
+              <div className={`font-bold ${remaining === 0 ? "text-emerald-400" : "text-amber-400"}`}>{K(remaining)}</div>
             </div>
             <div>
-              <div className="text-slate-500 mb-0.5">Weekly</div>
-              <div className="font-bold text-emerald-400">{K(weeklyAmt)}</div>
+              <div className="text-slate-500 mb-0.5">Total Paid</div>
+              <div className="font-bold text-emerald-400">{K(totalPaid)}</div>
+            </div>
+            <div>
+              <div className="text-slate-500 mb-0.5">Weekly Instalment</div>
+              <div className="font-bold text-indigo-400">{K(weeklyAmt)}</div>
             </div>
           </div>
 
@@ -319,7 +340,7 @@ function PaymentModal({
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   {[
                     { label: `Weekly — ${K(weeklyAmt)}`,  value: weeklyAmt },
-                    { label: `Full balance — ${K(Math.ceil(totalDue))}`, value: Math.ceil(totalDue) },
+                    { label: `Full balance — ${K(remaining)}`, value: remaining },
                   ].map(q => (
                     <button key={q.label} onClick={() => setAmount(String(q.value))}
                       className={`py-2.5 px-3 text-xs font-semibold rounded-xl border transition-all ${String(q.value) === amount ? "bg-emerald-600 text-white border-emerald-600" : "bg-slate-800 text-slate-400 border-slate-700 hover:border-emerald-700 hover:text-emerald-400"}`}>
@@ -794,6 +815,26 @@ export default function MyLoansPage() {
                     <div><div className="text-slate-500 mb-0.5">Purpose</div><div className="font-semibold text-slate-200 truncate">{app.purpose}</div></div>
                   </div>
 
+                  {/* Balance strip — only for disbursed loans with payment history */}
+                  {app.status === "DISBURSED" && (() => {
+                    const tDue = Math.ceil(app.amountRequested * (1 + (app.interestRate ?? 20) / 100));
+                    const tPaid = (app.paymentSubmissions ?? []).filter(p => p.status === "APPROVED").reduce((s, p) => s + (p.amount ?? 0), 0);
+                    const tRem = Math.max(0, tDue - tPaid);
+                    const paidPct = tDue > 0 ? Math.min(100, Math.round((tPaid / tDue) * 100)) : 0;
+                    return (
+                      <div className="mt-3 pt-3 border-t border-slate-800/60">
+                        <div className="flex justify-between text-xs mb-1.5">
+                          <span className="text-slate-500">Paid: <span className="text-emerald-400 font-semibold">{K(tPaid)}</span></span>
+                          <span className="text-slate-500">Remaining: <span className="text-amber-400 font-semibold">{K(tRem)}</span></span>
+                        </div>
+                        <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-500" style={{ width: `${paidPct}%` }} />
+                        </div>
+                        <div className="text-right text-[10px] text-slate-600 mt-0.5">{paidPct}% repaid of {K(tDue)}</div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Prominent Pay Now button — always visible for disbursed loans */}
                   {app.status === "DISBURSED" && (
                     <div className="mt-3 pt-3 border-t border-slate-800/60">
@@ -817,6 +858,34 @@ export default function MyLoansPage() {
                 {isOpen && (
                   <div className="border-t border-slate-800 px-5 py-4 space-y-4">
                     <p className="text-xs text-slate-500">{STATUS_DESC[app.status]}</p>
+
+                    {/* Payment history — shown for any loan that has submissions */}
+                    {(app.paymentSubmissions ?? []).length > 0 && (
+                      <div className="bg-slate-800/40 border border-slate-700 rounded-xl overflow-hidden">
+                        <div className="px-4 py-2.5 border-b border-slate-700 flex items-center gap-1.5">
+                          <Receipt size={13} className="text-emerald-400" />
+                          <span className="text-xs font-semibold text-slate-300">Payment History</span>
+                        </div>
+                        <div className="divide-y divide-slate-800">
+                          {(app.paymentSubmissions ?? []).map(p => (
+                            <div key={p.id} className="flex items-center justify-between px-4 py-2.5 text-xs">
+                              <div>
+                                <div className={`font-semibold ${p.status === "APPROVED" ? "text-emerald-400" : p.status === "REJECTED" ? "text-red-400" : "text-amber-400"}`}>
+                                  {p.amount != null ? K(p.amount) : "—"}
+                                </div>
+                                <div className="text-slate-500 mt-0.5">{p.provider ?? p.paymentMethod ?? "Mobile Money"}{p.reference ? ` · ${p.reference}` : ""}</div>
+                              </div>
+                              <div className="text-right">
+                                <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${p.status === "APPROVED" ? "bg-emerald-900/40 text-emerald-300 border-emerald-800/50" : p.status === "REJECTED" ? "bg-red-900/40 text-red-300 border-red-800/50" : "bg-amber-900/40 text-amber-300 border-amber-800/50"}`}>
+                                  {p.status}
+                                </div>
+                                <div className="text-slate-600 mt-0.5">{new Date(p.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {app.status === "REJECTED" && app.rejectedReason && (
                       <div className="bg-red-900/20 border border-red-800/40 rounded-xl p-3 text-xs text-red-400">
