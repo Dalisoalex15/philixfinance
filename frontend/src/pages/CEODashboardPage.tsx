@@ -64,6 +64,8 @@ export default function CEODashboardPage() {
     totalLoanedOut: 0,
     totalInterestEarned: 0,
     totalRepayable: 0,
+    totalCollected: 0,
+    repaidLoansCount: 0,
   });
   const [accountActionLoading, setAccountActionLoading] = useState<string | null>(null);
   const [portalAccounts, setPortalAccounts] = useState<PortalAccount[]>([]);
@@ -266,7 +268,7 @@ export default function CEODashboardPage() {
       </div>
 
       {/* Financial totals */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="philix-card p-5 flex items-center gap-4">
           <div className="p-3 rounded-xl bg-emerald-100 text-emerald-700 flex-shrink-0">
             <Banknote size={20} />
@@ -277,6 +279,18 @@ export default function CEODashboardPage() {
             </div>
             <div className="text-xs font-semibold text-navy-600 mt-0.5">Total Disbursed</div>
             <div className="text-xs text-navy-500">Zambian Kwacha (ZMW)</div>
+          </div>
+        </div>
+        <div className="philix-card p-5 flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-teal-100 text-teal-700 flex-shrink-0">
+            <CheckCircle size={20} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xl font-bold font-mono text-teal-700 truncate">
+              {formatKwacha(portalSummary.totalCollected)}
+            </div>
+            <div className="text-xs font-semibold text-navy-600 mt-0.5">Total Collected</div>
+            <div className="text-xs text-navy-500">{portalSummary.repaidLoansCount} loan{portalSummary.repaidLoansCount !== 1 ? "s" : ""} fully repaid</div>
           </div>
         </div>
         <div className="philix-card p-5 flex items-center gap-4">

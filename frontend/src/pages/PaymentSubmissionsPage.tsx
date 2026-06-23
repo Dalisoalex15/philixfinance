@@ -98,11 +98,16 @@ export default function PaymentSubmissionsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Total Submitted", value: submissions.length, color: "text-navy-900" },
-          { label: "Pending Review", value: pending.length, color: "text-amber-600" },
-          { label: "Approved", value: submissions.filter(s => s.status === "APPROVED").length, color: "text-emerald-600" },
+          { label: "Total Submitted",  value: submissions.length,                                                                    color: "text-navy-900"    },
+          { label: "Pending Review",   value: pending.length,                                                                        color: "text-amber-600"   },
+          { label: "Approved",         value: submissions.filter(s => s.status === "APPROVED").length,                              color: "text-emerald-600" },
+          {
+            label: "Total Paid (ZMW)",
+            value: K(submissions.filter(s => s.status === "APPROVED").reduce((sum, s) => sum + (s.amount ?? 0), 0)),
+            color: "text-indigo-700",
+          },
         ].map(s => (
           <div key={s.label} className="philix-card p-4 text-center">
             <div className={`text-2xl font-bold font-mono ${s.color}`}>{s.value}</div>

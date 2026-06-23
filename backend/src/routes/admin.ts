@@ -168,18 +168,22 @@ router.get("/summary", wrap(async (_req: Request, res: Response) => {
     disbursedAgg,
     activeAgg,
     disbursedLoans,
+    totalPaidAgg,
+    repaidCount,
   ] = await Promise.all([
     prisma.clientPortalAccount.count(),
     prisma.portalLoanApplication.count({ where: { status: { in: ["SUBMITTED", "UNDER_REVIEW"] } } }),
     prisma.portalLoanApplication.count({ where: { status: "APPROVED", reviewedAt: { gte: todayStart } } }),
     prisma.portalLoanApplication.count({ where: { createdAt: { gte: todayStart } } }),
     prisma.portalLoanApplication.count(),
-    prisma.portalLoanApplication.aggregate({ _sum: { amountRequested: true }, where: { status: "DISBURSED" } }),
+    prisma.portalLoanApplication.aggregate({ _sum: { amountRequested: true }, where: { status: { in: ["DISBURSED", "REPAID"] } } }),
     prisma.portalLoanApplication.aggregate({ _sum: { amountRequested: true }, where: { status: { in: ["APPROVED", "DISBURSED"] } } }),
     prisma.portalLoanApplication.findMany({
-      where: { status: "DISBURSED" },
+      where: { status: { in: ["DISBURSED", "REPAID"] } },
       select: { amountRequested: true, termMonths: true, interestRate: true, productType: true },
     }),
+    (prisma as any).loanPaymentSubmission.aggregate({ _sum: { amount: true }, where: { status: "APPROVED" } }),
+    prisma.portalLoanApplication.count({ where: { status: "REPAID" } }),
   ]);
 
   // Use the rate stored at application time; fall back to product+term table for legacy records
@@ -204,6 +208,8 @@ router.get("/summary", wrap(async (_req: Request, res: Response) => {
     totalLoanedOut: activeAgg._sum.amountRequested ?? 0,
     totalInterestEarned,
     totalRepayable: totalDisbursedAmount + totalInterestEarned,
+    totalCollected: totalPaidAgg._sum.amount ?? 0,
+    repaidLoansCount: repaidCount,
   });
 }));
 
