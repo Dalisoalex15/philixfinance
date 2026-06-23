@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Receipt, CheckCircle, XCircle, RefreshCw, Eye, X, Clock } from "lucide-react";
+import { Receipt, CheckCircle, XCircle, RefreshCw, Eye, X, Clock, Loader2 } from "lucide-react";
 
 const API = "/api";
 function token() { return localStorage.getItem("philix_staff_token") ?? ""; }
@@ -41,6 +41,7 @@ export default function PaymentSubmissionsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [showReject, setShowReject] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -52,28 +53,54 @@ export default function PaymentSubmissionsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  function showToast(msg: string, type: "success" | "error" = "success") {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 4000);
+  }
+
   async function approve(id: string) {
     setActionLoading(id);
+    const sub = selected;
     try {
-      await fetch(`${API}/admin/payment-submissions/${id}`, {
+      const r = await fetch(`${API}/admin/payment-submissions/${id}`, {
         method: "PATCH", headers: authH(),
         body: JSON.stringify({ status: "APPROVED" }),
       });
-      await load();
-      setSelected(null);
+      if (r.ok) {
+        // Optimistic in-place update — no full reload needed
+        const now = new Date().toISOString();
+        setSubmissions(prev => prev.map(s =>
+          s.id === id ? { ...s, status: "APPROVED" as const, reviewedAt: now } : s
+        ));
+        setSelected(null);
+        showToast(`✅ Payment approved${sub ? ` for ${sub.application.account.firstName} ${sub.application.account.lastName}` : ""}${sub?.amount ? ` — ${K(sub.amount)}` : ""}`);
+        load(); // background sync
+      } else {
+        showToast("Failed to approve. Please try again.", "error");
+      }
     } finally { setActionLoading(null); }
   }
 
   async function reject(id: string) {
     setActionLoading(id);
+    const sub = selected;
     try {
-      await fetch(`${API}/admin/payment-submissions/${id}`, {
+      const r = await fetch(`${API}/admin/payment-submissions/${id}`, {
         method: "PATCH", headers: authH(),
         body: JSON.stringify({ status: "REJECTED", rejectedReason: rejectReason }),
       });
-      setRejectReason(""); setShowReject(false);
-      await load();
-      setSelected(null);
+      if (r.ok) {
+        const now = new Date().toISOString();
+        setSubmissions(prev => prev.map(s =>
+          s.id === id ? { ...s, status: "REJECTED" as const, reviewedAt: now, rejectedReason: rejectReason || null } : s
+        ));
+        setRejectReason(""); setShowReject(false);
+        setSelected(null);
+        showToast(`❌ Payment rejected${sub ? ` for ${sub.application.account.firstName} ${sub.application.account.lastName}` : ""}`);
+        load(); // background sync
+      } else {
+        showToast("Failed to reject. Please try again.", "error");
+      }
     } finally { setActionLoading(null); }
   }
 
@@ -116,9 +143,30 @@ export default function PaymentSubmissionsPage() {
         ))}
       </div>
 
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-sm font-semibold transition-all ${toast.type === "error" ? "bg-red-600 text-white" : "bg-emerald-600 text-white"}`}>
+          {toast.type === "success" ? <CheckCircle size={16} /> : <XCircle size={16} />}
+          {toast.msg}
+        </div>
+      )}
+
       <div className="philix-card overflow-hidden">
         {loading ? (
-          <div className="text-center py-12 text-navy-500">Loading…</div>
+          <div className="divide-y divide-warm-100">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-4 py-4">
+                <div className="flex-1 space-y-2">
+                  <div className="h-3.5 bg-warm-100 rounded animate-pulse w-40" />
+                  <div className="h-3 bg-warm-100 rounded animate-pulse w-24" />
+                </div>
+                <div className="h-3 bg-warm-100 rounded animate-pulse w-20" />
+                <div className="h-3 bg-warm-100 rounded animate-pulse w-16" />
+                <div className="h-6 bg-warm-100 rounded-full animate-pulse w-16" />
+                <div className="h-3 bg-warm-100 rounded animate-pulse w-20" />
+              </div>
+            ))}
+          </div>
         ) : submissions.length === 0 ? (
           <div className="text-center py-16">
             <Receipt size={32} className="mx-auto mb-3 text-navy-300" />
@@ -233,7 +281,8 @@ export default function PaymentSubmissionsPage() {
                   <div className="flex gap-3">
                     <button onClick={() => approve(selected.id)} disabled={actionLoading === selected.id}
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl disabled:opacity-50">
-                      <CheckCircle size={15} /> Approve Payment
+                      {actionLoading === selected.id ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle size={15} />}
+                      {actionLoading === selected.id ? "Approving…" : "Approve Payment"}
                     </button>
                     <button onClick={() => setShowReject(true)}
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold bg-red-100 hover:bg-red-200 text-red-700 border border-red-200 rounded-xl">
@@ -250,8 +299,9 @@ export default function PaymentSubmissionsPage() {
                     />
                     <div className="flex gap-2">
                       <button onClick={() => reject(selected.id)} disabled={actionLoading === selected.id}
-                        className="flex-1 py-2 text-sm font-semibold bg-red-600 hover:bg-red-700 text-white rounded-xl disabled:opacity-50">
-                        Confirm Rejection
+                        className="flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold bg-red-600 hover:bg-red-700 text-white rounded-xl disabled:opacity-50">
+                        {actionLoading === selected.id ? <Loader2 size={14} className="animate-spin" /> : null}
+                        {actionLoading === selected.id ? "Rejecting…" : "Confirm Rejection"}
                       </button>
                       <button onClick={() => { setShowReject(false); setRejectReason(""); }}
                         className="flex-1 py-2 text-sm font-semibold border border-warm-300 text-navy-600 rounded-xl">

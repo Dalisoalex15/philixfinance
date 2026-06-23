@@ -6,19 +6,32 @@ import {
   Zap, Calculator, Home, CreditCard, Bell, User,
   ChevronRight, Quote, Sparkles, ShieldCheck, RefreshCw,
   CheckCircle2, TrendingUp, CalendarClock, Banknote, Info,
-  CalendarDays,
+  CalendarDays, X, CheckCircle, Wallet,
 } from "lucide-react";
 import { mockLoanProducts } from "../../lib/mock-data";
+
+interface PaymentRecord {
+  id: string;
+  amount: number | null;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  createdAt: string;
+  reference: string | null;
+  provider: string | null;
+  paymentMethod: string | null;
+}
 
 interface PortalApplication {
   id: string;
   reference: string;
   productType: string;
   amountRequested: number;
-  termMonths: number; // actually weeks for short-term loans
+  termMonths: number;
   status: string;
   createdAt: string;
   reviewedAt?: string | null;
+  interestRate?: number;
+  purpose?: string;
+  paymentSubmissions?: PaymentRecord[];
 }
 
 const K = (n: number) =>
@@ -73,13 +86,363 @@ function StatTile({ label, value, sub, color, to }: {
   return to ? <Link to={to} className="block">{inner}</Link> : <div>{inner}</div>;
 }
 
+// ── Dashboard Pay Modal ────────────────────────────────────────────────────
+function DashboardPayModal({ app, token, onClose, onDone }: {
+  app: PortalApplication; token: string | null;
+  onClose: () => void; onDone: (record: PaymentRecord) => void;
+}) {
+  const rate     = app.interestRate ?? TERM_RATES[app.termMonths] ?? 35;
+  const totalDue = app.amountRequested * (1 + rate / 100);
+  const totalPaid = (app.paymentSubmissions ?? [])
+    .filter(p => p.status === "APPROVED")
+    .reduce((s, p) => s + (p.amount ?? 0), 0);
+  const remaining = Math.max(0, totalDue - totalPaid);
+  const weeklyAmt = Math.ceil(totalDue / (app.termMonths || 1));
+
+  const [amount,    setAmount]    = useState(String(weeklyAmt));
+  const [method,    setMethod]    = useState("MOBILE_MONEY");
+  const [provider,  setProvider]  = useState("Airtel Money");
+  const [reference, setReference] = useState("");
+  const [step,      setStep]      = useState<"form" | "confirm" | "success">("form");
+  const [loading,   setLoading]   = useState(false);
+  const [error,     setError]     = useState("");
+
+  const MOBILE: Record<string, string> = {
+    "Airtel Money":   "0977 158 901",
+    "MTN MoMo":       "0968 158 901",
+    "Zamtel Kwacha":  "0955 158 901",
+  };
+
+  function submit() {
+    if (!reference) { setError("Enter the transaction reference"); return; }
+    setLoading(true);
+    const optimistic: PaymentRecord = {
+      id: `pending-${Date.now()}`,
+      amount: parseFloat(amount) || 0,
+      status: "PENDING",
+      createdAt: new Date().toISOString(),
+      reference,
+      provider: method === "MOBILE_MONEY" ? provider : null,
+      paymentMethod: method,
+    };
+    setStep("success");
+    onDone(optimistic);
+    fetch(`/api/portal/applications/${app.id}/pay`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ amount: parseFloat(amount), paymentMethod: method, provider, reference }),
+    }).catch(() => {});
+    setLoading(false);
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/80" onClick={onClose} />
+      <div className="relative w-full sm:max-w-md max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl"
+        style={{ background: "#080d1a", border: "1px solid rgba(255,255,255,0.1)" }}>
+
+        <div className="flex items-center justify-between px-5 pt-5 pb-4"
+          style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <div>
+            <h3 className="font-bold text-white text-base">Make a Repayment</h3>
+            <p className="text-xs text-slate-500 font-mono mt-0.5">{app.reference}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-500 hover:text-white p-1"><X size={18} /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Loan summary */}
+          <div className="grid grid-cols-2 gap-3 p-4 rounded-xl text-center text-xs"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div>
+              <div className="text-slate-500 mb-0.5">Total Loan</div>
+              <div className="font-bold text-slate-200">{K(totalDue)}</div>
+            </div>
+            <div>
+              <div className="text-slate-500 mb-0.5">Outstanding</div>
+              <div className="font-bold" style={{ color: "#C9A84C" }}>{K(remaining)}</div>
+            </div>
+            <div>
+              <div className="text-slate-500 mb-0.5">Paid to Date</div>
+              <div className="font-bold text-emerald-400">{K(totalPaid)}</div>
+            </div>
+            <div>
+              <div className="text-slate-500 mb-0.5">Instalment</div>
+              <div className="font-bold text-indigo-400">{K(weeklyAmt)}</div>
+            </div>
+          </div>
+
+          {step === "form" && (
+            <>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-2">How much are you paying?</label>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  {[
+                    { label: `Weekly — ${K(weeklyAmt)}`, val: weeklyAmt },
+                    { label: `Pay in Full — ${K(remaining)}`, val: remaining },
+                  ].map(q => (
+                    <button key={q.label} onClick={() => setAmount(String(q.val))}
+                      className="py-2.5 text-xs font-semibold rounded-xl transition-all"
+                      style={String(q.val) === amount
+                        ? { background: "rgba(201,168,76,0.15)", border: "1px solid rgba(201,168,76,0.5)", color: "#C9A84C" }
+                        : { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", color: "#64748b" }}>
+                      {q.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-sm text-slate-400">K</span>
+                  <input type="number" value={amount} onChange={e => setAmount(e.target.value)}
+                    className="w-full pl-8 pr-4 py-3 rounded-xl text-sm text-slate-100 font-semibold focus:outline-none"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }} />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-2">Payment Method</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[["MOBILE_MONEY","📱 Mobile"],["BANK_TRANSFER","🏦 Bank"],["CASH","💵 Cash"]].map(([v,l]) => (
+                    <button key={v} onClick={() => setMethod(v)}
+                      className="py-2.5 text-xs font-semibold rounded-xl transition-all"
+                      style={method === v
+                        ? { background: "rgba(201,168,76,0.15)", border: "1px solid rgba(201,168,76,0.4)", color: "#C9A84C" }
+                        : { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", color: "#64748b" }}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {method === "MOBILE_MONEY" && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    {["Airtel Money","MTN MoMo","Zamtel Kwacha"].map(p => (
+                      <button key={p} onClick={() => setProvider(p)}
+                        className="py-2 text-xs font-semibold rounded-xl transition-all"
+                        style={provider === p
+                          ? { background: "rgba(201,168,76,0.15)", border: "1px solid rgba(201,168,76,0.4)", color: "#C9A84C" }
+                          : { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", color: "#64748b" }}>
+                        {p.split(" ")[0]}
+                      </button>
+                    ))}
+                  </div>
+                  {MOBILE[provider] && (
+                    <div className="rounded-xl p-3"
+                      style={{ background: "rgba(201,168,76,0.06)", border: "1px solid rgba(201,168,76,0.2)" }}>
+                      <p className="text-xs text-slate-400 mb-1">Send {K(Number(amount) || weeklyAmt)} to:</p>
+                      <p className="text-lg font-black text-white tracking-widest">{MOBILE[provider]}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Philix Finance Ltd · {provider}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button onClick={() => setStep("confirm")} disabled={!amount || Number(amount) <= 0}
+                className="w-full py-3.5 font-bold rounded-[14px] text-sm disabled:opacity-40 transition-all hover:-translate-y-0.5"
+                style={{ background: "linear-gradient(135deg,#C9A84C 0%,#E8C96A 50%,#C9A84C 100%)", color: "#0A1F44", letterSpacing: "0.04em" }}>
+                I've Sent the Payment →
+              </button>
+            </>
+          )}
+
+          {step === "confirm" && (
+            <>
+              <div className="flex items-center gap-2 text-xs rounded-xl px-3 py-2.5"
+                style={{ background: "rgba(201,168,76,0.08)", border: "1px solid rgba(201,168,76,0.2)", color: "#C9A84C" }}>
+                <CheckCircle size={12} /> {K(Number(amount))} sent via {provider || method.replace(/_/g," ")}
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">Transaction Reference *</label>
+                <input type="text" value={reference} onChange={e => setReference(e.target.value)}
+                  placeholder="e.g. AIR123456789"
+                  className="w-full px-3 py-3 rounded-xl text-sm text-slate-100 font-mono focus:outline-none"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }} />
+                <p className="text-[10px] text-slate-600 mt-1">Found in your SMS or transaction history</p>
+              </div>
+              {error && <p className="text-xs text-red-400">{error}</p>}
+              <div className="flex gap-3">
+                <button onClick={() => setStep("form")}
+                  className="px-4 py-3 text-sm font-semibold rounded-xl text-slate-400"
+                  style={{ border: "1px solid rgba(255,255,255,0.08)" }}>← Back</button>
+                <button onClick={submit} disabled={loading || !reference}
+                  className="flex-1 py-3 font-bold rounded-[14px] text-sm disabled:opacity-50 transition-all"
+                  style={{ background: "linear-gradient(135deg,#C9A84C 0%,#E8C96A 50%,#C9A84C 100%)", color: "#0A1F44" }}>
+                  {loading ? "Submitting…" : "✓ Confirm Payment"}
+                </button>
+              </div>
+            </>
+          )}
+
+          {step === "success" && (
+            <div className="py-8 text-center space-y-4">
+              <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto"
+                style={{ background: "rgba(201,168,76,0.1)", border: "4px solid rgba(201,168,76,0.4)" }}>
+                <CheckCircle size={38} style={{ color: "#C9A84C" }} />
+              </div>
+              <div>
+                <p className="text-xl font-black text-white mb-1">Payment Submitted!</p>
+                <p className="text-sm text-slate-400">Our team will verify within a few hours.</p>
+                <p className="text-xs text-slate-600 mt-1">Ref: <span className="font-mono text-slate-300">{reference}</span></p>
+              </div>
+              <button onClick={onClose}
+                className="w-full py-3 font-semibold rounded-xl text-sm text-white"
+                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                Done
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Dashboard Reloan Modal ─────────────────────────────────────────────────
+function DashboardReloanModal({ sourceApp, token, onClose, onDone }: {
+  sourceApp: PortalApplication; token: string | null;
+  onClose: () => void; onDone: (created: PortalApplication) => void;
+}) {
+  const [amount,  setAmount]  = useState(sourceApp.amountRequested);
+  const [weeks,   setWeeks]   = useState(sourceApp.termMonths || 1);
+  const [purpose, setPurpose] = useState(sourceApp.purpose || "");
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState("");
+  const [success, setSuccess] = useState(false);
+
+  const rate    = TERM_RATES[weeks] ?? 35;
+  const total   = amount * (1 + rate / 100);
+  const weekly  = Math.ceil(total / weeks);
+
+  async function submit() {
+    if (!purpose || amount < 500) return;
+    setLoading(true); setError("");
+    try {
+      const r = await fetch(`/api/portal/applications/${sourceApp.id}/reloan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ amountRequested: amount, termWeeks: weeks, purpose }),
+      });
+      const data = await r.json();
+      if (!r.ok) { setError(data.error || "Failed. Please try again."); return; }
+      setSuccess(true);
+      onDone(data);
+    } finally { setLoading(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/80" onClick={onClose} />
+      <div className="relative w-full sm:max-w-md max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl"
+        style={{ background: "#0A1F44", border: "2px solid rgba(201,168,76,0.4)" }}>
+
+        <div className="flex items-center justify-between px-5 pt-5 pb-4"
+          style={{ borderBottom: "1px solid rgba(201,168,76,0.15)" }}>
+          <div>
+            <h3 className="font-bold text-white text-base">Apply Again</h3>
+            <p className="text-xs mt-0.5" style={{ color: "rgba(201,168,76,0.65)" }}>
+              Pre-filled from your previous loan
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1 hover:opacity-70" style={{ color: "rgba(201,168,76,0.5)" }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div className="flex items-center gap-3 rounded-xl px-4 py-3"
+            style={{ background: "rgba(22,163,74,0.1)", border: "1px solid rgba(22,163,74,0.25)" }}>
+            <CheckCircle size={16} className="text-emerald-400 flex-shrink-0" />
+            <p className="text-sm font-semibold text-emerald-300">You are eligible to re-apply</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "rgba(201,168,76,0.7)" }}>
+              Loan Amount (ZMW)
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-sm"
+                style={{ color: "rgba(201,168,76,0.6)" }}>K</span>
+              <input type="number" value={amount} onChange={e => setAmount(Number(e.target.value))} min={500}
+                className="w-full pl-8 pr-4 py-3 rounded-xl text-sm text-white focus:outline-none"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(201,168,76,0.25)" }} />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold mb-2" style={{ color: "rgba(201,168,76,0.7)" }}>
+              Loan Duration
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {[1,2,3,4].map(w => (
+                <button key={w} onClick={() => setWeeks(w)}
+                  className="py-2.5 rounded-xl text-sm font-bold transition-all"
+                  style={weeks === w
+                    ? { background: "#C9A84C", color: "#0A1F44", border: "none" }
+                    : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(201,168,76,0.2)", color: "rgba(201,168,76,0.55)" }}>
+                  {w}W
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: "rgba(201,168,76,0.7)" }}>
+              Loan Purpose
+            </label>
+            <input value={purpose} onChange={e => setPurpose(e.target.value)}
+              placeholder="e.g. School fees, Business capital…"
+              className="w-full px-3 py-3 rounded-xl text-sm text-white focus:outline-none"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(201,168,76,0.25)" }} />
+          </div>
+
+          {/* Live repayment preview */}
+          <div className="rounded-xl p-4"
+            style={{ background: "rgba(201,168,76,0.07)", border: "1px solid rgba(201,168,76,0.18)" }}>
+            <p className="text-xs font-semibold mb-2" style={{ color: "rgba(201,168,76,0.65)" }}>
+              Estimated Repayment
+            </p>
+            <p className="text-2xl font-black text-white">{K(total)}</p>
+            <p className="text-xs text-slate-500 mt-1">
+              {K(weekly)}/week × {weeks} week{weeks > 1 ? "s" : ""} · {rate}% flat interest
+            </p>
+          </div>
+
+          {error && <p className="text-xs text-red-400">{error}</p>}
+
+          {success ? (
+            <div className="text-center py-4 space-y-3">
+              <CheckCircle size={40} className="mx-auto text-emerald-400" />
+              <p className="font-bold text-white">Application Submitted!</p>
+              <p className="text-sm text-slate-400">Our team will review within 24 hours.</p>
+              <button onClick={onClose}
+                className="w-full py-3 rounded-xl font-semibold text-sm text-white"
+                style={{ background: "rgba(255,255,255,0.08)" }}>Done</button>
+            </div>
+          ) : (
+            <button onClick={submit} disabled={loading || !purpose || amount < 500}
+              className="w-full py-3.5 font-bold rounded-[14px] text-sm disabled:opacity-40 flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5"
+              style={{ background: "#0A1F44", border: "2px solid #C9A84C", color: "#C9A84C", letterSpacing: "0.06em" }}>
+              {loading ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              SUBMIT APPLICATION
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Dashboard ─────────────────────────────────────────────────────────
 export default function ClientDashboardPage() {
   const client = useClientAuthStore(s => s.client);
   const token  = useClientAuthStore(s => s.accessToken);
-  const [apps, setApps]       = useState<PortalApplication[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [ann, setAnn]         = useState<{ id: string; subject: string; body: string; createdAt: string }[]>([]);
-  const [tab, setTab]         = useState<"home" | "loans" | "alerts" | "profile">("home");
+  const [apps, setApps]               = useState<PortalApplication[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [ann, setAnn]                 = useState<{ id: string; subject: string; body: string; createdAt: string }[]>([]);
+  const [tab, setTab]                 = useState<"home" | "loans" | "alerts" | "profile">("home");
+  const [payModalOpen, setPayModalOpen]     = useState(false);
+  const [reloanModalOpen, setReloanModalOpen] = useState(false);
+  const [paySuccessMsg, setPaySuccessMsg]   = useState("");
 
   useEffect(() => {
     if (!token) { setLoading(false); return; }
@@ -105,12 +468,18 @@ export default function ClientDashboardPage() {
   const pending   = apps.filter(a => a.status === "SUBMITTED" || a.status === "UNDER_REVIEW");
   const disbursed = apps.filter(a => a.status === "DISBURSED").length;
 
-  // Loan financials
-  const termWeeks  = active?.termMonths ?? 1;
-  const rate       = TERM_RATES[termWeeks] ?? 35;
-  const principal  = active?.amountRequested ?? 0;
-  const interest   = principal * (rate / 100);
-  const totalDue   = principal + interest;
+  // Use stored interest rate if available, fall back to product-rate table
+  const termWeeks     = active?.termMonths ?? 1;
+  const rate          = active?.interestRate ?? TERM_RATES[termWeeks] ?? 35;
+  const principal     = active?.amountRequested ?? 0;
+  const interest      = principal * (rate / 100);
+  const totalDue      = principal + interest;
+  const totalPaid     = (active?.paymentSubmissions ?? [])
+    .filter(p => p.status === "APPROVED")
+    .reduce((s, p) => s + (p.amount ?? 0), 0);
+  const remaining     = Math.max(0, totalDue - totalPaid);
+  const isFullyPaid   = totalPaid > 0 && remaining === 0;
+
   const subMs      = active ? new Date(active.createdAt).getTime() : 0;
   const dueMs      = subMs ? subMs + termWeeks * 7 * 86400000 : 0;
   const daysUntilDue  = dueMs ? Math.ceil((dueMs - Date.now()) / 86400000) : 0;
@@ -119,6 +488,10 @@ export default function ClientDashboardPage() {
   const dueDateShort  = dueMs ? new Date(dueMs).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
   const overdue    = dueMs > 0 && daysUntilDue < 0;
   const nearDue    = !overdue && daysUntilDue <= 3 && dueMs > 0;
+
+  // Reloan eligibility: no active loan AND has a past loan to clone details from
+  const reloanSource  = !active ? apps.find(a => a.status === "REPAID" || a.status === "REJECTED") : undefined;
+  const eligibleForReloan = !!reloanSource;
 
   // Score factors
   const utilizationPct = active ? Math.min(100, Math.round((principal / 20000) * 100)) : 0;
@@ -141,8 +514,56 @@ export default function ClientDashboardPage() {
     { icon: CalendarDays,  text: "Pay before or on the due date — never late",                impact: "+100 pts",     color: "#f97316", done: payHistPct === 100 },
   ];
 
+  function handlePaymentDone(record: PaymentRecord) {
+    if (!active) return;
+    setApps(prev => prev.map(a =>
+      a.id === active.id
+        ? { ...a, paymentSubmissions: [record, ...(a.paymentSubmissions ?? [])] }
+        : a
+    ));
+    setPayModalOpen(false);
+    setPaySuccessMsg("Payment submitted! Our team will verify within a few hours.");
+    setTimeout(() => setPaySuccessMsg(""), 6000);
+  }
+
+  function handleReloanDone(created: PortalApplication) {
+    setApps(prev => [created, ...prev]);
+    setReloanModalOpen(false);
+    setPaySuccessMsg(`New application ${created.reference} submitted — we'll review within 24 hours.`);
+    setTimeout(() => setPaySuccessMsg(""), 8000);
+  }
+
   return (
     <div className="max-w-xl mx-auto pb-24" style={{ fontFamily: "system-ui, sans-serif" }}>
+
+      {/* Shimmer keyframe */}
+      <style>{`
+        @keyframes philix-shimmer {
+          0%   { transform: translateX(-120%) skewX(-15deg); }
+          100% { transform: translateX(300%)  skewX(-15deg); }
+        }
+        .pay-loan-btn { position: relative; overflow: hidden; }
+        .pay-loan-btn::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.38) 50%, transparent 100%);
+          animation: philix-shimmer 1.4s ease-out forwards;
+          pointer-events: none;
+        }
+        .pay-loan-btn:hover { filter: brightness(1.08); }
+        .pay-loan-btn:active { transform: translateY(0) !important; }
+        .reloan-btn:hover { background: #122850 !important; box-shadow: 0 0 0 3px rgba(201,168,76,0.22), 0 8px 24px rgba(10,31,68,0.35) !important; }
+        .reloan-btn:active { transform: translateY(0) !important; }
+      `}</style>
+
+      {/* Modals */}
+      {payModalOpen && active && (
+        <DashboardPayModal app={active} token={token} onClose={() => setPayModalOpen(false)} onDone={handlePaymentDone} />
+      )}
+      {reloanModalOpen && reloanSource && (
+        <DashboardReloanModal sourceApp={reloanSource} token={token} onClose={() => setReloanModalOpen(false)} onDone={handleReloanDone} />
+      )}
 
       {/* ── KYC BANNER ─────────────────────────────────────────────────── */}
       {!kycOk && (
@@ -180,7 +601,16 @@ export default function ClientDashboardPage() {
         <span className="text-[10px] font-mono text-slate-700 bg-white/5 px-2 py-1 rounded-lg">{client.clientNumber}</span>
       </div>
 
-      {/* ══ 1. LOAN SUMMARY — first thing shown ════════════════════════════ */}
+      {/* ── SUCCESS TOAST ──────────────────────────────────────────────── */}
+      {paySuccessMsg && (
+        <div className="flex items-center gap-3 mb-3 rounded-xl px-4 py-3"
+          style={{ background: "rgba(22,163,74,0.1)", border: "1px solid rgba(22,163,74,0.25)" }}>
+          <CheckCircle size={14} className="text-emerald-400 flex-shrink-0" />
+          <p className="text-xs text-emerald-300">{paySuccessMsg}</p>
+        </div>
+      )}
+
+      {/* ══ 1. LOAN SUMMARY ════════════════════════════════════════════════ */}
       {loading ? (
         <div className="flex items-center justify-center py-12 rounded-2xl mb-3"
           style={{ background: "#0e1625", border: "1px solid rgba(255,255,255,0.07)" }}>
@@ -190,7 +620,6 @@ export default function ClientDashboardPage() {
         <div className="rounded-2xl overflow-hidden mb-3"
           style={{ background: "#0e1625", border: `1px solid ${overdue ? "rgba(239,68,68,0.3)" : nearDue ? "rgba(245,166,35,0.3)" : "rgba(255,255,255,0.08)"}` }}>
 
-          {/* Overdue / Near-due alert strip */}
           {(overdue || nearDue) && (
             <div className="flex items-center gap-2 px-4 py-2.5"
               style={{ background: overdue ? "rgba(239,68,68,0.1)" : "rgba(245,166,35,0.1)" }}>
@@ -209,18 +638,37 @@ export default function ClientDashboardPage() {
               <span className="text-[10px] font-mono text-slate-700">{active.reference}</span>
             </div>
 
-            {/* Total amount to pay — hero number */}
+            {/* Balance hero — shows remaining if payments exist, else totalDue */}
             <div className="mb-5">
-              <p className="text-[10px] text-slate-600 uppercase tracking-wide mb-1">Total Amount to Pay</p>
-              <p className="text-5xl font-black text-white" style={{ letterSpacing: "-2px", lineHeight: 1 }}>
-                {K(totalDue)}
-              </p>
-              <p className="text-xs text-slate-600 mt-2">
-                {K(principal)} principal + {K(interest)} interest ({rate}%)
-              </p>
+              {isFullyPaid ? (
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ background: "rgba(22,163,74,0.15)", border: "2px solid rgba(22,163,74,0.4)" }}>
+                    <CheckCircle size={22} className="text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-black text-emerald-400">FULLY PAID</p>
+                    <p className="text-xs text-slate-600 mt-0.5">Congratulations — loan fully cleared!</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="text-[10px] text-slate-600 uppercase tracking-wide mb-1">
+                    {totalPaid > 0 ? "Outstanding Balance" : "Total Amount to Pay"}
+                  </p>
+                  <p className="text-5xl font-black text-white" style={{ letterSpacing: "-2px", lineHeight: 1 }}>
+                    {K(totalPaid > 0 ? remaining : totalDue)}
+                  </p>
+                  <p className="text-xs text-slate-600 mt-2">
+                    {totalPaid > 0
+                      ? `${K(totalPaid)} paid of ${K(totalDue)} total`
+                      : `${K(principal)} principal + ${K(interest)} interest (${rate}%)`}
+                  </p>
+                </>
+              )}
             </div>
 
-            {/* Date row: loan date → due date */}
+            {/* Date row */}
             <div className="grid grid-cols-2 gap-3 mb-5">
               <div className="rounded-xl p-3"
                 style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
@@ -246,10 +694,7 @@ export default function ClientDashboardPage() {
                 <p className="text-sm font-bold text-white">{dueDateShort}</p>
                 <p className="text-[10px] mt-0.5 font-semibold"
                   style={{ color: overdue ? "#ef4444" : nearDue ? "#F5A623" : "#22c55e" }}>
-                  {overdue
-                    ? `${Math.abs(daysUntilDue)}d overdue`
-                    : daysUntilDue === 0 ? "Due today"
-                    : `${daysUntilDue} days left`}
+                  {overdue ? `${Math.abs(daysUntilDue)}d overdue` : daysUntilDue === 0 ? "Due today" : `${daysUntilDue} days left`}
                 </p>
               </div>
             </div>
@@ -272,11 +717,43 @@ export default function ClientDashboardPage() {
                   <span className="text-white">Total Due</span>
                   <span style={{ color: "#22c55e" }}>{K(totalDue)}</span>
                 </div>
+                {/* Show paid & outstanding when payments exist */}
+                {totalPaid > 0 && (
+                  <>
+                    <div className="h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+                    <div className="flex justify-between text-xs">
+                      <span className="text-emerald-500">Amount Paid</span>
+                      <span className="text-emerald-400 font-semibold">– {K(totalPaid)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-black">
+                      <span className="text-white">Outstanding Balance</span>
+                      <span style={{ color: "#C9A84C" }}>{K(remaining)}</span>
+                    </div>
+                  </>
+                )}
               </div>
-              <p className="text-[10px] text-slate-600 mt-3 pt-2.5" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-                Full payment of <span className="text-white font-semibold">{K(totalDue)}</span> is due on <span className="text-white font-semibold">{dueDateShort}</span>. The entire amount must be paid at once — partial payments are not accepted.
-              </p>
+              {!isFullyPaid && (
+                <p className="text-[10px] text-slate-600 mt-3 pt-2.5" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                  {totalPaid > 0
+                    ? `Outstanding balance of ${K(remaining)} is due on ${dueDateShort}.`
+                    : `Full payment of ${K(totalDue)} is due on ${dueDateShort}.`}
+                </p>
+              )}
             </div>
+
+            {/* Repayment progress bar */}
+            {totalPaid > 0 && !isFullyPaid && (
+              <div className="mb-5">
+                <div className="flex justify-between text-[10px] text-slate-500 mb-1">
+                  <span>{Math.round((totalPaid / totalDue) * 100)}% repaid</span>
+                  <span>{K(remaining)} remaining</span>
+                </div>
+                <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
+                  <div className="h-full rounded-full transition-all duration-700"
+                    style={{ width: `${Math.min(100, (totalPaid / totalDue) * 100)}%`, background: "linear-gradient(90deg,#C9A84C,#E8C96A)" }} />
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Link to="/portal/loans"
@@ -328,6 +805,68 @@ export default function ClientDashboardPage() {
         </div>
       )}
 
+      {/* ══ QUICK ACTIONS ══════════════════════════════════════════════════ */}
+      {(active?.status === "DISBURSED" || eligibleForReloan) && (
+        <div className="mb-3 rounded-2xl overflow-hidden"
+          style={{ background: "#0e1625", border: "1px solid rgba(255,255,255,0.08)", borderLeft: "4px solid #C9A84C" }}>
+          <div className="px-4 pt-4 pb-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Quick Actions</p>
+            <p className="text-xs text-slate-400">
+              {active?.status === "DISBURSED"
+                ? "You have an active loan. Make a payment to reduce your balance."
+                : apps.some(a => a.status === "REPAID")
+                ? "Your loan is fully cleared. Ready to borrow again?"
+                : "No active loan. Apply for a new loan today."}
+            </p>
+          </div>
+          <div className="p-4 flex flex-col sm:flex-row gap-3">
+            {active?.status === "DISBURSED" && !isFullyPaid && (
+              <button onClick={() => setPayModalOpen(true)}
+                className="pay-loan-btn flex-1 rounded-[14px] font-bold uppercase flex flex-col items-center justify-center gap-1 transition-all hover:-translate-y-0.5"
+                style={{
+                  background: "linear-gradient(135deg,#C9A84C 0%,#E8C96A 50%,#C9A84C 100%)",
+                  color: "#0A1F44",
+                  padding: "16px 24px",
+                  fontSize: 15,
+                  letterSpacing: "0.08em",
+                  boxShadow: "0 8px 24px rgba(201,168,76,0.40)",
+                  minWidth: 200,
+                }}>
+                <div className="flex items-center gap-2">
+                  <Wallet size={18} />
+                  PAY LOAN
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 400, letterSpacing: "0.02em", opacity: 0.7 }}>
+                  Outstanding: {K(remaining)}
+                </span>
+              </button>
+            )}
+            {eligibleForReloan && (
+              <button onClick={() => setReloanModalOpen(true)}
+                className="reloan-btn flex-1 rounded-[14px] font-bold uppercase flex flex-col items-center justify-center gap-1 transition-all hover:-translate-y-0.5"
+                style={{
+                  background: "#0A1F44",
+                  color: "#C9A84C",
+                  padding: "16px 24px",
+                  fontSize: 15,
+                  letterSpacing: "0.08em",
+                  border: "2px solid #C9A84C",
+                  boxShadow: "0 8px 24px rgba(10,31,68,0.30)",
+                  minWidth: 200,
+                }}>
+                <div className="flex items-center gap-2">
+                  <RefreshCw size={18} />
+                  RELOAN
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 400, letterSpacing: "0.02em", opacity: 0.7 }}>
+                  Borrow again — fast approval
+                </span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ══ 2. STAT TILES ══════════════════════════════════════════════════ */}
       <div className="grid grid-cols-3 gap-2 mb-3">
         <StatTile label="KYC" value={kycOk ? "Verified" : "Pending"}
@@ -338,9 +877,9 @@ export default function ClientDashboardPage() {
           color="#818cf8" to="/portal/loans" />
         <StatTile
           label="Due Status"
-          value={active ? (overdue ? "Overdue" : nearDue ? "Due Soon" : "On Track") : "—"}
-          sub={active ? (overdue ? `${Math.abs(daysUntilDue)}d overdue` : `${daysUntilDue}d left`) : "No active loan"}
-          color={active ? (overdue ? "#ef4444" : nearDue ? "#F5A623" : "#22c55e") : "#475569"}
+          value={active ? (overdue ? "Overdue" : nearDue ? "Due Soon" : isFullyPaid ? "Paid!" : "On Track") : "—"}
+          sub={active ? (overdue ? `${Math.abs(daysUntilDue)}d overdue` : isFullyPaid ? "Cleared" : `${daysUntilDue}d left`) : "No active loan"}
+          color={active ? (overdue ? "#ef4444" : isFullyPaid ? "#22c55e" : nearDue ? "#F5A623" : "#22c55e") : "#475569"}
           to="/portal/loans" />
       </div>
 
@@ -434,7 +973,7 @@ export default function ClientDashboardPage() {
         </div>
       </div>
 
-      {/* ══ 5. QUICK ACTIONS ═══════════════════════════════════════════════ */}
+      {/* ══ 5. QUICK LINKS ═════════════════════════════════════════════════ */}
       <div className="grid grid-cols-4 gap-2 mb-3">
         {[
           { to: "/portal/apply",      Icon: FileText,   label: "Apply",      c: "#4f46e5" },
@@ -484,9 +1023,10 @@ export default function ClientDashboardPage() {
               APPROVED:     { label: "Approved",     c: "#22c55e", dot: "bg-emerald-400" },
               DISBURSED:    { label: "Active",       c: "#818cf8", dot: "bg-violet-400" },
               REJECTED:     { label: "Declined",     c: "#ef4444", dot: "bg-red-400" },
+              REPAID:       { label: "Repaid",       c: "#22c55e", dot: "bg-emerald-400" },
             } as Record<string, { label: string; c: string; dot: string }>)[app.status]
               ?? { label: app.status, c: "#64748b", dot: "bg-slate-500" };
-            const appRate  = TERM_RATES[app.termMonths] ?? 35;
+            const appRate  = app.interestRate ?? TERM_RATES[app.termMonths] ?? 35;
             const appTotal = app.amountRequested * (1 + appRate / 100);
             return (
               <Link key={app.id} to="/portal/loans"
