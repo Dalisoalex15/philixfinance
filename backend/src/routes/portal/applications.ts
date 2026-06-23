@@ -247,22 +247,23 @@ router.get("/", wrap(async (req: Request, res: Response) => {
   });
 
   // Auto-upgrade: DISBURSED loans < 4 weeks within 3 days of due date
+  // Run all upgrades in parallel to avoid N+1 sequential latency
   const now = Date.now();
+  const upgradePromises: Promise<unknown>[] = [];
   for (const app of apps) {
     if (app.status === "DISBURSED" && app.termMonths < 4 && app.reviewedAt) {
-      const disbursedMs = app.reviewedAt.getTime();
-      const dueDateMs = disbursedMs + app.termMonths * 7 * 86400000;
-      const daysUntilDue = (dueDateMs - now) / 86400000;
+      const daysUntilDue = (app.reviewedAt.getTime() + app.termMonths * 7 * 86400000 - now) / 86400000;
       if (daysUntilDue <= 3) {
-        await prisma.portalLoanApplication.update({
-          where: { id: app.id },
-          data: { termMonths: 4 },
-        });
         (app as any).termMonths = 4;
         (app as any).autoUpgraded = true;
+        upgradePromises.push(
+          prisma.portalLoanApplication.update({ where: { id: app.id }, data: { termMonths: 4 } })
+        );
       }
     }
   }
+  // Fire all upgrades in parallel; respond immediately without waiting
+  if (upgradePromises.length > 0) Promise.all(upgradePromises).catch(() => {});
 
   res.json(apps);
 }));

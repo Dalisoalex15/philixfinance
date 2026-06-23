@@ -56,8 +56,9 @@ const STATUS_DESC: Record<string, string> = {
 };
 
 const ACTIVE = ["SUBMITTED", "UNDER_REVIEW", "APPROVED", "DISBURSED"];
+// REPAID is intentionally excluded from ACTIVE — it moves to history
 const CAN_UPGRADE = ["SUBMITTED", "UNDER_REVIEW", "APPROVED", "DISBURSED"];
-const CAN_RELOAN  = ["DISBURSED", "REJECTED"];
+const CAN_RELOAN  = ["DISBURSED", "REJECTED", "REPAID"];
 
 function UpgradeModal({
   app, onClose, onDone, token,
@@ -223,7 +224,7 @@ function ReloanModal({
 
 function PaymentModal({
   app, onClose, onDone, token,
-}: { app: LoanApp; onClose: () => void; onDone: () => void; token: string | null }) {
+}: { app: LoanApp; onClose: () => void; onDone: (appId: string, submission: PaymentRecord) => void; token: string | null }) {
   const totalDue = Math.ceil(app.amountRequested * (1 + (app.interestRate ?? 20) / 100));
   const totalPaid = (app.paymentSubmissions ?? [])
     .filter(p => p.status === "APPROVED")
@@ -274,15 +275,25 @@ function PaymentModal({
     if (!amount) { setError("Enter the amount you paid"); return; }
     if (!reference) { setError("Enter the transaction reference number"); return; }
 
-    // Show success immediately — fire request in background
+    const optimisticRecord: PaymentRecord = {
+      id: `pending-${Date.now()}`,
+      amount: parseFloat(amount),
+      status: "PENDING",
+      createdAt: new Date().toISOString(),
+      reference,
+      provider: method === "MOBILE_MONEY" ? provider : null,
+      paymentMethod: method,
+    };
+
+    // Show success immediately and inject optimistic record — no reload needed
     setStep("success");
-    onDone();
+    onDone(app.id, optimisticRecord);
 
     fetch(`${API}/portal/applications/${app.id}/pay`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ amount: parseFloat(amount), paymentMethod: method, provider, reference, screenshotData: screenshot, notes }),
-    }).catch(() => {}); // silent — user already sees success
+    }).catch(() => {}); // optimistic — user sees success immediately
   }
 
   const MOBILE_ACCOUNTS: Record<string, { number: string; name: string }> = {
@@ -555,6 +566,18 @@ export default function MyLoansPage() {
     setTimeout(() => setSuccessMsg(""), 5000);
   }
 
+  function handlePaymentDone(appId: string, submission: PaymentRecord) {
+    // Inject optimistic PENDING record into the specific loan — no network round-trip
+    setApps(prev => prev.map(a =>
+      a.id === appId
+        ? { ...a, paymentSubmissions: [submission, ...(a.paymentSubmissions ?? [])] }
+        : a
+    ));
+    setPayApp(null);
+    setSuccessMsg("Payment submitted! It will be confirmed by a loan officer shortly.");
+    setTimeout(() => setSuccessMsg(""), 6000);
+  }
+
   function handleReloanDone(created: LoanApp) {
     setApps(prev => [created, ...prev]);
     setReloanTarget(null);
@@ -684,7 +707,7 @@ export default function MyLoansPage() {
           app={payApp}
           token={token}
           onClose={() => setPayApp(null)}
-          onDone={load}
+          onDone={handlePaymentDone}
         />
       )}
 
@@ -721,9 +744,9 @@ export default function MyLoansPage() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "Active Loans",       value: activeApps.filter(a => a.status === "DISBURSED").length,  color: "text-emerald-400" },
-          { label: "Applications",        value: apps.length,                                              color: "text-slate-200"   },
-          { label: "Pending Review",      value: apps.filter(a => a.status === "SUBMITTED" || a.status === "UNDER_REVIEW").length, color: "text-amber-400" },
+          { label: "Active Loans",   value: activeApps.filter(a => a.status === "DISBURSED").length,                           color: "text-emerald-400" },
+          { label: "Fully Repaid",   value: apps.filter(a => a.status === "REPAID").length,                                    color: "text-indigo-400"  },
+          { label: "Pending Review", value: apps.filter(a => a.status === "SUBMITTED" || a.status === "UNDER_REVIEW").length,  color: "text-amber-400"   },
         ].map(s => (
           <div key={s.label} className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
             <div className={`text-xl font-bold mb-1 ${s.color}`}>{s.value}</div>
@@ -1020,9 +1043,43 @@ export default function MyLoansPage() {
 
                 {isOpen && (
                   <div className="border-t border-slate-800 px-5 py-4 space-y-3">
+                    {app.status === "REPAID" && (
+                      <div className="bg-emerald-900/20 border border-emerald-700/40 rounded-xl p-3 text-xs text-emerald-300 font-semibold flex items-center gap-2">
+                        <CheckCircle size={14} /> Loan fully repaid — well done! Your credit score has been updated.
+                      </div>
+                    )}
+
                     {app.rejectedReason && (
                       <div className="bg-red-900/20 border border-red-800/40 rounded-xl p-3 text-xs text-red-400">
                         <span className="font-semibold">Rejection reason: </span>{app.rejectedReason}
+                      </div>
+                    )}
+
+                    {/* Payment history for repaid loans */}
+                    {(app.paymentSubmissions ?? []).length > 0 && (
+                      <div className="bg-slate-800/40 border border-slate-700 rounded-xl overflow-hidden">
+                        <div className="px-4 py-2.5 border-b border-slate-700 flex items-center gap-1.5">
+                          <Receipt size={13} className="text-emerald-400" />
+                          <span className="text-xs font-semibold text-slate-300">Payment History</span>
+                        </div>
+                        <div className="divide-y divide-slate-800">
+                          {(app.paymentSubmissions ?? []).map(p => (
+                            <div key={p.id} className="flex items-center justify-between px-4 py-2.5 text-xs">
+                              <div>
+                                <div className={`font-semibold ${p.status === "APPROVED" ? "text-emerald-400" : p.status === "REJECTED" ? "text-red-400" : "text-amber-400"}`}>
+                                  {p.amount != null ? K(p.amount) : "—"}
+                                </div>
+                                <div className="text-slate-500 mt-0.5">{p.provider ?? p.paymentMethod ?? "Mobile Money"}{p.reference ? ` · ${p.reference}` : ""}</div>
+                              </div>
+                              <div className="text-right">
+                                <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${p.status === "APPROVED" ? "bg-emerald-900/40 text-emerald-300 border-emerald-800/50" : p.status === "REJECTED" ? "bg-red-900/40 text-red-300 border-red-800/50" : "bg-amber-900/40 text-amber-300 border-amber-800/50"}`}>
+                                  {p.status}
+                                </div>
+                                <div className="text-slate-600 mt-0.5">{new Date(p.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
 

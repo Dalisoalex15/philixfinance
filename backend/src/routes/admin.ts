@@ -518,83 +518,82 @@ router.patch("/payment-submissions/:id", wrap(async (req: Request, res: Response
     return res.status(400).json({ error: "status must be APPROVED or REJECTED" });
   }
 
-  // Fetch the submission with its application and account before updating
-  const submission = await (prisma as any).loanPaymentSubmission.findUnique({
-    where: { id: req.params.id },
-    include: {
-      application: {
-        select: {
-          id: true, reference: true, amountRequested: true, interestRate: true,
-          status: true, accountId: true,
-          account: { select: { id: true, firstName: true } },
-          paymentSubmissions: {
-            where: { status: "APPROVED" },
-            select: { amount: true },
+  // Fetch submission + update in parallel to save one round-trip
+  const [submission, updated] = await Promise.all([
+    (prisma as any).loanPaymentSubmission.findUnique({
+      where: { id: req.params.id },
+      include: {
+        application: {
+          select: {
+            id: true, reference: true, amountRequested: true, interestRate: true,
+            status: true, accountId: true,
+            account: { select: { firstName: true } },
+            paymentSubmissions: { where: { status: "APPROVED" }, select: { amount: true } },
           },
         },
       },
-    },
-  });
+    }),
+    (prisma as any).loanPaymentSubmission.update({
+      where: { id: req.params.id },
+      data: {
+        status,
+        reviewedBy: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email,
+        reviewedAt: new Date(),
+        rejectedReason: rejectedReason || null,
+      },
+    }),
+  ]);
   if (!submission) return res.status(404).json({ error: "Payment submission not found" });
 
-  const updated = await (prisma as any).loanPaymentSubmission.update({
-    where: { id: req.params.id },
-    data: {
-      status,
-      reviewedBy: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email,
-      reviewedAt: new Date(),
-      rejectedReason: rejectedReason || null,
-    },
+  // Respond immediately — fire side-effects (notifications + status update) asynchronously
+  res.json(updated);
+
+  // Background: notification + repaid check (does not block the admin UI)
+  setImmediate(async () => {
+    try {
+      if (status === "APPROVED" && submission.application) {
+        const app = submission.application;
+        const paidSoFar = (app.paymentSubmissions as { amount: number | null }[])
+          .reduce((s: number, p) => s + (p.amount ?? 0), 0);
+        const thisPayment = submission.amount ?? 0;
+        const totalPaid = paidSoFar + thisPayment;
+        const totalDue = Math.ceil(app.amountRequested * (1 + (app.interestRate ?? 20) / 100));
+        const remaining = Math.max(0, totalDue - totalPaid);
+        const fullyRepaid = totalPaid >= totalDue;
+
+        const notifPromise = prisma.clientNotification.create({
+          data: {
+            accountId: app.accountId,
+            subject: fullyRepaid
+              ? `✅ Loan ${app.reference} fully repaid!`
+              : `✅ Payment of K${thisPayment.toLocaleString()} confirmed`,
+            body: fullyRepaid
+              ? `Congratulations, ${app.account.firstName}! Your payment of K${thisPayment.toLocaleString()} has been confirmed and your loan ${app.reference} is now fully repaid. Thank you for banking with Philix Finance.`
+              : `Your payment of K${thisPayment.toLocaleString()} for loan ${app.reference} has been confirmed. Total paid: K${totalPaid.toLocaleString()}. Remaining balance: K${remaining.toLocaleString()}.`,
+            category: "PAYMENT_CONFIRMED",
+          },
+        });
+
+        const loanUpdatePromise = fullyRepaid && app.status === "DISBURSED"
+          ? prisma.portalLoanApplication.update({ where: { id: app.id }, data: { status: "REPAID" } })
+          : Promise.resolve();
+
+        await Promise.all([notifPromise, loanUpdatePromise]);
+      }
+
+      if (status === "REJECTED" && submission.application) {
+        const app = submission.application;
+        await prisma.clientNotification.create({
+          data: {
+            accountId: app.accountId,
+            subject: `❌ Payment proof for ${app.reference} was rejected`,
+            body: `Your payment submission for loan ${app.reference} could not be verified.${rejectedReason ? ` Reason: ${rejectedReason}.` : ""} Please resubmit with a clear screenshot of the transaction.`,
+            category: "PAYMENT_REJECTED",
+          },
+        });
+      }
+    } catch (_) { /* background failure must not surface to client */ }
   });
-
-  // After approval: send client notification + check if loan is fully repaid
-  if (status === "APPROVED" && submission.application) {
-    const app = submission.application;
-    const paidSoFar = (app.paymentSubmissions as { amount: number | null }[])
-      .reduce((s: number, p) => s + (p.amount ?? 0), 0);
-    const thisPayment = submission.amount ?? 0;
-    const totalPaid = paidSoFar + thisPayment;
-    const interestRate = (app.interestRate ?? 20) / 100;
-    const totalDue = Math.ceil(app.amountRequested * (1 + interestRate));
-    const remaining = Math.max(0, totalDue - totalPaid);
-    const fullyRepaid = totalPaid >= totalDue;
-
-    // Create in-app notification for the client
-    await prisma.clientNotification.create({
-      data: {
-        accountId: app.accountId,
-        subject: fullyRepaid
-          ? `✅ Loan ${app.reference} fully repaid!`
-          : `✅ Payment of K${thisPayment.toLocaleString()} confirmed`,
-        body: fullyRepaid
-          ? `Congratulations, ${app.account.firstName}! Your payment of K${thisPayment.toLocaleString()} has been confirmed and your loan ${app.reference} is now fully repaid. Thank you for banking with Philix Finance.`
-          : `Your payment of K${thisPayment.toLocaleString()} for loan ${app.reference} has been confirmed. Total paid: K${totalPaid.toLocaleString()}. Remaining balance: K${remaining.toLocaleString()}.`,
-        category: "PAYMENT_CONFIRMED",
-      },
-    });
-
-    // Mark loan as REPAID if fully settled
-    if (fullyRepaid && app.status === "DISBURSED") {
-      await prisma.portalLoanApplication.update({
-        where: { id: app.id },
-        data: { status: "REPAID" },
-      });
-    }
-  }
-
-  if (status === "REJECTED" && submission.application) {
-    const app = submission.application;
-    await prisma.clientNotification.create({
-      data: {
-        accountId: app.accountId,
-        subject: `❌ Payment proof for ${app.reference} was rejected`,
-        body: `Your payment submission for loan ${app.reference} could not be verified.${rejectedReason ? ` Reason: ${rejectedReason}.` : ""} Please resubmit with a clear screenshot of the transaction.`,
-        category: "PAYMENT_REJECTED",
-      },
-    });
-  }
-
-  res.json({ ...updated, fullyRepaid: false });
 }));
 
 // POST /api/admin/broadcast — send message to all clients or a specific client
