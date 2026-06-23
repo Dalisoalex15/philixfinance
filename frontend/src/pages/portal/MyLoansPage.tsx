@@ -17,6 +17,7 @@ interface LoanApp {
   productType: string;
   amountRequested: number;
   termMonths: number; // represents weeks for short-term loans
+  interestRate?: number; // flat rate % stored at submission time
   purpose: string;
   status: "SUBMITTED" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "DISBURSED";
   createdAt: string;
@@ -210,7 +211,7 @@ function ReloanModal({
 function PaymentModal({
   app, onClose, onDone, token,
 }: { app: LoanApp; onClose: () => void; onDone: () => void; token: string | null }) {
-  const totalDue = app.amountRequested * (1 + ((app as any).interestRate ?? 20) / 100);
+  const totalDue = app.amountRequested * (1 + (app.interestRate ?? 20) / 100);
   const weeklyAmt = Math.ceil(totalDue / (app.termMonths || 1));
 
   const [amount, setAmount] = useState(String(weeklyAmt));
@@ -244,8 +245,12 @@ function PaymentModal({
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const compressed = await compressImage(file);
-    setScreenshot(compressed);
+    try {
+      const compressed = await compressImage(file);
+      setScreenshot(compressed);
+    } catch {
+      setError("Failed to process image. Please try a different file.");
+    }
   }
 
   function submit() {
@@ -540,16 +545,14 @@ export default function MyLoansPage() {
     const client = useClientAuthStore.getState().client;
     const fullName = client ? `${client.firstName} ${client.lastName}` : "Client";
     const doc = new jsPDF({ unit: "mm", format: "a4" });
-    const monthlyRate = 0.04;
-    const interest = app.amountRequested * monthlyRate * app.termMonths;
+    const flatRatePct = (app.interestRate ?? 20) / 100; // use stored flat rate; fall back to 20%
+    const interest = app.amountRequested * flatRatePct;
     const total = app.amountRequested + interest;
-    const monthly = total / app.termMonths;
+    const monthly = total / (app.termMonths || 1);
     const fmtK = (n: number) => `K${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     const approvedDate = app.reviewedAt ? new Date(app.reviewedAt) : new Date();
-    const firstPayment = new Date(approvedDate);
-    firstPayment.setMonth(firstPayment.getMonth() + 1);
-    const finalPayment = new Date(approvedDate);
-    finalPayment.setMonth(finalPayment.getMonth() + app.termMonths);
+    const firstPayment = new Date(approvedDate.getTime() + 7 * 86400000); // 1 week after disbursement
+    const finalPayment = new Date(approvedDate.getTime() + app.termMonths * 7 * 86400000); // N weeks after
     const fmt = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
     // Header
@@ -602,25 +605,25 @@ export default function MyLoansPage() {
     section("LOAN PARTICULARS");
     row("Loan Reference", app.reference);
     row("Loan Product", app.productType.replace(/_/g, " "));
-    row("Loan Term", `${app.termMonths} Months`);
+    row("Loan Term", `${app.termMonths} Week${app.termMonths !== 1 ? "s" : ""}`);
     row("Purpose", app.purpose || "—");
     row("Approval Date", fmt(approvedDate));
     y += 2;
 
     section("FINANCIAL BREAKDOWN");
     row("Principal Amount", fmtK(app.amountRequested));
-    row("Interest Rate", "4% per month (flat)");
+    row("Interest Rate", `${app.interestRate ?? 20}% flat (for ${app.termMonths} week${app.termMonths !== 1 ? "s" : ""})`);
     row("Total Interest Charged", fmtK(interest));
     doc.setTextColor(245, 166, 35);
     row("TOTAL REPAYABLE", fmtK(total));
     doc.setTextColor(20, 20, 20);
-    row("Monthly Instalment", fmtK(monthly));
+    row("Weekly Instalment", fmtK(monthly));
     y += 2;
 
     section("REPAYMENT SCHEDULE");
-    row("First Payment Due", fmt(firstPayment));
+    row("First Weekly Payment Due", fmt(firstPayment));
     row("Final Payment Due", fmt(finalPayment));
-    row("Number of Instalments", String(app.termMonths));
+    row("Number of Weekly Payments", String(app.termMonths));
     y += 8;
 
     // Signature

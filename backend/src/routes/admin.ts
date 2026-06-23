@@ -358,7 +358,7 @@ router.patch("/portal-accounts/:id/trust", wrap(async (req: Request, res: Respon
     data: {
       isTrustedClient: !!isTrustedClient,
       trustGrantedAt: isTrustedClient ? new Date() : null,
-      trustGrantedBy: isTrustedClient ? `${user.firstName} ${user.lastName}` : null,
+      trustGrantedBy: isTrustedClient ? (user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email) : null,
     },
     select: { id: true, isTrustedClient: true, trustGrantedAt: true, trustGrantedBy: true },
   });
@@ -521,7 +521,7 @@ router.patch("/payment-submissions/:id", wrap(async (req: Request, res: Response
     where: { id: req.params.id },
     data: {
       status,
-      reviewedBy: `${user.firstName} ${user.lastName}`,
+      reviewedBy: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email,
       reviewedAt: new Date(),
       rejectedReason: rejectedReason || null,
     },
@@ -585,7 +585,7 @@ router.post("/portal-accounts/:id/blacklist", wrap(async (req: Request, res: Res
       isBlacklisted: blacklist,
       blacklistReason: blacklist ? reason : null,
       blacklistedAt: blacklist ? new Date() : null,
-      blacklistedBy: blacklist ? `${user.firstName} ${user.lastName}` : null,
+      blacklistedBy: blacklist ? (user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email) : null,
       status: blacklist ? "BLACKLISTED" : "ACTIVE",
     },
     select: { id: true, isBlacklisted: true, blacklistReason: true, status: true },
@@ -681,7 +681,7 @@ router.post("/portal-accounts/:id/nok-alert", wrap(async (req: Request, res: Res
     data: {
       accountId: req.params.id,
       subject: "⚠️ NOK Alert Sent",
-      body: `An emergency alert was sent to your next of kin (${acc.nextOfKinName}, ${acc.nextOfKinPhone}) by ${user.firstName} ${user.lastName}.`,
+      body: `An emergency alert was sent to your next of kin (${acc.nextOfKinName}, ${acc.nextOfKinPhone}) by ${user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email}.`,
       category: "ALERT",
     },
   }).catch(() => {});
@@ -847,8 +847,8 @@ router.post("/targets", wrap(async (req: Request, res: Response) => {
 
   const target = await (prisma as any).loanOfficerTarget.upsert({
     where: { userId_month: { userId, month } },
-    update: { disbursementTarget, collectionTarget, loansTarget, setBy: `${user.firstName} ${user.lastName}`, updatedAt: new Date() },
-    create: { userId, month, disbursementTarget, collectionTarget, loansTarget, setBy: `${user.firstName} ${user.lastName}` },
+    update: { disbursementTarget, collectionTarget, loansTarget, setBy: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email, updatedAt: new Date() },
+    create: { userId, month, disbursementTarget, collectionTarget, loansTarget, setBy: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email },
   });
 
   res.json(target);
