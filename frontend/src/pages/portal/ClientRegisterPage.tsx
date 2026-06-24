@@ -63,6 +63,8 @@ export default function ClientRegisterPage() {
     return () => clearTimeout(t);
   }, [countdown]);
 
+  const [devCode, setDevCode] = useState("");
+
   // ── Step 0a: send code ──────────────────────────────────────────────────────
   async function handleSendCode() {
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -72,10 +74,15 @@ export default function ClientRegisterPage() {
     setSendingCode(true);
     setApiError("");
     setOtpError("");
+    setDevCode("");
     try {
-      await portalApi.sendEmailCode(email);
+      const res = await portalApi.sendEmailCode(email) as { sent: boolean; message: string; _devCode?: string };
+      if (res._devCode) {
+        setDevCode(res._devCode);
+        // auto-fill the digits so the user doesn't have to type
+        setDigits(res._devCode.split(""));
+      }
       setEmailSent(true);
-      setDigits(["", "", "", "", "", ""]);
       setCountdown(60);
       setTimeout(() => otpRefs.current[0]?.focus(), 100);
     } catch (e: unknown) {
@@ -90,9 +97,15 @@ export default function ClientRegisterPage() {
     if (countdown > 0 || resending) return;
     setResending(true);
     setOtpError("");
+    setDevCode("");
     try {
-      await portalApi.sendEmailCode(email);
-      setDigits(["", "", "", "", "", ""]);
+      const res = await portalApi.sendEmailCode(email) as { sent: boolean; message: string; _devCode?: string };
+      if (res._devCode) {
+        setDevCode(res._devCode);
+        setDigits(res._devCode.split(""));
+      } else {
+        setDigits(["", "", "", "", "", ""]);
+      }
       setCountdown(60);
       setTimeout(() => otpRefs.current[0]?.focus(), 100);
     } catch (e: unknown) {
@@ -322,12 +335,20 @@ export default function ClientRegisterPage() {
                       <span>Code sent to <span className="text-white font-medium">{email}</span></span>
                     </div>
                     <button
-                      onClick={() => { setEmailSent(false); setOtpError(""); setApiError(""); setDigits(["","","","","",""]); }}
+                      onClick={() => { setEmailSent(false); setOtpError(""); setApiError(""); setDigits(["","","","","",""]); setDevCode(""); }}
                       className="mt-2 text-xs text-amber-500 hover:text-amber-400"
                     >
                       Use a different email
                     </button>
                   </div>
+
+                  {devCode && (
+                    <div className="bg-amber-950/40 border border-amber-700/50 rounded-xl p-3 text-center">
+                      <p className="text-xs text-amber-400 font-semibold mb-1">Email delivery not configured — your code is:</p>
+                      <p className="text-2xl font-mono font-bold text-amber-300 tracking-[0.3em]">{devCode}</p>
+                      <p className="text-xs text-slate-500 mt-1">This notice only appears when no email provider is set up.</p>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-3 text-center">

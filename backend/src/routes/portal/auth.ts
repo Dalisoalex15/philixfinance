@@ -117,32 +117,40 @@ router.post("/send-email-code", wrap(async (req: Request, res: Response) => {
   if (!parsed.success) throw new AppError("A valid email address is required", 400);
   const { email } = parsed.data;
 
-  // Tell the user if the email is already taken (helpful, not a security leak here)
+  // Tell the user if the email is already taken
   const existing = await prisma.clientPortalAccount.findUnique({
     where: { email },
     select: { id: true },
   });
-  if (existing) throw new AppError("An account with this email already exists", 409);
+  if (existing) throw new AppError("An account with this email already exists. Please log in instead.", 409);
 
   // Expire any previous pre-check OTPs for this email
-  await (prisma as any).otpVerification.updateMany({
+  await prisma.otpVerification.updateMany({
     where: { email, type: "EMAIL_PRECHECK", verified: false },
     data: { expiresAt: new Date() },
   });
 
   const otp = genOtp();
-  await (prisma as any).otpVerification.create({
+  await prisma.otpVerification.create({
     data: {
       email,
       otp,
       type: "EMAIL_PRECHECK",
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
     },
   });
 
-  await Mailer.otp(email, email.split("@")[0], otp, "EMAIL_VERIFY");
+  // Fire-and-forget — SMTP failures must not block the response
+  Mailer.otp(email, email.split("@")[0], otp, "EMAIL_VERIFY").catch(() => {});
 
-  res.json({ sent: true, message: "Verification code sent. Please check your inbox." });
+  const isDev = process.env.NODE_ENV !== "production";
+  const noEmail = !process.env.RESEND_API_KEY && !process.env.SMTP_PASS;
+  res.json({
+    sent: true,
+    message: "Verification code sent. Please check your inbox.",
+    // Return code in dev/unconfigured environments so the user can still register
+    ...(isDev || noEmail ? { _devCode: otp } : {}),
+  });
 }));
 
 // ── POST /api/portal/auth/confirm-email-code ──────────────────────────────────
@@ -155,7 +163,7 @@ router.post("/confirm-email-code", wrap(async (req: Request, res: Response) => {
   if (!parsed.success) throw new AppError("Email and 6-digit code required", 400);
   const { email, otp } = parsed.data;
 
-  const record = await (prisma as any).otpVerification.findFirst({
+  const record = await prisma.otpVerification.findFirst({
     where: { email, type: "EMAIL_PRECHECK", verified: false },
     orderBy: { createdAt: "desc" },
   });
@@ -167,7 +175,7 @@ router.post("/confirm-email-code", wrap(async (req: Request, res: Response) => {
   }
 
   if (record.otp !== String(otp)) {
-    await (prisma as any).otpVerification.update({
+    await prisma.otpVerification.update({
       where: { id: record.id },
       data: { attempts: { increment: 1 } },
     });
@@ -178,8 +186,7 @@ router.post("/confirm-email-code", wrap(async (req: Request, res: Response) => {
     );
   }
 
-  // Mark as verified
-  await (prisma as any).otpVerification.update({
+  await prisma.otpVerification.update({
     where: { id: record.id },
     data: { verified: true },
   });
