@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { authenticate } from "../middleware/auth";
-import { Mailer, sendEmail } from "../lib/mailer";
+import { Mailer, sendEmail, buildBaseHtml } from "../lib/mailer";
 
 type AsyncHandler = (req: Request, res: Response, next: (err?: unknown) => void) => Promise<unknown>;
 const wrap = (fn: AsyncHandler) => (req: Request, res: Response, next: (err?: unknown) => void) =>
@@ -1201,6 +1201,88 @@ router.post("/email-campaigns", wrap(async (req: Request, res: Response) => {
   });
 
   res.status(201).json({ ...campaign, totalRecipients: accounts.length });
+}));
+
+// POST /api/admin/send-client-email — compose & send a direct email to one client
+router.post("/send-client-email", wrap(async (req: Request, res: Response) => {
+  const user = (req as any).user;
+  const { accountId, subject, body, loanRef, loanId } = req.body as {
+    accountId: string; subject: string; body: string; loanRef?: string; loanId?: string;
+  };
+
+  if (!accountId) return res.status(400).json({ error: "accountId is required" });
+  if (!subject?.trim()) return res.status(400).json({ error: "Subject is required" });
+  if (!body?.trim()) return res.status(400).json({ error: "Message body is required" });
+
+  const account = await prisma.clientPortalAccount.findUnique({
+    where: { id: accountId },
+    select: { id: true, email: true, firstName: true, lastName: true, clientNumber: true },
+  });
+  if (!account) return res.status(404).json({ error: "Client not found" });
+
+  const senderName = user.firstName && user.lastName
+    ? `${user.firstName} ${user.lastName}`
+    : user.email;
+
+  // Build a clean branded HTML body
+  const escapedBody = body
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\n/g, "<br>");
+
+  const loanBanner = loanRef
+    ? `<div style="background:#0f172a;border-left:4px solid #C9A84C;padding:10px 16px;border-radius:4px;margin-bottom:20px;">
+         <div style="color:#C9A84C;font-size:11px;font-weight:700;letter-spacing:1px;">LOAN REFERENCE</div>
+         <div style="color:#e2e8f0;font-size:15px;font-weight:700;font-family:'Courier New',monospace;margin-top:2px;">${loanRef}</div>
+       </div>`
+    : "";
+
+  const htmlBody = `
+<div style="text-align:center;padding:8px 0 24px;">
+  <div style="display:inline-block;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.4);color:#a5b4fc;font-size:11px;font-weight:700;letter-spacing:1.5px;padding:5px 14px;border-radius:20px;">PHILIX FINANCE — DIRECT MESSAGE</div>
+  <h2 style="color:#f8fafc;font-size:20px;font-weight:800;margin:16px 0 4px;">Dear ${account.firstName},</h2>
+  <p style="color:#64748b;font-size:12px;margin:0;">${account.clientNumber}</p>
+</div>
+${loanBanner}
+<div style="background:#0f172a;border-radius:12px;padding:20px 24px;margin-bottom:20px;">
+  <p style="color:#cbd5e1;font-size:14px;line-height:1.9;margin:0;">${escapedBody}</p>
+</div>
+<div style="border-top:1px solid #1e293b;padding-top:16px;margin-top:4px;">
+  <p style="color:#475569;font-size:12px;margin:0 0 4px;">This message was sent by <strong style="color:#94a3b8;">${senderName}</strong> on behalf of Philix Finance Ltd.</p>
+  <p style="color:#334155;font-size:11px;margin:0;">For queries, contact us at <a href="mailto:${process.env.COMPANY_EMAIL || "info@philixfinance.com"}" style="color:#6366f1;">${process.env.COMPANY_EMAIL || "info@philixfinance.com"}</a></p>
+</div>`;
+
+  const result = await sendEmail({
+    to: account.email,
+    toName: `${account.firstName} ${account.lastName}`,
+    subject,
+    body: body.replace(/\n/g, " "),
+    category: "DIRECT",
+    portalAccountId: account.id,
+    loanId,
+    htmlOverride: buildBaseHtml("DIRECT MESSAGE", htmlBody, account.email),
+  });
+
+  // Also create an in-app notification so client sees it in their portal
+  await prisma.clientNotification.create({
+    data: {
+      accountId: account.id,
+      subject,
+      body: body.trim(),
+      category: "GENERAL",
+      sentViaEmail: result.ok,
+    },
+  });
+
+  res.json({
+    ok: result.ok,
+    to: account.email,
+    clientNumber: account.clientNumber,
+    message: result.ok
+      ? `Email sent to ${account.email}`
+      : `Email queued (delivery may be delayed — check email logs)`,
+  });
 }));
 
 // GET /api/admin/email-directory — searchable client email list

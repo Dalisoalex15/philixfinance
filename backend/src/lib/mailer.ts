@@ -24,7 +24,7 @@ const LOGO_SVG = `<svg width="160" height="44" viewBox="0 0 160 44" fill="none" 
   <text x="49" y="37" font-family="'Segoe UI',Arial,sans-serif" font-weight="500" font-size="11" fill="rgba(255,255,255,0.55)" letter-spacing="2.5">FINANCE</text>
 </svg>`;
 
-function buildBaseHtml(headerRef: string, bodyContent: string, to: string): string {
+export function buildBaseHtml(headerRef: string, bodyContent: string, to: string): string {
   const year  = new Date().getFullYear();
   const today = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
   return `<!DOCTYPE html>

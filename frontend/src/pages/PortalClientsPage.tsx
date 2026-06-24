@@ -3,8 +3,9 @@ import {
   Users, Search, Eye, RefreshCw, ShieldCheck, ShieldOff, Lock,
   Mail, Phone, MapPin, Briefcase, BadgeCheck, AlertTriangle, X,
   Calendar, CreditCard, KeyRound, CheckCircle, ChevronDown, ChevronUp,
-  Unlock, Bell, FileCheck, Trash2, ShieldAlert,
+  Unlock, Bell, FileCheck, Trash2, ShieldAlert, Send,
 } from "lucide-react";
+import SendEmailModal, { type EmailContext } from "../components/SendEmailModal";
 
 const API = "/api";
 
@@ -102,6 +103,9 @@ export default function PortalClientsPage() {
   const [notifyBody, setNotifyBody] = useState("");
   const [notifyLoading, setNotifyLoading] = useState(false);
   const [notifyMsg, setNotifyMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Direct email compose
+  const [emailCtx, setEmailCtx] = useState<EmailContext | null>(null);
 
   // KYC update
   const [kycModal, setKycModal] = useState(false);
@@ -501,6 +505,17 @@ export default function PortalClientsPage() {
                     className="flex items-center gap-1 text-xs font-semibold text-indigo-400 bg-indigo-900/20 border border-indigo-800/40 px-2.5 py-1.5 rounded-lg hover:bg-indigo-900/40 transition-all">
                     <Bell size={12} /> Notify
                   </button>
+                  <button
+                    onClick={() => setEmailCtx({
+                      accountId: selected.id,
+                      firstName: selected.firstName,
+                      lastName:  selected.lastName,
+                      email:     selected.email,
+                      clientNumber: selected.clientNumber,
+                    })}
+                    className="flex items-center gap-1 text-xs font-semibold text-sky-400 bg-sky-900/20 border border-sky-800/40 px-2.5 py-1.5 rounded-lg hover:bg-sky-900/40 transition-all">
+                    <Send size={12} /> Email
+                  </button>
                   <button onClick={() => { setKycModal(true); setKycValue(selected.kycStatus); }}
                     className="flex items-center gap-1 text-xs font-semibold text-teal-400 bg-teal-900/20 border border-teal-800/40 px-2.5 py-1.5 rounded-lg hover:bg-teal-900/40 transition-all">
                     <FileCheck size={12} /> KYC
@@ -783,7 +798,7 @@ export default function PortalClientsPage() {
                       ) : (
                         <table className="data-table text-xs">
                           <thead>
-                            <tr><th>Reference</th><th>Product</th><th>Amount</th><th>Status</th><th>Date</th></tr>
+                            <tr><th>Reference</th><th>Product</th><th>Amount</th><th>Status</th><th>Date</th><th></th></tr>
                           </thead>
                           <tbody>
                             {selected.loanApplications.map(app => (
@@ -800,6 +815,25 @@ export default function PortalClientsPage() {
                                   }`}>{app.status}</span>
                                 </td>
                                 <td className="text-slate-500">{new Date(app.createdAt).toLocaleDateString()}</td>
+                                <td>
+                                  <button
+                                    onClick={() => setEmailCtx({
+                                      accountId:   selected.id,
+                                      firstName:   selected.firstName,
+                                      lastName:    selected.lastName,
+                                      email:       selected.email,
+                                      clientNumber: selected.clientNumber,
+                                      loanRef:     app.reference,
+                                      loanAmount:  app.amountRequested,
+                                      loanStatus:  app.status,
+                                      loanProduct: app.productType,
+                                      loanId:      app.id,
+                                    })}
+                                    className="flex items-center gap-1 text-[10px] font-semibold text-sky-400 bg-sky-900/20 border border-sky-800/30 px-2 py-1 rounded-lg hover:bg-sky-900/40 transition-all whitespace-nowrap"
+                                  >
+                                    <Send size={10} /> Email
+                                  </button>
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -993,6 +1027,11 @@ export default function PortalClientsPage() {
             ) : null}
           </div>
         </div>
+      )}
+
+      {/* ── Send Email modal (global, triggered from client actions or loan rows) ── */}
+      {emailCtx && (
+        <SendEmailModal context={emailCtx} onClose={() => setEmailCtx(null)} />
       )}
     </div>
   );
