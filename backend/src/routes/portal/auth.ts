@@ -1,7 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import crypto from "crypto";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma";
 import { AppError } from "../../middleware/errorHandler";
@@ -9,20 +8,21 @@ import { Mailer } from "../../lib/mailer";
 
 // ── Zod schemas ───────────────────────────────────────────────────────────────
 const registerSchema = z.object({
-  firstName:     z.string().min(1).max(60).trim(),
-  lastName:      z.string().min(1).max(60).trim(),
-  email:         z.string().email().max(200).toLowerCase(),
-  phone:         z.string().min(9).max(20).regex(/^[+\d\s()-]+$/, "Invalid phone format"),
-  password:      z.string().min(8).max(128),
-  dateOfBirth:   z.string().optional(),
-  gender:        z.enum(["MALE", "FEMALE"]).optional(),
-  address:       z.string().max(300).optional(),
-  city:          z.string().max(100).optional(),
-  occupation:    z.string().max(100).optional(),
-  employer:      z.string().max(200).optional(),
-  monthlyIncome: z.union([z.number().min(0), z.string()]).optional(),
-  nrcNumber:     z.string().max(30).optional(),
-  referralCode:  z.string().max(20).optional(),
+  firstName:          z.string().min(1).max(60).trim(),
+  lastName:           z.string().min(1).max(60).trim(),
+  email:              z.string().email().max(200).toLowerCase(),
+  phone:              z.string().min(9).max(20).regex(/^[+\d\s()-]+$/, "Invalid phone format"),
+  password:           z.string().min(8).max(128),
+  emailProofToken:    z.string().min(1, "Email must be verified before registration"),
+  dateOfBirth:        z.string().optional(),
+  gender:             z.enum(["MALE", "FEMALE"]).optional(),
+  address:            z.string().max(300).optional(),
+  city:               z.string().max(100).optional(),
+  occupation:         z.string().max(100).optional(),
+  employer:           z.string().max(200).optional(),
+  monthlyIncome:      z.union([z.number().min(0), z.string()]).optional(),
+  nrcNumber:          z.string().max(30).optional(),
+  referralCode:       z.string().max(20).optional(),
 });
 
 const loginSchema = z.object({
@@ -84,6 +84,116 @@ function sanitize(a: Record<string, unknown>) {
   return safe;
 }
 
+/**
+ * Issue a short-lived proof token that proves the email was verified.
+ * Signed with JWT_SECRET, expires in 30 minutes.
+ */
+function genEmailProofToken(email: string): string {
+  return jwt.sign(
+    { email, purpose: "email_precheck" },
+    process.env.JWT_SECRET!,
+    { expiresIn: "30m" },
+  );
+}
+
+/**
+ * Verify and decode an email proof token.
+ * Returns the email it was issued for, or throws.
+ */
+function verifyEmailProofToken(token: string): string {
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET!) as { email: string; purpose: string };
+    if (payload.purpose !== "email_precheck") throw new Error("Wrong purpose");
+    return payload.email;
+  } catch {
+    throw new AppError("Email verification token is invalid or expired. Please restart registration.", 400);
+  }
+}
+
+// ── POST /api/portal/auth/send-email-code ─────────────────────────────────────
+// Step 1 of registration: send OTP to the email before creating an account.
+router.post("/send-email-code", wrap(async (req: Request, res: Response) => {
+  const parsed = z.object({ email: z.string().email().toLowerCase() }).safeParse(req.body);
+  if (!parsed.success) throw new AppError("A valid email address is required", 400);
+  const { email } = parsed.data;
+
+  // Tell the user if the email is already taken (helpful, not a security leak here)
+  const existing = await prisma.clientPortalAccount.findUnique({
+    where: { email },
+    select: { id: true },
+  });
+  if (existing) throw new AppError("An account with this email already exists", 409);
+
+  // Expire any previous pre-check OTPs for this email
+  await (prisma as any).otpVerification.updateMany({
+    where: { email, type: "EMAIL_PRECHECK", verified: false },
+    data: { expiresAt: new Date() },
+  });
+
+  const otp = genOtp();
+  await (prisma as any).otpVerification.create({
+    data: {
+      email,
+      otp,
+      type: "EMAIL_PRECHECK",
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+    },
+  });
+
+  await Mailer.otp(email, email.split("@")[0], otp, "EMAIL_VERIFY");
+
+  res.json({ sent: true, message: "Verification code sent. Please check your inbox." });
+}));
+
+// ── POST /api/portal/auth/confirm-email-code ──────────────────────────────────
+// Step 2 of registration: verify the OTP, return an email proof token.
+router.post("/confirm-email-code", wrap(async (req: Request, res: Response) => {
+  const parsed = z.object({
+    email: z.string().email().toLowerCase(),
+    otp:   z.string().length(6).regex(/^\d{6}$/),
+  }).safeParse(req.body);
+  if (!parsed.success) throw new AppError("Email and 6-digit code required", 400);
+  const { email, otp } = parsed.data;
+
+  const record = await (prisma as any).otpVerification.findFirst({
+    where: { email, type: "EMAIL_PRECHECK", verified: false },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!record) throw new AppError("No pending verification found. Please request a new code.", 404);
+  if (record.attempts >= 5) throw new AppError("Too many incorrect attempts. Please request a new code.", 429);
+  if (new Date() > new Date(record.expiresAt)) {
+    throw new AppError("Code has expired. Please request a new one.", 410);
+  }
+
+  if (record.otp !== String(otp)) {
+    await (prisma as any).otpVerification.update({
+      where: { id: record.id },
+      data: { attempts: { increment: 1 } },
+    });
+    const remaining = 4 - record.attempts;
+    throw new AppError(
+      `Incorrect code. ${remaining} attempt${remaining !== 1 ? "s" : ""} remaining.`,
+      400,
+    );
+  }
+
+  // Mark as verified
+  await (prisma as any).otpVerification.update({
+    where: { id: record.id },
+    data: { verified: true },
+  });
+
+  // Issue a short-lived proof token the frontend will attach to the register call
+  const emailProofToken = genEmailProofToken(email);
+
+  res.json({
+    verified: true,
+    emailProofToken,
+    message: "Email verified. You may now complete your registration.",
+  });
+}));
+
 // ── POST /api/portal/auth/register ────────────────────────────────────────────
 router.post("/register", wrap(async (req: Request, res: Response) => {
   const parsed = registerSchema.safeParse(req.body);
@@ -93,9 +203,16 @@ router.post("/register", wrap(async (req: Request, res: Response) => {
   }
   const {
     firstName, lastName, email, phone, password,
+    emailProofToken,
     dateOfBirth, gender, address, city,
     occupation, employer, monthlyIncome, nrcNumber, referralCode,
   } = parsed.data;
+
+  // Validate the proof token and confirm it was issued for this email
+  const provenEmail = verifyEmailProofToken(emailProofToken);
+  if (provenEmail !== email) {
+    throw new AppError("Email mismatch: the verified email does not match the registration email.", 400);
+  }
 
   const existing = await prisma.clientPortalAccount.findUnique({ where: { email } });
   if (existing) throw new AppError("An account with this email already exists", 409);
@@ -106,6 +223,7 @@ router.post("/register", wrap(async (req: Request, res: Response) => {
     clientNumber = genClientNumber();
   }
 
+  // Account is created with emailVerified: true since we already confirmed it
   const account = await prisma.clientPortalAccount.create({
     data: {
       clientNumber,
@@ -118,49 +236,39 @@ router.post("/register", wrap(async (req: Request, res: Response) => {
       nrcNumber,
       status: "PENDING_KYC",
       kycStatus: "NOT_STARTED",
-      emailVerified: false,
+      emailVerified: true, // already confirmed by emailProofToken
       referredByCode: referralCode ? referralCode.trim().toUpperCase() : null,
     },
   });
 
-  // Generate + send OTP
-  const otp = genOtp();
-  await (prisma as any).otpVerification.create({
-    data: {
-      email: account.email,
-      otp,
-      type: "EMAIL_VERIFY",
-      accountId: account.id,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-    },
-  });
-  Mailer.otp(account.email, account.firstName, otp, "EMAIL_VERIFY").catch(() => {});
-
-  // Welcome email (non-blocking, secondary to OTP)
-  Mailer.welcome({ email: account.email, firstName: account.firstName, lastName: account.lastName, clientNumber: account.clientNumber, id: account.id }).catch(() => {});
-
-  res.status(201).json({
-    requiresVerification: true,
+  // Welcome email — fire and forget
+  Mailer.welcome({
     email: account.email,
-    message: "Account created. Please check your email for the verification code.",
-  });
+    firstName: account.firstName,
+    lastName: account.lastName,
+    clientNumber: account.clientNumber,
+    id: account.id,
+  }).catch(() => {});
+
+  // Issue tokens immediately — no second OTP step needed
+  const tokens = await issueTokens(account.id, account.email);
+  res.status(201).json({ ...tokens, account: sanitize(account as any) });
 }));
 
 // ── POST /api/portal/auth/verify-otp ─────────────────────────────────────────
+// Kept for password-reset and any legacy flows
 router.post("/verify-otp", wrap(async (req: Request, res: Response) => {
   const parsed = otpSchema.safeParse(req.body);
   if (!parsed.success) throw new AppError("Invalid request: " + parsed.error.errors[0].message, 400);
   const { email, otp, type } = parsed.data;
 
   const record = await (prisma as any).otpVerification.findFirst({
-    where: { email: email.toLowerCase(), type, verified: false },
+    where: { email, type, verified: false },
     orderBy: { createdAt: "desc" },
   });
 
   if (!record) throw new AppError("No pending verification found", 404);
-
   if (record.attempts >= 5) throw new AppError("Too many attempts. Please request a new code.", 429);
-
   if (new Date() > new Date(record.expiresAt)) {
     throw new AppError("Verification code has expired. Please request a new one.", 410);
   }
@@ -174,28 +282,24 @@ router.post("/verify-otp", wrap(async (req: Request, res: Response) => {
     throw new AppError(`Invalid code. ${remaining} attempt${remaining !== 1 ? "s" : ""} remaining.`, 400);
   }
 
-  // Mark OTP verified
   await (prisma as any).otpVerification.update({
     where: { id: record.id },
     data: { verified: true },
   });
 
   if (type === "EMAIL_VERIFY" && record.accountId) {
-    // Activate account
     await prisma.clientPortalAccount.update({
       where: { id: record.accountId },
       data: { emailVerified: true },
     });
     const account = await prisma.clientPortalAccount.findUnique({ where: { id: record.accountId } });
     if (!account) throw new AppError("Account not found", 404);
-
     const tokens = await issueTokens(account.id, account.email);
     return res.json({ ...tokens, account: sanitize(account as any) });
   }
 
-  // For PASSWORD_RESET: return a short-lived reset token
-  const resetToken = crypto.randomBytes(32).toString("hex");
-  res.json({ resetToken, email: email.toLowerCase(), message: "OTP verified. Proceed to reset password." });
+  // PASSWORD_RESET: return verified flag so frontend can proceed to reset form
+  res.json({ verified: true, email, message: "Code verified. Proceed to reset password." });
 }));
 
 // ── POST /api/portal/auth/resend-otp ─────────────────────────────────────────
@@ -211,9 +315,8 @@ router.post("/resend-otp", wrap(async (req: Request, res: Response) => {
     throw new AppError("Email is already verified", 400);
   }
 
-  // Expire old OTPs
   await (prisma as any).otpVerification.updateMany({
-    where: { email: email.toLowerCase(), type, verified: false },
+    where: { email, type, verified: false },
     data: { expiresAt: new Date() },
   });
 
@@ -229,7 +332,6 @@ router.post("/resend-otp", wrap(async (req: Request, res: Response) => {
   });
 
   await Mailer.otp(account.email, account.firstName, otp, type as any);
-
   res.json({ message: "New verification code sent. Please check your email." });
 }));
 
@@ -241,10 +343,9 @@ router.post("/forgot-password", wrap(async (req: Request, res: Response) => {
 
   const account = await prisma.clientPortalAccount.findUnique({ where: { email } });
 
-  // Always respond success to avoid email enumeration
   if (account) {
     await (prisma as any).otpVerification.updateMany({
-      where: { email: email.toLowerCase(), type: "PASSWORD_RESET", verified: false },
+      where: { email, type: "PASSWORD_RESET", verified: false },
       data: { expiresAt: new Date() },
     });
 
@@ -271,7 +372,7 @@ router.post("/reset-password", wrap(async (req: Request, res: Response) => {
   const { email, otp, newPassword } = parsed.data;
 
   const record = await (prisma as any).otpVerification.findFirst({
-    where: { email: email.toLowerCase(), type: "PASSWORD_RESET", verified: false },
+    where: { email, type: "PASSWORD_RESET", verified: false },
     orderBy: { createdAt: "desc" },
   });
 
@@ -290,7 +391,7 @@ router.post("/reset-password", wrap(async (req: Request, res: Response) => {
 
   const hash = await bcrypt.hash(newPassword, 12);
   await prisma.clientPortalAccount.update({
-    where: { email: email.toLowerCase() },
+    where: { email },
     data: { passwordHash: hash, failedLoginCount: 0, lockedUntil: null },
   });
 
@@ -311,7 +412,7 @@ router.post("/login", wrap(async (req: Request, res: Response) => {
 
   if (account.lockedUntil && account.lockedUntil > new Date())
     throw new AppError("Account temporarily locked. Try again later.", 423);
-  if (account.status === "SUSPENDED") throw new AppError("Account is suspended", 403);
+  if (account.status === "SUSPENDED")  throw new AppError("Account is suspended", 403);
   if (account.status === "BLACKLISTED") throw new AppError("Account is blacklisted", 403);
 
   const valid = await bcrypt.compare(password, account.passwordHash);

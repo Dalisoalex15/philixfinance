@@ -81,8 +81,9 @@ interface ClientAuthState {
   refreshToken: string | null;
   isAuthenticated: boolean;
   login: (client: ClientUser, password?: string) => void;
+  setClient: (account: ClientAccount) => void;
   loginWithApi: (email: string, password: string) => Promise<void>;
-  registerWithApi: (data: Record<string, unknown>) => Promise<{ requiresVerification?: boolean; email?: string }>;
+  registerWithApi: (data: Record<string, unknown>) => Promise<Record<string, never>>;
   logout: () => void;
   updateProfile: (data: Partial<ClientUser>) => void;
 }
@@ -97,6 +98,11 @@ export const useClientAuthStore = create<ClientAuthState>()(
 
       login: (client) => set({ client, isAuthenticated: true }),
 
+      setClient: (account) => set({
+        client: toClientUser(account),
+        isAuthenticated: true,
+      }),
+
       loginWithApi: async (email, password) => {
         const res = await portalApi.login(email, password);
         savePortalTokens(res.accessToken!, res.refreshToken!);
@@ -110,14 +116,11 @@ export const useClientAuthStore = create<ClientAuthState>()(
 
       registerWithApi: async (data) => {
         const res = await portalApi.register(data);
-        if (res.requiresVerification) {
-          return { requiresVerification: true, email: res.email };
-        }
-        savePortalTokens(res.accessToken!, res.refreshToken!);
+        savePortalTokens(res.accessToken, res.refreshToken);
         set({
-          client: toClientUser(res.account!),
-          accessToken: res.accessToken!,
-          refreshToken: res.refreshToken!,
+          client: toClientUser(res.account),
+          accessToken: res.accessToken,
+          refreshToken: res.refreshToken,
           isAuthenticated: true,
         });
         return {};

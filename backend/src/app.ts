@@ -172,9 +172,11 @@ app.use("/api/ai",            aiRoutes);
 
 // Portal — public auth (register/login) under authLimiter;
 // OTP routes also get the stricter otpLimiter mounted before the auth router
-app.use("/api/portal/auth/verify-otp",     otpLimiter);
-app.use("/api/portal/auth/resend-otp",     otpLimiter);
-app.use("/api/portal/auth/forgot-password",otpLimiter);
+app.use("/api/portal/auth/send-email-code",    otpLimiter);
+app.use("/api/portal/auth/confirm-email-code", otpLimiter);
+app.use("/api/portal/auth/verify-otp",         otpLimiter);
+app.use("/api/portal/auth/resend-otp",         otpLimiter);
+app.use("/api/portal/auth/forgot-password",    otpLimiter);
 app.use("/api/portal/auth",                authLimiter, portalAuthRoutes);
 
 // Portal — authenticated client routes (authenticatePortal enforced inside each router)

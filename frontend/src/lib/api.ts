@@ -290,8 +290,18 @@ export interface StaffPortalApplication {
 
 // ── Portal auth ──────────────────────────────────────────────────────────────
 export const portalApi = {
+  sendEmailCode: (email: string) =>
+    request<{ sent: boolean; message: string }>("/portal/auth/send-email-code", {
+      method: "POST", body: JSON.stringify({ email }),
+    }),
+
+  confirmEmailCode: (email: string, otp: string) =>
+    request<{ verified: boolean; emailProofToken: string; message: string }>("/portal/auth/confirm-email-code", {
+      method: "POST", body: JSON.stringify({ email, otp }),
+    }),
+
   register: (body: Record<string, unknown>) =>
-    request<{ accessToken?: string; refreshToken?: string; account?: ClientAccount; requiresVerification?: boolean; email?: string }>("/portal/auth/register", {
+    request<{ accessToken: string; refreshToken: string; account: ClientAccount }>("/portal/auth/register", {
       method: "POST", body: JSON.stringify(body),
     }),
 
