@@ -21,6 +21,10 @@ services:
         value: https://philixfinance.vercel.app
       - key: ANTHROPIC_API_KEY
         sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: SMTP_FROM
+        value: "Philix Finance <noreply@philixfinance.com>"
 
 databases:
   - name: philix-finance-db

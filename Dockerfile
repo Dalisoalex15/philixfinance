@@ -1,5 +1,4 @@
 # Philix Finance Backend — Production Dockerfile
-# Builds from repo root so Railway can find it without subdirectory config
 
 FROM node:20-alpine AS builder
 WORKDIR /app

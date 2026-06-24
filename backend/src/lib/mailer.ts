@@ -249,6 +249,8 @@ ${cta("Open Client Portal", `${PORTAL}/portal/dashboard`, "#C9A84C")}`;
 
   // ── OTP Verification ─────────────────────────────────────────────────────
   async otp(email: string, firstName: string, otp: string, type: "EMAIL_VERIFY" | "PASSWORD_RESET" | "EMAIL_CHANGE") {
+    // Always log the code so it's findable during dev/testing when email isn't configured
+    console.log(`\n🔑 OTP [${type}] for ${email}: ${otp} (expires 10 min)\n`);
     const titles: Record<string, string> = {
       EMAIL_VERIFY:  "Verify Your Email Address",
       PASSWORD_RESET:"Password Reset Request",
