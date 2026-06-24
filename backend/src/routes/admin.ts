@@ -1329,4 +1329,147 @@ router.get("/email-directory", wrap(async (req: Request, res: Response) => {
   res.json(accounts);
 }));
 
+// ══════════════════════════════════════════════════════════════════════════════
+// INVESTMENT PRODUCT MANAGEMENT
+// ══════════════════════════════════════════════════════════════════════════════
+
+const investmentProductSchema = z.object({
+  name:         z.string().min(2).max(100).trim(),
+  description:  z.string().max(500).trim().optional(),
+  type:         z.enum(["FIXED_DEPOSIT", "SAVINGS", "MONEY_MARKET", "NOTICE"]),
+  interestRate: z.number().min(0.1).max(100),
+  minAmount:    z.number().positive().default(500),
+  maxAmount:    z.number().positive().optional(),
+  termMonths:   z.number().int().min(1),
+  isActive:     z.boolean().default(true),
+});
+
+// GET /api/admin/investment-products
+router.get("/investment-products", wrap(async (_req: Request, res: Response) => {
+  const products = await (prisma as any).investmentProduct.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      _count: { select: { investments: true } },
+    },
+  });
+  res.json(products);
+}));
+
+// POST /api/admin/investment-products
+router.post("/investment-products", wrap(async (req: Request, res: Response) => {
+  const user = (req as any).user;
+  const parsed = investmentProductSchema.safeParse(req.body);
+  if (!parsed.success) throw new Error(parsed.error.errors[0].message);
+
+  const product = await (prisma as any).investmentProduct.create({
+    data: { ...parsed.data, createdBy: `${user.firstName} ${user.lastName}` },
+  });
+  res.status(201).json(product);
+}));
+
+// PATCH /api/admin/investment-products/:id
+router.patch("/investment-products/:id", wrap(async (req: Request, res: Response) => {
+  const parsed = investmentProductSchema.partial().safeParse(req.body);
+  if (!parsed.success) throw new Error(parsed.error.errors[0].message);
+
+  const product = await (prisma as any).investmentProduct.update({
+    where: { id: req.params.id },
+    data: parsed.data,
+  });
+  res.json(product);
+}));
+
+// DELETE /api/admin/investment-products/:id — deactivates, not hard delete
+router.delete("/investment-products/:id", wrap(async (req: Request, res: Response) => {
+  const product = await (prisma as any).investmentProduct.update({
+    where: { id: req.params.id },
+    data: { isActive: false },
+  });
+  res.json(product);
+}));
+
+// ── INVESTMENT MANAGEMENT ─────────────────────────────────────────────────────
+
+// GET /api/admin/investments
+router.get("/investments", wrap(async (_req: Request, res: Response) => {
+  const investments = await (prisma as any).clientInvestment.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      account: { select: { firstName: true, lastName: true, clientNumber: true, email: true } },
+      product: { select: { name: true, type: true, interestRate: true } },
+    },
+  });
+
+  const totalInvested = investments
+    .filter((i: any) => ["ACTIVE", "MATURED"].includes(i.status))
+    .reduce((s: number, i: any) => s + i.amountInvested, 0);
+
+  const pending = investments.filter((i: any) => i.status === "PENDING").length;
+  const active  = investments.filter((i: any) => i.status === "ACTIVE").length;
+  const matured = investments.filter((i: any) => i.status === "MATURED").length;
+
+  res.json({ investments, summary: { totalInvested, pending, active, matured, total: investments.length } });
+}));
+
+// PATCH /api/admin/investments/:id — approve / activate / mature / cancel
+router.patch("/investments/:id", wrap(async (req: Request, res: Response) => {
+  const user = (req as any).user;
+  const { status, notes } = req.body as { status: string; notes?: string };
+
+  const allowed = ["PENDING", "ACTIVE", "MATURED", "WITHDRAWN", "CANCELLED"];
+  if (!allowed.includes(status)) throw new Error(`Invalid status. Must be one of: ${allowed.join(", ")}`);
+
+  const inv = await (prisma as any).clientInvestment.findUnique({
+    where: { id: req.params.id },
+    include: { account: true, product: true },
+  });
+  if (!inv) return res.status(404).json({ error: "Investment not found" });
+
+  const update: Record<string, unknown> = { status };
+  if (notes) update.notes = notes;
+
+  if (status === "ACTIVE" && inv.status === "PENDING") {
+    update.approvedBy = `${user.firstName} ${user.lastName}`;
+    update.approvedAt = new Date();
+    update.startDate  = new Date();
+    const mat = new Date();
+    mat.setMonth(mat.getMonth() + inv.termMonths);
+    update.maturityDate = mat;
+  }
+
+  if (status === "MATURED") {
+    update.actualReturn = inv.expectedReturn;
+  }
+
+  const updated = await (prisma as any).clientInvestment.update({
+    where: { id: req.params.id },
+    data: update,
+    include: {
+      account: { select: { firstName: true, lastName: true, clientNumber: true, email: true } },
+      product: { select: { name: true, type: true } },
+    },
+  });
+
+  // Notify the client
+  const statusMessages: Record<string, string> = {
+    ACTIVE:    `Your investment of K${inv.amountInvested.toLocaleString()} in ${inv.product.name} (ref: ${inv.reference}) has been approved and is now ACTIVE. It matures on ${new Date(updated.maturityDate).toLocaleDateString()}.`,
+    MATURED:   `Congratulations! Your investment (ref: ${inv.reference}) has matured. Your return of K${inv.expectedReturn.toLocaleString("en-ZM", { minimumFractionDigits: 2 })} is now ready for withdrawal.`,
+    WITHDRAWN: `Your investment (ref: ${inv.reference}) withdrawal has been processed. Thank you for investing with Philix Finance.`,
+    CANCELLED: `Your investment request (ref: ${inv.reference}) has been cancelled. ${notes ? `Reason: ${notes}` : ""} Please contact us if you have questions.`,
+  };
+
+  if (statusMessages[status]) {
+    await (prisma as any).clientNotification.create({
+      data: {
+        accountId: inv.accountId,
+        subject: `Investment ${status.charAt(0) + status.slice(1).toLowerCase()}`,
+        body: statusMessages[status],
+        category: "INVESTMENT",
+      },
+    }).catch(() => {});
+  }
+
+  res.json(updated);
+}));
+
 export default router;

@@ -96,6 +96,8 @@ import ClientBroadcastPage from "./pages/ClientBroadcastPage";
 import CapitalPage from "./pages/CapitalPage";
 import PaymentSubmissionsPage from "./pages/PaymentSubmissionsPage";
 import CollateralCommandPage from "./pages/CollateralCommandPage";
+import InvestmentManagementPage from "./pages/InvestmentManagementPage";
+import InvestPage from "./pages/portal/InvestPage";
 
 class RouteErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -235,6 +237,7 @@ export default function App() {
           <Route path="support"      element={<RouteErrorBoundary><SupportPage /></RouteErrorBoundary>} />
           <Route path="eligibility"  element={<RouteErrorBoundary><EligibilityPage /></RouteErrorBoundary>} />
           <Route path="credit-score" element={<RouteErrorBoundary><CreditScorePage /></RouteErrorBoundary>} />
+          <Route path="invest"       element={<RouteErrorBoundary><InvestPage /></RouteErrorBoundary>} />
         </Route>
         <Route
           path="/"
@@ -317,6 +320,7 @@ export default function App() {
           <Route path="payment-submissions" element={<PaymentSubmissionsPage />} />
           <Route path="client-broadcasts" element={<ClientBroadcastPage />} />
           <Route path="collateral-command" element={<CollateralCommandPage />} />
+          <Route path="investments" element={<InvestmentManagementPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

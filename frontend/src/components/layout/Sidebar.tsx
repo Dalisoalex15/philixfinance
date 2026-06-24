@@ -87,6 +87,7 @@ const navGroups: NavGroup[] = [
     label: "Capital & Investors",
     items: [
       { href: "/capital",             icon: Wallet,     label: "Capital & Funding",  roles: ["SUPER_ADMIN", "MANAGER"] },
+      { href: "/investments",         icon: TrendingUp, label: "Client Investments", roles: ["SUPER_ADMIN", "MANAGER", "LOAN_OFFICER"] },
       { href: "/investors",           icon: TrendingUp, label: "Investors",          roles: ["SUPER_ADMIN", "MANAGER"] },
       { href: "/investor-statements", icon: FileText,   label: "Investor Statements",roles: ["SUPER_ADMIN", "MANAGER"] },
     ],

@@ -14,6 +14,7 @@ import PortalChatbot from "./PortalChatbot";
 const navItems = [
   { href: "/portal/dashboard", icon: LayoutDashboard, label: "Dashboard", color: "text-indigo-400" },
   { href: "/portal/apply", icon: FileText, label: "Apply for Loan", color: "text-blue-400", highlight: true },
+  { href: "/portal/invest", icon: TrendingUp, label: "Invest", color: "text-indigo-400" },
   { href: "/portal/loans", icon: CreditCard, label: "My Loans", color: "text-emerald-400" },
   { href: "/portal/calculator", icon: Calculator, label: "Loan Calculator", color: "text-cyan-400" },
   { href: "/portal/eligibility", icon: ClipboardList, label: "Loan Eligibility", color: "text-teal-400" },

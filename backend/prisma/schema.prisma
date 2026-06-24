@@ -123,6 +123,7 @@ model ClientPortalAccount {
   portalRefreshTokens PortalRefreshToken[]
   notifications       ClientNotification[]
   kycDocuments        KycDocument[]
+  investments         ClientInvestment[]
 
   @@index([email])
   @@index([clientNumber])
@@ -355,4 +356,51 @@ model EmailCampaign {
   createdBy   String
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+// ── CLIENT INVESTMENTS ────────────────────────────────────────────────────────
+
+model InvestmentProduct {
+  id            String   @id @default(uuid())
+  name          String
+  description   String?
+  type          String   // FIXED_DEPOSIT | SAVINGS | MONEY_MARKET | NOTICE
+  interestRate  Float    // Annual rate (%)
+  minAmount     Float    @default(500)
+  maxAmount     Float?
+  termMonths    Int      // Minimum lock-in period
+  isActive      Boolean  @default(true)
+  createdBy     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  investments   ClientInvestment[]
+}
+
+model ClientInvestment {
+  id             String              @id @default(uuid())
+  reference      String              @unique
+  accountId      String
+  account        ClientPortalAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  productId      String
+  product        InvestmentProduct   @relation(fields: [productId], references: [id])
+  amountInvested Float
+  interestRate   Float               // Rate locked at time of investment
+  termMonths     Int
+  startDate      DateTime            @default(now())
+  maturityDate   DateTime
+  status         String              @default("PENDING")
+  // PENDING | ACTIVE | MATURED | WITHDRAWN | CANCELLED
+  expectedReturn Float               // Total expected at maturity
+  actualReturn   Float?
+  paymentMethod  String?             // CASH | MOBILE_MONEY | BANK_TRANSFER
+  paymentRef     String?
+  notes          String?
+  approvedBy     String?
+  approvedAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([accountId])
+  @@index([status])
 }

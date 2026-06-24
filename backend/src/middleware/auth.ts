@@ -9,6 +9,8 @@ export interface AuthUser {
   email: string;
   role: string;
   branchId?: string | null;
+  firstName?: string;
+  lastName?: string;
 }
 
 declare global {
@@ -32,14 +34,14 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     // Verify user still exists and is active
     const user = await prisma.user.findUnique({
       where: { id: payload.id },
-      select: { id: true, email: true, role: true, status: true, branchId: true },
+      select: { id: true, email: true, role: true, status: true, branchId: true, firstName: true, lastName: true },
     });
 
     if (!user || user.status !== "ACTIVE") {
       return res.status(401).json({ error: "Account is not active" });
     }
 
-    req.user = { id: user.id, email: user.email, role: user.role, branchId: user.branchId };
+    req.user = { id: user.id, email: user.email, role: user.role, branchId: user.branchId, firstName: user.firstName, lastName: user.lastName };
     next();
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
