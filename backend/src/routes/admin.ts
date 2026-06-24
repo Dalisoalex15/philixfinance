@@ -1184,7 +1184,7 @@ router.post("/email-campaigns", wrap(async (req: Request, res: Response) => {
       htmlBody: htmlBody || text,
       targetGroup: targetGroup || "ALL",
       status: "SENDING",
-      createdBy: `${user.firstName} ${user.lastName}`,
+      createdBy: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email,
     },
   });
 
