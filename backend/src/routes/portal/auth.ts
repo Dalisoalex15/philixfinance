@@ -284,29 +284,6 @@ router.post("/login", wrap(async (req: Request, res: Response) => {
     throw new AppError("Invalid email or password", 401);
   }
 
-  // If email not verified, send a new OTP and ask them to verify
-  if (!account.emailVerified) {
-    await (prisma as any).otpVerification.updateMany({
-      where: { email: account.email, type: "EMAIL_VERIFY", verified: false },
-      data: { expiresAt: new Date() },
-    });
-    const otp = genOtp();
-    await (prisma as any).otpVerification.create({
-      data: {
-        email: account.email, otp, type: "EMAIL_VERIFY",
-        accountId: account.id,
-        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-      },
-    });
-    Mailer.otp(account.email, account.firstName, otp, "EMAIL_VERIFY").catch(() => {});
-
-    return res.status(403).json({
-      requiresVerification: true,
-      email: account.email,
-      message: "Please verify your email. A new code has been sent.",
-    });
-  }
-
   await prisma.clientPortalAccount.update({
     where: { id: account.id },
     data: { failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date() },

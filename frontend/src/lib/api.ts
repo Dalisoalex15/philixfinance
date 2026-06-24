@@ -258,7 +258,7 @@ export const portalApi = {
     }),
 
   login: (email: string, password: string) =>
-    request<{ accessToken: string; refreshToken: string; account: ClientAccount }>("/portal/auth/login", {
+    request<{ accessToken: string; refreshToken: string; account: ClientAccount; requiresVerification?: boolean; email?: string }>("/portal/auth/login", {
       method: "POST", body: JSON.stringify({ email, password }),
     }),
 

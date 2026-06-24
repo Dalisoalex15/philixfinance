@@ -81,7 +81,7 @@ interface ClientAuthState {
   refreshToken: string | null;
   isAuthenticated: boolean;
   login: (client: ClientUser, password?: string) => void;
-  loginWithApi: (email: string, password: string) => Promise<{ requiresVerification?: boolean; email?: string }>;
+  loginWithApi: (email: string, password: string) => Promise<void>;
   registerWithApi: (data: Record<string, unknown>) => Promise<{ requiresVerification?: boolean; email?: string }>;
   logout: () => void;
   updateProfile: (data: Partial<ClientUser>) => void;
@@ -98,27 +98,14 @@ export const useClientAuthStore = create<ClientAuthState>()(
       login: (client) => set({ client, isAuthenticated: true }),
 
       loginWithApi: async (email, password) => {
-        // Raw fetch so we can inspect 403 + requiresVerification
-        const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api";
-        const r = await fetch(`${BASE}/portal/auth/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        });
-        const res = await r.json().catch(() => ({}));
-        if (r.status === 403 && res.requiresVerification) {
-          return { requiresVerification: true, email: res.email || email };
-        }
-        if (!r.ok) throw new Error(res.message || res.error || `Login failed`);
-
-        savePortalTokens(res.accessToken, res.refreshToken);
+        const res = await portalApi.login(email, password);
+        savePortalTokens(res.accessToken!, res.refreshToken!);
         set({
-          client: toClientUser(res.account),
-          accessToken: res.accessToken,
-          refreshToken: res.refreshToken,
+          client: toClientUser(res.account!),
+          accessToken: res.accessToken!,
+          refreshToken: res.refreshToken!,
           isAuthenticated: true,
         });
-        return {};
       },
 
       registerWithApi: async (data) => {
