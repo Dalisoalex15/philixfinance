@@ -219,6 +219,141 @@ const PORTAL = process.env.FRONTEND_URL || "https://philixfinance.vercel.app";
 const fmtK   = (n: number) => `K${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmt    = (d: Date)   => d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
+// ── Branded Philix Finance email template (matches design in screenshots) ──
+function buildPhilixEmail(opts: {
+  ref: string;
+  firstName: string;
+  isCongratulations?: boolean;
+  quote: string;
+  actionType: "Required" | "Completed";
+  actionLine: string;
+  subLine: string;
+  particulars?: Array<{ label: string; value: string }>;
+  breakdown: Array<{ label: string; value: string; color?: string; bold?: boolean }>;
+  principal: number;
+  totalPaid: number;
+  totalDue: number;
+  progressPct?: number;
+  ctaType: "pay" | "growth";
+}): string {
+  const outstanding = Math.max(0, opts.totalDue - opts.totalPaid);
+  const pct = opts.progressPct ?? (opts.totalDue > 0 ? Math.min(100, Math.round((opts.totalPaid / opts.totalDue) * 100)) : 0);
+  const whatsapp = `https://wa.me/260777158901?text=Hi+Philix+Finance,+I+want+to+make+a+payment+for+loan+${encodeURIComponent(opts.ref)}`;
+  const qr = `https://api.qrserver.com/v1/create-qrcode/?size=70x70&data=${encodeURIComponent(opts.ref)}&bgcolor=f0fdf4&color=166534&margin=4`;
+
+  const particularsHtml = opts.particulars ? `
+  <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:16px;">
+    <tr><td colspan="2" style="padding:10px 16px;background:#fafafa;border-bottom:1px solid #e2e8f0;">
+      <span style="color:#d97706;font-size:13px;font-weight:700;">&#9670;&#9670;&#9670;&#9670;&#9670; Loan Particulars</span>
+    </td></tr>
+    ${opts.particulars.map(p => `
+    <tr>
+      <td style="padding:9px 16px;color:#64748b;font-size:13px;border-top:1px solid #f1f5f9;">${p.label}</td>
+      <td style="padding:9px 16px;color:#1e293b;font-size:13px;text-align:right;border-top:1px solid #f1f5f9;">${p.value}</td>
+    </tr>`).join("")}
+  </table>` : "";
+
+  const breakdownHtml = `
+  <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:16px;">
+    <tr><td colspan="2" style="padding:10px 16px;background:#fafafa;border-bottom:1px solid #e2e8f0;">
+      <span style="color:#d97706;font-size:13px;font-weight:700;">&#9670;&#9670;&#9670;&#9670;&#9670; Financial Breakdown</span>
+    </td></tr>
+    ${opts.breakdown.map(b => `
+    <tr>
+      <td style="padding:9px 16px;color:${b.color ?? "#64748b"};font-size:13px;font-weight:${b.bold ? "700" : "400"};border-top:1px solid #f1f5f9;">${b.label}</td>
+      <td style="padding:9px 16px;color:${b.color ?? "#1e293b"};font-size:13px;font-weight:${b.bold ? "700" : "400"};text-align:right;border-top:1px solid #f1f5f9;">${b.value}</td>
+    </tr>`).join("")}
+    <tr>
+      <td style="padding:12px 16px;color:#1e293b;font-size:14px;font-weight:700;border-top:2px solid #e2e8f0;">OUTSTANDING</td>
+      <td style="padding:12px 16px;color:${outstanding <= 0 ? "#16a34a" : "#ef4444"};font-size:16px;font-weight:900;text-align:right;border-top:2px solid #e2e8f0;">ZMW ${outstanding.toLocaleString("en-ZM", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+    </tr>
+    ${pct > 0 && pct < 100 ? `
+    <tr><td colspan="2" style="padding:8px 16px 12px;">
+      <div style="height:7px;background:#f1f5f9;border-radius:4px;overflow:hidden;">
+        <div style="height:7px;background:#f59e0b;border-radius:4px;width:${pct}%;"></div>
+      </div>
+    </td></tr>` : ""}
+  </table>`;
+
+  const ctaHtml = opts.ctaType === "growth" ? `
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0B1F3A;border-radius:8px;overflow:hidden;">
+    <tr><td style="padding:22px 24px;text-align:center;">
+      <div style="color:#d97706;font-weight:700;font-size:14px;margin-bottom:8px;">&#9670;&#9670;&#9670;&#9670;&#9670; Ready for Growth?</div>
+      <p style="color:#94a3b8;font-size:12px;margin:0 0 14px;">Because you paid on time, you are now eligible for a higher limit with faster approval.</p>
+      <a href="${PORTAL}/portal/apply" style="display:inline-block;background:#d97706;color:#ffffff;padding:11px 26px;border-radius:6px;text-decoration:none;font-weight:900;font-size:13px;letter-spacing:1px;">GET NEXT LOAN</a>
+    </td></tr>
+  </table>
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px;">
+    <tr>
+      <td align="center" style="color:#94a3b8;font-size:12px;padding:8px 0;">&#9670;&#9670;&#9670;&#9670;&#9670;&#9670;&#9670;&#9670;</td>
+      <td align="center" style="color:#94a3b8;font-size:12px;padding:8px 0;">&#9670;&#9670;&#9670;&#9670;&#9670;&#9670;&#9670;&#9670;</td>
+    </tr>
+    <tr>
+      <td align="center" style="color:#64748b;font-size:11px;">500+ Happy Clients</td>
+      <td align="center" style="color:#64748b;font-size:11px;">500+ Happy Clients</td>
+    </tr>
+  </table>` : `
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;overflow:hidden;">
+    <tr>
+      <td width="90" style="padding:16px 12px 16px 16px;vertical-align:middle;">
+        <img src="${qr}" width="70" height="70" alt="QR Code" style="display:block;border-radius:4px;" />
+      </td>
+      <td style="padding:16px 16px 16px 4px;vertical-align:middle;">
+        <div style="color:#166534;font-weight:700;font-size:13px;margin-bottom:4px;">Ready to Pay?</div>
+        <div style="color:#64748b;font-size:11px;margin-bottom:10px;">Scan code or use the link below to contact support.</div>
+        <a href="${whatsapp}" style="display:inline-block;background:#16a34a;color:#ffffff;padding:8px 16px;border-radius:6px;text-decoration:none;font-weight:700;font-size:12px;">Pay via WhatsApp</a>
+      </td>
+    </tr>
+  </table>`;
+
+  const congratsBlock = opts.isCongratulations ? `
+  <tr>
+    <td style="padding:24px 32px 0;text-align:center;background:#ffffff;">
+      <div style="color:#16a34a;font-size:28px;font-weight:900;letter-spacing:2px;font-family:Arial,sans-serif;">CONGRATULATIONS!</div>
+      <div style="color:#64748b;font-size:11px;letter-spacing:3px;margin-top:4px;">LOAN FULLY SETTLED</div>
+    </td>
+  </tr>` : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Philix Finance</title></head>
+<body style="margin:0;padding:20px 0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr><td align="center" style="padding:20px 16px;">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.12);">
+  <tr>
+    <td style="background:linear-gradient(135deg,#0B1F3A 0%,#1a3358 100%);padding:28px 32px;text-align:center;">
+      <div style="color:#ffffff;font-size:20px;font-weight:900;letter-spacing:3px;font-family:Arial,sans-serif;">PHILIX FINANCE</div>
+      <div style="color:#94a3b8;font-size:11px;letter-spacing:1.5px;margin-top:5px;">CLIENT REF: ${opts.ref}</div>
+    </td>
+  </tr>
+  ${congratsBlock}
+  <tr>
+    <td style="padding:28px 32px;background:#ffffff;">
+      <p style="color:#1e293b;font-size:15px;margin:0 0 16px;font-family:Arial,sans-serif;">Hello ${opts.firstName},</p>
+      <div style="background:#fffbeb;border-left:4px solid #f59e0b;padding:12px 16px;margin:0 0 16px;border-radius:0 8px 8px 0;">
+        <em style="color:#92400e;font-size:13px;">"${opts.quote}"</em>
+      </div>
+      <p style="color:#1e293b;font-size:13px;margin:0 0 3px;font-family:Arial,sans-serif;"><strong>Action ${opts.actionType}:</strong> ${opts.actionLine}</p>
+      <p style="color:#64748b;font-size:12px;margin:0 0 20px;font-family:Arial,sans-serif;">&#9670; ${opts.subLine}</p>
+      ${particularsHtml}
+      ${breakdownHtml}
+      ${ctaHtml}
+    </td>
+  </tr>
+  <tr>
+    <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 32px;text-align:center;">
+      <p style="color:#94a3b8;font-size:10px;letter-spacing:1.5px;margin:0 0 4px;font-family:Arial,sans-serif;">POWERED BY PHILIX FINANCE</p>
+      <p style="color:#cbd5e1;font-size:10px;margin:0;font-family:Arial,sans-serif;">Philix Finance Ltd · Lusaka, Zambia · BoZ Licensed · <a href="mailto:info@philixfinance.com" style="color:#94a3b8;text-decoration:none;">info@philixfinance.com</a></p>
+    </td>
+  </tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+}
+
 export const Mailer = {
 
   // ── Welcome ──────────────────────────────────────────────────────────────
@@ -315,48 +450,36 @@ ${highlight(`<p style="color:#94a3b8;font-size:12px;margin:0;">🔒 <strong styl
     termMonths: number; interestRate: number; accountId: string;
   }) {
     const productLabel = opts.productType.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-    const interest     = opts.amountRequested * (opts.interestRate / 100);
-    const total        = opts.amountRequested + interest;
-    const weekly       = Math.ceil(total / opts.termMonths);
-    const approvedDate = new Date();
-    const dueDate      = new Date(approvedDate.getTime() + opts.termMonths * 7 * 86400000);
-    const qr = `https://api.qrserver.com/v1/create-qrcode/?size=110x110&data=${opts.reference}&bgcolor=0B1F3A&color=C9A84C&margin=8`;
-
-    const body = `
-<div style="text-align:center;padding:8px 0 28px;">
-  ${badge("APPROVED ✓", "#14532d", "#4ade80")}
-  <h2 style="color:#f8fafc;font-size:24px;font-weight:800;margin:18px 0 8px;">Congratulations, ${opts.firstName}!</h2>
-  <p style="color:#94a3b8;font-size:14px;margin:0;">Your loan has been approved. Here are your full details.</p>
-</div>
-${section("LOAN PARTICULARS", [
-  row("Reference",    opts.reference, true),
-  row("Product",      productLabel),
-  row("Approval Date",fmt(approvedDate)),
-  row("Due Date",     fmt(dueDate)),
-  row("Status",       `<span style="background:#166534;color:#4ade80;font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;">APPROVED</span>`),
-].join(""))}
-${section("FINANCIAL BREAKDOWN", [
-  row("Principal Amount",    fmtK(opts.amountRequested)),
-  row(`Interest (${opts.interestRate}% flat)`, fmtK(interest)),
-  row("Total Repayable",     `<strong style="color:#F5A623;font-size:14px;">${fmtK(total)}</strong>`, true),
-  row("Weekly Payment",      fmtK(weekly)),
-  row("Term",                `${opts.termMonths} week${opts.termMonths > 1 ? "s" : ""}`),
-].join(""))}
-<div style="text-align:center;margin:0 0 24px;">
-  <div style="display:inline-block;background:#0B1F3A;border:1px solid #334155;border-radius:12px;padding:16px;">
-    <img src="${qr}" width="110" height="110" alt="QR Code" style="display:block;border-radius:6px;"/>
-    <p style="color:#64748b;font-size:10px;margin:8px 0 0;letter-spacing:1px;">${opts.reference}</p>
-  </div>
-  <p style="color:#475569;font-size:11px;margin:8px 0 0;">Show this QR code when making repayments</p>
-</div>
-${cta("View Loan Dashboard", `${PORTAL}/portal/loans`, "#16a34a")}`;
+    const interest = Math.ceil(opts.amountRequested * (opts.interestRate / 100));
+    const total    = opts.amountRequested + interest;
+    const weekly   = Math.ceil(total / opts.termMonths);
+    const dueDate  = new Date(Date.now() + opts.termMonths * 7 * 86400000);
+    const daysUntil = opts.termMonths * 7;
 
     return sendEmail({
       to: opts.email, toName: `${opts.firstName} ${opts.lastName}`,
-      subject: `✅ Loan Approved — ${opts.reference} · Philix Finance`,
+      subject: `Loan Approved — ${opts.reference} · Philix Finance`,
       category: "LOAN_APPROVED", portalAccountId: opts.accountId,
       body: `Your loan ${opts.reference} has been APPROVED.\n\nAmount: ${fmtK(opts.amountRequested)}\nTotal Repayable: ${fmtK(total)}\nWeekly Payment: ${fmtK(weekly)}\nDue: ${fmt(dueDate)}\n\nLog in to your portal to view details.`,
-      htmlOverride: buildBaseHtml(`REF: ${opts.reference}`, body, opts.email),
+      htmlOverride: buildPhilixEmail({
+        ref: opts.reference, firstName: opts.firstName,
+        quote: "Your loan has been approved. We're excited to support your goals.",
+        actionType: "Required", actionLine: "Review your loan details and prepare for disbursement.",
+        subLine: "Thank you for choosing Philix Finance.",
+        particulars: [
+          { label: "Loan Type", value: productLabel },
+          { label: "Due Date", value: fmt(dueDate) },
+          { label: "Status", value: `Due in ${daysUntil} days` },
+        ],
+        breakdown: [
+          { label: "Principal", value: `ZMW ${opts.amountRequested.toLocaleString()}` },
+          { label: "Interest (${opts.interestRate}% flat)", value: `ZMW ${interest.toLocaleString()}` },
+          { label: "Weekly Payment", value: `ZMW ${weekly.toLocaleString()}` },
+          { label: "Total Paid", value: "- ZMW 0.00", color: "#16a34a", bold: true },
+        ],
+        principal: opts.amountRequested, totalPaid: 0, totalDue: total,
+        ctaType: "pay",
+      }),
     });
   },
 
@@ -397,68 +520,69 @@ ${cta("Apply Again", `${PORTAL}/portal/apply`, "#4f46e5")}`;
     email: string; firstName: string; reference: string;
     amountRequested: number; interestRate: number; termMonths: number; accountId: string;
   }) {
-    const total  = opts.amountRequested * (1 + opts.interestRate / 100);
-    const weekly = Math.ceil(total / opts.termMonths);
-    const dueDate = new Date(Date.now() + opts.termMonths * 7 * 86400000);
-
-    const body = `
-<div style="text-align:center;padding:8px 0 24px;">
-  ${badge("FUNDS DISBURSED 💰", "#1e3a5f", "#60a5fa")}
-  <h2 style="color:#f8fafc;font-size:22px;font-weight:800;margin:18px 0 8px;">Your funds are on the way, ${opts.firstName}!</h2>
-  <p style="color:#94a3b8;font-size:14px;margin:0;">Loan ${opts.reference} has been disbursed to your account.</p>
-</div>
-${section("DISBURSEMENT DETAILS", [
-  row("Reference",       opts.reference, true),
-  row("Amount Disbursed",`<strong style="color:#4ade80;font-size:15px;">${fmtK(opts.amountRequested)}</strong>`),
-  row("Total Repayable", fmtK(total)),
-  row("Weekly Instalment",fmtK(weekly)),
-  row("Final Due Date",  fmt(dueDate)),
-].join(""))}
-${highlight(`<p style="color:#94a3b8;font-size:13px;margin:0;line-height:1.7;"><strong style="color:#f59e0b;">Important:</strong> Your first weekly payment of <strong style="color:#e2e8f0;">${fmtK(weekly)}</strong> is due in 7 days. Please ensure funds are available to avoid late fees.</p>`, "#f59e0b")}
-${cta("Make a Payment Now", `${PORTAL}/portal/loans`, "#C9A84C")}`;
+    const interest = Math.ceil(opts.amountRequested * (opts.interestRate / 100));
+    const total    = opts.amountRequested + interest;
+    const weekly   = Math.ceil(total / opts.termMonths);
+    const dueDate  = new Date(Date.now() + opts.termMonths * 7 * 86400000);
+    const daysUntil = opts.termMonths * 7;
 
     return sendEmail({
       to: opts.email, toName: opts.firstName,
-      subject: `💰 Loan Disbursed — ${opts.reference} · Philix Finance`,
+      subject: `Statement: ${opts.reference}`,
       category: "LOAN_DISBURSED", portalAccountId: opts.accountId,
-      body: `Your loan ${opts.reference} has been disbursed!\n\nAmount: ${fmtK(opts.amountRequested)}\nWeekly Payment: ${fmtK(weekly)}\nFinal Due: ${fmt(dueDate)}\n\nFirst payment due in 7 days.`,
-      htmlOverride: buildBaseHtml(`REF: ${opts.reference}`, body, opts.email),
+      body: `Your loan ${opts.reference} has been disbursed!\n\nAmount: ZMW ${opts.amountRequested.toLocaleString()}\nWeekly Payment: ZMW ${weekly.toLocaleString()}\nFinal Due: ${fmt(dueDate)}\n\nFirst payment due in 7 days.`,
+      htmlOverride: buildPhilixEmail({
+        ref: opts.reference, firstName: opts.firstName,
+        quote: "We appreciate your partnership with Philix Finance.",
+        actionType: "Required", actionLine: "Review your statement.",
+        subLine: "Thank you for your continued business.",
+        particulars: [
+          { label: "Loan Type", value: "Trusted Client" },
+          { label: "Due Date", value: fmt(dueDate) },
+          { label: "Status", value: `Due in ${daysUntil} days` },
+        ],
+        breakdown: [
+          { label: "Principal", value: `ZMW ${opts.amountRequested.toLocaleString()}` },
+          { label: "Interest", value: `ZMW ${interest.toLocaleString()}` },
+          { label: "Total Paid", value: "- ZMW 0.00", color: "#16a34a", bold: true },
+        ],
+        principal: opts.amountRequested, totalPaid: 0, totalDue: total,
+        ctaType: "pay",
+      }),
     });
   },
 
   // ── Payment confirmed ─────────────────────────────────────────────────────
   async paymentConfirmed(opts: {
     email: string; firstName: string; reference: string;
-    amount: number; totalPaid: number; remaining: number; accountId: string;
+    amount: number; totalPaid: number; remaining: number; totalDue: number; accountId: string;
   }) {
     const fullyPaid = opts.remaining <= 0;
-    const body = `
-<div style="text-align:center;padding:8px 0 24px;">
-  ${badge(fullyPaid ? "FULLY REPAID 🎉" : "PAYMENT CONFIRMED ✓", fullyPaid ? "#14532d" : "#1e3a5f", fullyPaid ? "#4ade80" : "#60a5fa")}
-  <h2 style="color:#f8fafc;font-size:22px;font-weight:800;margin:18px 0 8px;">
-    ${fullyPaid ? `Congratulations ${opts.firstName}! Loan fully cleared!` : `Payment received, ${opts.firstName}!`}
-  </h2>
-</div>
-${section("PAYMENT DETAILS", [
-  row("Loan Reference",   opts.reference, true),
-  row("Amount Confirmed", `<strong style="color:#4ade80;">${fmtK(opts.amount)}</strong>`),
-  row("Total Paid",       fmtK(opts.totalPaid)),
-  row("Outstanding Balance", fullyPaid ? `<span style="color:#4ade80;">CLEARED ✓</span>` : `<strong style="color:#F5A623;">${fmtK(opts.remaining)}</strong>`),
-  row("Date",             fmt(new Date())),
-].join(""))}
-${fullyPaid
-  ? highlight(`<p style="color:#4ade80;font-size:14px;font-weight:700;margin:0;text-align:center;">🏆 Your loan is fully repaid. Thank you for banking with Philix Finance!</p>`, "#22c55e")
-  : highlight(`<p style="color:#94a3b8;font-size:13px;margin:0;">Outstanding balance of <strong style="color:#F5A623;">${fmtK(opts.remaining)}</strong> remains. Your next payment will further reduce this balance.</p>`, "#C9A84C")}
-${cta("View Loan Dashboard", `${PORTAL}/portal/loans`, "#16a34a")}`;
 
     return sendEmail({
       to: opts.email, toName: opts.firstName,
-      subject: fullyPaid
-        ? `🎉 Loan ${opts.reference} Fully Repaid — Philix Finance`
-        : `✅ Payment of ${fmtK(opts.amount)} Confirmed — ${opts.reference}`,
+      subject: fullyPaid ? `Congratulations: ${opts.reference} Fully Repaid` : `Payment Confirmed — ${opts.reference}`,
       category: "PAYMENT_CONFIRMED", portalAccountId: opts.accountId,
-      body: `Payment of ${fmtK(opts.amount)} confirmed for loan ${opts.reference}.\nTotal paid: ${fmtK(opts.totalPaid)}\nOutstanding: ${fullyPaid ? "CLEARED" : fmtK(opts.remaining)}`,
-      htmlOverride: buildBaseHtml(`REF: ${opts.reference}`, body, opts.email),
+      body: `Payment of ZMW ${opts.amount.toLocaleString()} confirmed for loan ${opts.reference}.\nTotal paid: ZMW ${opts.totalPaid.toLocaleString()}\nOutstanding: ${fullyPaid ? "CLEARED" : `ZMW ${opts.remaining.toLocaleString()}`}`,
+      htmlOverride: buildPhilixEmail({
+        ref: opts.reference, firstName: opts.firstName,
+        isCongratulations: fullyPaid,
+        quote: fullyPaid
+          ? "Smart debt is the fuel for business growth. Use your next loan to stock up inventory in bulk or upgrade your equipment."
+          : "Thank you for your payment. Every payment builds your credit profile.",
+        actionType: "Completed",
+        actionLine: "Payment Received.",
+        subLine: "Thank you for your partnership with Philix Finance.",
+        breakdown: fullyPaid ? [
+          { label: "Principal Loaned", value: `ZMW ${(opts.totalDue > 0 ? opts.totalDue - (opts.totalDue - (opts.totalPaid || opts.totalDue)) : opts.amount).toLocaleString()}` },
+          { label: "Total Repaid", value: `ZMW ${opts.totalPaid.toLocaleString()}`, color: "#16a34a", bold: true },
+        ] : [
+          { label: "Amount Confirmed", value: `ZMW ${opts.amount.toLocaleString()}`, color: "#16a34a", bold: true },
+          { label: "Total Paid", value: `- ZMW ${opts.totalPaid.toLocaleString()}`, color: "#16a34a", bold: true },
+        ],
+        principal: opts.totalDue, totalPaid: opts.totalPaid, totalDue: opts.totalDue,
+        ctaType: fullyPaid ? "growth" : "pay",
+      }),
     });
   },
 
@@ -478,64 +602,64 @@ ${cta("View Loan Dashboard", `${PORTAL}/portal/loans`, "#16a34a")}`;
   // ── Payment reminder (pre-due) ────────────────────────────────────────────
   async paymentReminder(opts: {
     email: string; firstName: string; reference: string;
-    amountDue: number; dueDate: Date; accountId: string;
+    amountDue: number; dueDate: Date; totalDue: number; totalPaid: number; accountId: string;
   }) {
-    const body = `
-<div style="text-align:center;padding:8px 0 24px;">
-  ${badge("PAYMENT DUE SOON ⏰", "#451a03", "#fbbf24")}
-  <h2 style="color:#f8fafc;font-size:22px;font-weight:800;margin:18px 0 8px;">Reminder, ${opts.firstName}</h2>
-  <p style="color:#94a3b8;font-size:14px;margin:0;">Your loan payment is due in 3 days.</p>
-</div>
-${section("PAYMENT DETAILS", [
-  row("Loan Reference", opts.reference, true),
-  row("Amount Due",     `<strong style="color:#F5A623;font-size:15px;">${fmtK(opts.amountDue)}</strong>`),
-  row("Due Date",       `<strong style="color:#f59e0b;">${fmt(opts.dueDate)}</strong>`),
-].join(""))}
-${highlight(`<p style="color:#94a3b8;font-size:13px;margin:0;line-height:1.7;"><strong style="color:#e2e8f0;">How to pay:</strong><br>
-• Airtel Money: 0977 158 901<br>
-• MTN MoMo: 0968 158 901<br>
-• Zamtel Kwacha: 0955 158 901<br>
-<span style="color:#64748b;">Account Name: Philix Finance Ltd</span></p>`, "#f59e0b")}
-${cta("Pay Now", `${PORTAL}/portal/loans`, "#f59e0b")}`;
+    const daysUntil = Math.round((opts.dueDate.getTime() - Date.now()) / 86400000);
+    const statusText = daysUntil <= 1 ? "Due tomorrow" : `Due in ${daysUntil} days`;
 
     return sendEmail({
       to: opts.email, toName: opts.firstName,
-      subject: `⏰ Payment Reminder — ${fmtK(opts.amountDue)} due ${fmt(opts.dueDate)}`,
+      subject: `Reminder: Payment due in ${daysUntil} day${daysUntil !== 1 ? "s" : ""} — ${opts.reference}`,
       category: "PAYMENT_REMINDER", portalAccountId: opts.accountId,
-      body: `Reminder: Payment of ${fmtK(opts.amountDue)} for loan ${opts.reference} is due on ${fmt(opts.dueDate)}.`,
-      htmlOverride: buildBaseHtml(`REF: ${opts.reference}`, body, opts.email),
+      body: `Reminder: Payment of ZMW ${opts.amountDue.toLocaleString()} for loan ${opts.reference} is due on ${fmt(opts.dueDate)}.`,
+      htmlOverride: buildPhilixEmail({
+        ref: opts.reference, firstName: opts.firstName,
+        quote: "Your facility is maturing soon.",
+        actionType: "Required", actionLine: "Please prepare your payment.",
+        subLine: "Planning ahead ensures a stress-free financial life.",
+        particulars: [
+          { label: "Loan Type", value: "Trusted Client" },
+          { label: "Due Date", value: fmt(opts.dueDate) },
+          { label: "Status", value: statusText },
+        ],
+        breakdown: [
+          { label: "Principal", value: `ZMW ${(opts.totalDue - Math.ceil((opts.totalDue - (opts.totalDue / (1 + 0.2))) )).toLocaleString()}` },
+          { label: "Interest", value: `ZMW ${Math.ceil(opts.totalDue * 0.17).toLocaleString()}` },
+          { label: "Total Paid", value: `- ZMW ${opts.totalPaid.toLocaleString()}`, color: "#16a34a", bold: true },
+        ],
+        principal: opts.amountDue, totalPaid: opts.totalPaid, totalDue: opts.totalDue,
+        ctaType: "pay",
+      }),
     });
   },
 
   // ── Overdue notice ────────────────────────────────────────────────────────
   async overdueNotice(opts: {
     email: string; firstName: string; reference: string;
-    amountDue: number; daysOverdue: number; accountId: string;
+    amountDue: number; daysOverdue: number; totalDue: number; totalPaid: number; accountId: string;
   }) {
-    const body = `
-<div style="text-align:center;padding:8px 0 24px;">
-  ${badge("OVERDUE ⚠️", "#7f1d1d", "#fca5a5")}
-  <h2 style="color:#f8fafc;font-size:22px;font-weight:800;margin:18px 0 8px;">Urgent: Overdue Payment</h2>
-  <p style="color:#94a3b8;font-size:14px;margin:0;">Dear ${opts.firstName}, your loan payment is ${opts.daysOverdue} day${opts.daysOverdue !== 1 ? "s" : ""} overdue.</p>
-</div>
-${section("OVERDUE DETAILS", [
-  row("Loan Reference", opts.reference, true),
-  row("Amount Overdue", `<strong style="color:#ef4444;font-size:15px;">${fmtK(opts.amountDue)}</strong>`),
-  row("Days Overdue",   `<span style="color:#ef4444;font-weight:700;">${opts.daysOverdue} days</span>`),
-].join(""))}
-${highlight(`<p style="color:#fca5a5;font-size:13px;margin:0;line-height:1.7;"><strong>Continued non-payment may result in:</strong><br>
-• Late payment fees<br>
-• Negative impact on your credit score<br>
-• Legal action<br><br>
-Please contact us immediately on <a href="tel:+260777158901" style="color:#F5A623;">+260 777 158 901</a> to arrange payment.</p>`, "#ef4444")}
-${cta("Pay Now", `${PORTAL}/portal/loans`, "#ef4444")}`;
-
     return sendEmail({
       to: opts.email, toName: opts.firstName,
-      subject: `🚨 OVERDUE: Loan ${opts.reference} — ${opts.daysOverdue} days past due`,
+      subject: `OVERDUE: Loan ${opts.reference} — ${opts.daysOverdue} days past due`,
       category: "PAYMENT_OVERDUE", portalAccountId: opts.accountId,
-      body: `URGENT: Your payment of ${fmtK(opts.amountDue)} for loan ${opts.reference} is ${opts.daysOverdue} days overdue. Please pay immediately.`,
-      htmlOverride: buildBaseHtml(`REF: ${opts.reference}`, body, opts.email),
+      body: `URGENT: Your payment of ZMW ${opts.amountDue.toLocaleString()} for loan ${opts.reference} is ${opts.daysOverdue} days overdue. Please pay immediately.`,
+      htmlOverride: buildPhilixEmail({
+        ref: opts.reference, firstName: opts.firstName,
+        quote: "Settling overdue amounts protects your credit and keeps future loans available.",
+        actionType: "Required", actionLine: `Make payment now — ${opts.daysOverdue} day${opts.daysOverdue !== 1 ? "s" : ""} overdue.`,
+        subLine: "Continued non-payment may affect your credit score and eligibility.",
+        particulars: [
+          { label: "Loan Type", value: "Trusted Client" },
+          { label: "Days Overdue", value: `${opts.daysOverdue} day${opts.daysOverdue !== 1 ? "s" : ""}` },
+          { label: "Status", value: "OVERDUE — Action Required" },
+        ],
+        breakdown: [
+          { label: "Amount Overdue", value: `ZMW ${opts.amountDue.toLocaleString()}`, color: "#ef4444", bold: true },
+          { label: "Total Paid", value: `- ZMW ${opts.totalPaid.toLocaleString()}`, color: "#16a34a", bold: true },
+        ],
+        principal: opts.amountDue, totalPaid: opts.totalPaid, totalDue: opts.totalDue,
+        ctaType: "pay",
+      }),
     });
   },
 

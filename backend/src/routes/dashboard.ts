@@ -243,4 +243,86 @@ router.get("/capital-utilization", async (_req: Request, res: Response) => {
   });
 });
 
+// GET /api/dashboard/alerts — last 24h critical events for CEO feed
+router.get("/alerts", async (_req, res: Response) => {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  const [overdueLoans, newPortalApps, newPayments, newAccounts, fraudFlags] = await Promise.all([
+    // Loans that went overdue recently
+    prisma.loan.findMany({
+      where: { status: "OVERDUE", updatedAt: { gte: since } },
+      select: { id: true, loanNumber: true, outstandingBalance: true, updatedAt: true,
+        client: { select: { firstName: true, lastName: true } } },
+      orderBy: { updatedAt: "desc" }, take: 10,
+    }),
+    // New portal loan applications
+    prisma.portalLoanApplication.findMany({
+      where: { createdAt: { gte: since } },
+      select: { id: true, reference: true, amountRequested: true, createdAt: true, status: true, riskCategory: true,
+        account: { select: { firstName: true, lastName: true } } },
+      orderBy: { createdAt: "desc" }, take: 10,
+    }),
+    // Payment submissions from portal clients
+    prisma.loanPaymentSubmission.findMany({
+      where: { createdAt: { gte: since }, status: "PENDING" },
+      select: { id: true, amount: true, createdAt: true,
+        application: { select: { reference: true, account: { select: { firstName: true, lastName: true } } } } },
+      orderBy: { createdAt: "desc" }, take: 10,
+    }),
+    // New portal account registrations
+    prisma.clientPortalAccount.findMany({
+      where: { createdAt: { gte: since } },
+      select: { id: true, clientNumber: true, firstName: true, lastName: true, createdAt: true },
+      orderBy: { createdAt: "desc" }, take: 10,
+    }),
+    // High-risk applications
+    prisma.portalLoanApplication.findMany({
+      where: { riskCategory: { in: ["HIGH", "VERY_HIGH"] }, status: "SUBMITTED", createdAt: { gte: since } },
+      select: { id: true, reference: true, amountRequested: true, riskCategory: true, createdAt: true,
+        account: { select: { firstName: true, lastName: true } } },
+      orderBy: { createdAt: "desc" }, take: 5,
+    }),
+  ]);
+
+  const alerts: { id: string; type: string; severity: "critical" | "warning" | "info" | "success"; title: string; detail: string; amount?: number; timestamp: string; link?: string }[] = [];
+
+  overdueLoans.forEach(l => alerts.push({
+    id: `overdue-${l.id}`, type: "OVERDUE_LOAN", severity: "critical",
+    title: `Loan overdue — ${l.client ? `${l.client.firstName} ${l.client.lastName}` : "Unknown"}`,
+    detail: `${l.loanNumber} · K${l.outstandingBalance.toLocaleString()} outstanding`,
+    amount: l.outstandingBalance, timestamp: l.updatedAt.toISOString(), link: `/loans/${l.id}`,
+  }));
+
+  fraudFlags.forEach(a => alerts.push({
+    id: `fraud-${a.id}`, type: "HIGH_RISK_APP", severity: "critical",
+    title: `High-risk application — ${a.account ? `${a.account.firstName} ${a.account.lastName}` : "Unknown"}`,
+    detail: `${a.reference} · K${a.amountRequested.toLocaleString()} · Risk: ${a.riskCategory}`,
+    amount: a.amountRequested, timestamp: a.createdAt.toISOString(), link: `/online-applications`,
+  }));
+
+  newPortalApps.forEach(a => alerts.push({
+    id: `app-${a.id}`, type: "NEW_APPLICATION", severity: a.riskCategory === "HIGH" || a.riskCategory === "VERY_HIGH" ? "warning" : "info",
+    title: `New application — ${a.account ? `${a.account.firstName} ${a.account.lastName}` : "Unknown"}`,
+    detail: `${a.reference} · K${a.amountRequested.toLocaleString()} · ${a.status}`,
+    amount: a.amountRequested, timestamp: a.createdAt.toISOString(), link: `/online-applications`,
+  }));
+
+  newPayments.forEach(p => alerts.push({
+    id: `pay-${p.id}`, type: "PAYMENT_SUBMITTED", severity: "success",
+    title: `Payment submitted — ${p.application?.account ? `${p.application.account.firstName} ${p.application.account.lastName}` : "Unknown"}`,
+    detail: `${p.application?.reference ?? ""} · K${(p.amount ?? 0).toLocaleString()} · awaiting confirmation`,
+    amount: p.amount ?? 0, timestamp: p.createdAt.toISOString(), link: `/online-applications`,
+  }));
+
+  newAccounts.forEach(a => alerts.push({
+    id: `acct-${a.id}`, type: "NEW_ACCOUNT", severity: "info",
+    title: `New client registered — ${a.firstName} ${a.lastName}`,
+    detail: `${a.clientNumber} · registered just now`,
+    timestamp: a.createdAt.toISOString(), link: `/portal-clients`,
+  }));
+
+  alerts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  res.json(alerts.slice(0, 30));
+});
+
 export default router;

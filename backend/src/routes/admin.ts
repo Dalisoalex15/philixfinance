@@ -642,7 +642,7 @@ router.patch("/payment-submissions/:id", wrap(async (req: Request, res: Response
         // Payment confirmed email
         const acctPay = await prisma.clientPortalAccount.findUnique({ where: { id: app.accountId }, select: { email: true, firstName: true } });
         if (acctPay) {
-          Mailer.paymentConfirmed({ email: acctPay.email, firstName: acctPay.firstName, reference: app.reference, amount: thisPayment, totalPaid, remaining, accountId: app.accountId }).catch(() => {});
+          Mailer.paymentConfirmed({ email: acctPay.email, firstName: acctPay.firstName, reference: app.reference, amount: thisPayment, totalPaid, remaining, totalDue, accountId: app.accountId }).catch(() => {});
         }
       }
 

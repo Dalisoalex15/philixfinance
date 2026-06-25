@@ -79,6 +79,89 @@ router.post("/change-password", wrap(async (req: Request, res: Response) => {
   res.json({ message: "Password updated" });
 }));
 
+// GET /api/portal/me/credit-score — compute + persist creditworthiness score
+router.get("/credit-score", wrap(async (req: Request, res: Response) => {
+  const id = (req as Request & { portalAccountId: string }).portalAccountId;
+  const account = await prisma.clientPortalAccount.findUnique({
+    where: { id },
+    include: {
+      portalLoans: {
+        select: { id: true, status: true, amountRequested: true },
+      },
+      kycDocuments: { select: { id: true } },
+    },
+  });
+  if (!account) throw new AppError("Account not found", 404);
+
+  const kycVerified = account.kycStatus === "VERIFIED";
+  const kycScore = kycVerified ? 25 : account.kycStatus === "PENDING" ? 5 : 0;
+
+  const profileFields = [account.firstName, account.lastName, account.phone, account.address, account.city, account.occupation, account.employer, account.monthlyIncome];
+  const filled = profileFields.filter(Boolean).length;
+  const profileScore = Math.round((filled / profileFields.length) * 20);
+
+  const disbursedApps = account.portalLoans.filter(a => ["DISBURSED", "REPAID"].includes(a.status));
+  const rejectedApps = account.portalLoans.filter(a => a.status === "REJECTED");
+  const totalApps = account.portalLoans.length;
+  let historyScore = 30;
+  if (totalApps === 0) historyScore = 10;
+  else {
+    const penalty = Math.min(30, rejectedApps.length * 10);
+    historyScore = Math.max(0, 30 - penalty);
+    if (disbursedApps.length > 0) historyScore = Math.min(30, historyScore + disbursedApps.length * 5);
+  }
+
+  const employScore = (account.employer || account.occupation ? 5 : 0) + (account.monthlyIncome ? 5 : 0);
+
+  const ageDays = Math.floor((Date.now() - new Date(account.createdAt).getTime()) / 86400000);
+  const ageScore = Math.min(10, Math.floor(ageDays / 10));
+
+  const suffix = account.clientNumber.replace(/\D/g, "").slice(-5);
+  const myCode = `PHX-${suffix || account.clientNumber.slice(-5).toUpperCase()}`;
+  const referralCount = await prisma.clientPortalAccount.count({ where: { referredByCode: myCode } });
+  const referralScore = Math.min(5, referralCount * 2);
+
+  const totalScore = kycScore + profileScore + historyScore + employScore + ageScore + referralScore;
+
+  await prisma.clientPortalAccount.update({ where: { id }, data: { creditScore: totalScore } });
+
+  res.json({
+    score: totalScore,
+    factors: [
+      { name: "KYC Verification", score: kycScore, max: 25,
+        status: kycVerified ? "good" : account.kycStatus === "PENDING" ? "warn" : "bad",
+        tip: kycVerified ? "Your identity is verified" : "Complete KYC to add 25 points",
+        actionHref: !kycVerified ? "/portal/kyc" : null, actionLabel: "Verify Identity" },
+      { name: "Repayment History", score: historyScore, max: 30,
+        status: historyScore >= 20 ? "good" : historyScore >= 10 ? "warn" : "bad",
+        tip: totalApps === 0 ? "No history yet — apply for your first loan"
+          : disbursedApps.length > 0 && rejectedApps.length === 0
+          ? `${disbursedApps.length} successful loan(s) — great track record`
+          : `${rejectedApps.length} rejection(s) affecting your score` },
+      { name: "Profile Completeness", score: profileScore, max: 20,
+        status: profileScore >= 15 ? "good" : profileScore >= 10 ? "warn" : "bad",
+        tip: profileScore < 20 ? `${filled}/${profileFields.length} fields complete — fill your profile for more points` : "Profile fully complete",
+        actionHref: profileScore < 20 ? "/portal/profile" : null, actionLabel: "Complete Profile" },
+      { name: "Employment & Income", score: employScore, max: 10,
+        status: employScore >= 8 ? "good" : employScore >= 5 ? "warn" : "bad",
+        tip: employScore === 10 ? "Employment and income on file" : "Add employer and monthly income in your profile",
+        actionHref: employScore < 10 ? "/portal/profile" : null, actionLabel: "Add Employment" },
+      { name: "Account Age", score: ageScore, max: 10,
+        status: ageScore >= 8 ? "good" : ageScore >= 4 ? "warn" : "bad",
+        tip: ageScore === 10 ? "Established account" : `Account is ${ageDays} days old — score grows over time` },
+      { name: "Referrals", score: referralScore, max: 5,
+        status: referralScore >= 4 ? "good" : referralScore >= 2 ? "warn" : "bad",
+        tip: referralCount > 0 ? `${referralCount} friend(s) referred — keep sharing your code` : "Refer friends to earn up to 5 points",
+        actionHref: referralScore < 5 ? "/portal/referral" : null, actionLabel: "Share Code" },
+    ],
+    accountAgeDays: ageDays,
+    referralCount,
+    disbursedCount: disbursedApps.length,
+    rejectedCount: rejectedApps.length,
+    totalApps,
+  });
+}));
+
 // GET /api/portal/me/referral — referral programme stats
 router.get("/referral", wrap(async (req: Request, res: Response) => {
   const id = (req as Request & { portalAccountId: string }).portalAccountId;

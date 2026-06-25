@@ -129,4 +129,105 @@ router.get("/interest-revenue", async (req: Request, res: Response) => {
   });
 });
 
+// GET /api/reports/financials/pl — 12-month P&L
+router.get("/financials/pl", async (_req, res: Response) => {
+  const now = new Date();
+  const months = [];
+  for (let i = 11; i >= 0; i--) {
+    const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const end   = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
+
+    const [interestRev, principalIn, capitalOut, portalInterest] = await Promise.all([
+      // Interest revenue from staff loan payments
+      prisma.payment.aggregate({ where: { paymentDate: { gte: start, lte: end } }, _sum: { interestAmount: true, penaltyAmount: true } }),
+      // Principal repayments received
+      prisma.payment.aggregate({ where: { paymentDate: { gte: start, lte: end } }, _sum: { principalAmount: true } }),
+      // Capital deployed (disbursements)
+      prisma.loan.aggregate({ where: { disbursementDate: { gte: start, lte: end }, status: { notIn: ["DRAFT","CANCELLED"] } }, _sum: { principal: true } }),
+      // Portal loan interest income
+      prisma.loanPaymentSubmission.aggregate({
+        where: { status: "APPROVED", reviewedAt: { gte: start, lte: end } },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const staffInterest = (interestRev._sum.interestAmount || 0) + (interestRev._sum.penaltyAmount || 0);
+    const totalRevenue = staffInterest + (portalInterest._sum.amount || 0) * 0.2; // ~20% of portal collections = interest
+    const disbursed = capitalOut._sum.principal || 0;
+    const netProfit = totalRevenue - disbursed * 0.05; // simplified operating expense estimate
+
+    months.push({
+      month: start.toLocaleString("default", { month: "short", year: "numeric" }),
+      revenue: Math.round(totalRevenue),
+      interestIncome: Math.round(staffInterest),
+      portalCollections: Math.round(portalInterest._sum.amount || 0),
+      principalRepaid: Math.round(principalIn._sum.principalAmount || 0),
+      capitalDeployed: Math.round(disbursed),
+      netProfit: Math.round(netProfit),
+    });
+  }
+  res.json(months);
+});
+
+// GET /api/reports/financials/balance-sheet
+router.get("/financials/balance-sheet", async (_req, res: Response) => {
+  const [
+    activeLoansTotal, overdueLoansTotal, defaultedLoansTotal,
+    capitalDeposits, capitalWithdrawals,
+    portalDisbursed, portalCollected,
+  ] = await Promise.all([
+    prisma.loan.aggregate({ where: { status: "ACTIVE" }, _sum: { outstandingBalance: true } }),
+    prisma.loan.aggregate({ where: { status: "OVERDUE" }, _sum: { outstandingBalance: true } }),
+    prisma.loan.aggregate({ where: { status: "DEFAULTED" }, _sum: { outstandingBalance: true } }),
+    prisma.capitalEntry.aggregate({ where: { type: "DEPOSIT" }, _sum: { amount: true } }),
+    prisma.capitalEntry.aggregate({ where: { type: "WITHDRAWAL" }, _sum: { amount: true } }),
+    prisma.portalLoanApplication.aggregate({ where: { status: { in: ["DISBURSED","REPAID"] } }, _sum: { amountRequested: true } }),
+    prisma.loanPaymentSubmission.aggregate({ where: { status: "APPROVED" }, _sum: { amount: true } }),
+  ]);
+
+  const loanPortfolio = (activeLoansTotal._sum.outstandingBalance || 0) +
+    (overdueLoansTotal._sum.outstandingBalance || 0) +
+    (defaultedLoansTotal._sum.outstandingBalance || 0);
+  const portalPortfolio = (portalDisbursed._sum.amountRequested || 0) - (portalCollected._sum.amount || 0);
+  const totalAssets = loanPortfolio + portalPortfolio;
+
+  const equity = (capitalDeposits._sum.amount || 0) - (capitalWithdrawals._sum.amount || 0);
+
+  res.json({
+    assets: {
+      loanPortfolio: Math.round(loanPortfolio),
+      portalLoanPortfolio: Math.round(Math.max(0, portalPortfolio)),
+      totalAssets: Math.round(totalAssets),
+    },
+    liabilities: { total: 0 },
+    equity: { totalEquity: Math.round(equity), retainedEarnings: Math.round(totalAssets - equity) },
+  });
+});
+
+// GET /api/reports/financials/cash-flow — 12-month cash flow
+router.get("/financials/cash-flow", async (_req, res: Response) => {
+  const now = new Date();
+  const months = [];
+  for (let i = 11; i >= 0; i--) {
+    const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const end   = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
+
+    const [inflows, outflows, portalIn] = await Promise.all([
+      prisma.payment.aggregate({ where: { paymentDate: { gte: start, lte: end } }, _sum: { amount: true } }),
+      prisma.loan.aggregate({ where: { disbursementDate: { gte: start, lte: end }, status: { notIn: ["DRAFT","CANCELLED"] } }, _sum: { principal: true } }),
+      prisma.loanPaymentSubmission.aggregate({ where: { status: "APPROVED", reviewedAt: { gte: start, lte: end } }, _sum: { amount: true } }),
+    ]);
+
+    const cashIn  = (inflows._sum.amount || 0) + (portalIn._sum.amount || 0);
+    const cashOut = outflows._sum.principal || 0;
+    months.push({
+      month: start.toLocaleString("default", { month: "short", year: "numeric" }),
+      cashIn: Math.round(cashIn),
+      cashOut: Math.round(cashOut),
+      net: Math.round(cashIn - cashOut),
+    });
+  }
+  res.json(months);
+});
+
 export default router;

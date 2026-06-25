@@ -786,6 +786,66 @@ function RolloverModal({ app, token, onClose, onDone }: {
   );
 }
 
+function SchedulePanel({ app }: { app: LoanApp }) {
+  const rate     = app.interestRate ?? 20;
+  const totalDue = Math.ceil(app.amountRequested * (1 + rate / 100));
+  const weeklyAmt = Math.ceil(totalDue / (app.termMonths || 1));
+  const totalPaid = (app.paymentSubmissions ?? [])
+    .filter(p => p.status === "APPROVED")
+    .reduce((s, p) => s + (p.amount ?? 0), 0);
+  const paidCount  = totalPaid >= totalDue ? app.termMonths : Math.floor(totalPaid / weeklyAmt);
+  const startDate  = app.reviewedAt ? new Date(app.reviewedAt) : new Date();
+  const today      = new Date();
+
+  const weeks = Array.from({ length: app.termMonths }, (_, i) => {
+    const dueDate = new Date(startDate.getTime() + (i + 1) * 7 * 86400000);
+    const isPaid     = i < paidCount;
+    const isDue      = !isPaid && dueDate <= today;
+    return { week: i + 1, dueDate, amount: weeklyAmt, isPaid, isDue };
+  });
+
+  return (
+    <div className="bg-slate-800/40 border border-slate-700 rounded-xl overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-slate-700 flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Calendar size={13} className="text-indigo-400" />
+          <span className="text-xs font-semibold text-slate-300">Repayment Schedule</span>
+        </div>
+        <span className="text-[10px] text-slate-500">{paidCount}/{app.termMonths} paid</span>
+      </div>
+      <div className="divide-y divide-slate-800/60">
+        {weeks.map(w => (
+          <div key={w.week} className={`flex items-center justify-between px-4 py-2.5 text-xs transition-colors
+            ${w.isPaid ? "bg-emerald-900/10" : w.isDue ? "bg-amber-900/10" : ""}`}>
+            <div className="flex items-center gap-2.5">
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0
+                ${w.isPaid ? "bg-emerald-600/40 text-emerald-300" : w.isDue ? "bg-amber-600/40 text-amber-300" : "bg-slate-700 text-slate-500"}`}>
+                {w.isPaid ? "✓" : w.week}
+              </div>
+              <div>
+                <div className={`font-semibold ${w.isPaid ? "text-emerald-400" : w.isDue ? "text-amber-400" : "text-slate-400"}`}>
+                  Week {w.week}
+                </div>
+                <div className="text-slate-600">
+                  {w.dueDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                </div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className={`font-bold ${w.isPaid ? "text-emerald-400" : w.isDue ? "text-amber-400" : "text-slate-400"}`}>
+                {K(w.amount)}
+              </div>
+              <div className={`text-[10px] font-semibold ${w.isPaid ? "text-emerald-600" : w.isDue ? "text-amber-600" : "text-slate-600"}`}>
+                {w.isPaid ? "PAID" : w.isDue ? "OVERDUE" : "UPCOMING"}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function MyLoansPage() {
   const token = useClientAuthStore(s => s.accessToken);
   const [apps, setApps] = useState<LoanApp[]>([]);
@@ -1256,6 +1316,9 @@ export default function MyLoansPage() {
                       </div>
                     )}
 
+                    {/* Repayment schedule — for disbursed loans */}
+                    {app.status === "DISBURSED" && <SchedulePanel app={app} />}
+
                     {/* Upgrade section */}
                     {canUpgrade && (
                       <div className="bg-indigo-900/20 border border-indigo-800/30 rounded-xl p-4">
@@ -1422,6 +1485,9 @@ export default function MyLoansPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* Repayment schedule — for completed loans */}
+                    {app.status === "REPAID" && <SchedulePanel app={app} />}
 
                     {canReloan && (
                       <div className="bg-emerald-900/20 border border-emerald-800/30 rounded-xl p-4">

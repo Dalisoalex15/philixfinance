@@ -3,6 +3,7 @@ import {
   DollarSign, TrendingUp, CheckCircle, Users,
   Zap, ArrowUpRight, Crown, Clock, XCircle, Activity, FileText,
   ThumbsUp, ThumbsDown, Banknote, RefreshCw, BarChart2, Trash2, ShieldOff, ShieldCheck,
+  Bell, AlertTriangle, UserPlus, CreditCard,
 } from "lucide-react";
 import { formatKwacha } from "../lib/mock-data";
 import { useLoanApplicationStore } from "../store/loanApplicationStore";
@@ -16,6 +17,17 @@ interface ActivityEvent {
   amount: number;
   description: string;
   timestamp: string;
+}
+
+interface AlertItem {
+  id: string;
+  type: string;
+  severity: "critical" | "warning" | "info" | "success";
+  title: string;
+  detail: string;
+  amount?: number;
+  timestamp: string;
+  link?: string;
 }
 
 interface PortalAccount {
@@ -76,6 +88,18 @@ export default function CEODashboardPage() {
   }[]>([]);
   const [statementsLoading, setStatementsLoading] = useState(false);
   const [statementsMsg, setStatementsMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const [alertsLoading, setAlertsLoading] = useState(false);
+
+  const fetchAlerts = useCallback(async () => {
+    setAlertsLoading(true);
+    try {
+      const token = localStorage.getItem("philix_staff_token");
+      const r = await fetch("/api/dashboard/alerts", { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (r.ok) setAlerts(await r.json());
+    } catch { /* ignore */ }
+    finally { setAlertsLoading(false); }
+  }, []);
 
   const fetchActivity = useCallback(async () => {
     setActivityLoading(true);
@@ -117,10 +141,11 @@ export default function CEODashboardPage() {
     syncFromApi();
     fetchActivity();
     fetchPortalAccounts();
-    const activityInterval = setInterval(() => { syncFromApi(); fetchActivity(); }, 30000);
+    fetchAlerts();
+    const activityInterval = setInterval(() => { syncFromApi(); fetchActivity(); fetchAlerts(); }, 30000);
     const clockInterval = setInterval(() => setClockTime(new Date()), 1000);
     return () => { clearInterval(activityInterval); clearInterval(clockInterval); };
-  }, [fetchActivity, fetchPortalAccounts]);
+  }, [fetchActivity, fetchPortalAccounts, fetchAlerts]);
 
   const pendingApps = applications.filter(a => a.status === "PENDING" || a.status === "UNDER_REVIEW");
 
@@ -702,6 +727,63 @@ export default function CEODashboardPage() {
             </div>
           );
         })()}
+      </div>
+
+      {/* Real-Time Alert Feed */}
+      <div className="philix-card p-0 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Bell size={16} className="text-red-500" />
+            <h3 className="font-bold text-navy-900">Live Alert Feed</h3>
+            {alerts.filter(a => a.severity === "critical").length > 0 && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200">
+                {alerts.filter(a => a.severity === "critical").length} critical
+              </span>
+            )}
+          </div>
+          <button onClick={fetchAlerts} className="text-xs text-navy-500 hover:text-navy-700 flex items-center gap-1">
+            <RefreshCw size={11} className={alertsLoading ? "animate-spin" : ""} /> Refresh
+          </button>
+        </div>
+        {alertsLoading && alerts.length === 0 ? (
+          <div className="py-8 text-center text-sm text-navy-400">Loading alerts…</div>
+        ) : alerts.length === 0 ? (
+          <div className="py-8 text-center text-sm text-navy-400 flex flex-col items-center gap-2">
+            <CheckCircle size={20} className="text-emerald-400" />
+            No critical events in the last 24 hours
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+            {alerts.map(alert => {
+              const SEVERITY = {
+                critical: { bg: "bg-red-50", border: "border-red-200", dot: "bg-red-500", icon: AlertTriangle, ic: "text-red-600" },
+                warning:  { bg: "bg-amber-50", border: "border-amber-200", dot: "bg-amber-500", icon: AlertTriangle, ic: "text-amber-600" },
+                info:     { bg: "bg-blue-50",  border: "border-blue-200",  dot: "bg-blue-400",  icon: FileText, ic: "text-blue-600" },
+                success:  { bg: "bg-emerald-50", border: "border-emerald-200", dot: "bg-emerald-500", icon: CreditCard, ic: "text-emerald-600" },
+              }[alert.severity];
+              const Icon = alert.type === "NEW_ACCOUNT" ? UserPlus : SEVERITY.icon;
+              return (
+                <div key={alert.id} className={`flex items-start gap-3 px-5 py-3.5 ${SEVERITY.bg} border-l-4 ${SEVERITY.border}`}>
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${alert.severity === "critical" ? "bg-red-100" : alert.severity === "warning" ? "bg-amber-100" : alert.severity === "success" ? "bg-emerald-100" : "bg-blue-100"}`}>
+                    <Icon size={13} className={SEVERITY.ic} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-navy-900 truncate">{alert.title}</div>
+                    <div className="text-xs text-navy-500 mt-0.5 truncate">{alert.detail}</div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    {alert.amount ? (
+                      <div className="text-xs font-bold text-navy-700">K{alert.amount.toLocaleString()}</div>
+                    ) : null}
+                    <div className="text-[10px] text-navy-400 mt-0.5">
+                      {new Date(alert.timestamp).toLocaleTimeString("en-ZM", { hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Financial Metrics — Launching Soon */}
