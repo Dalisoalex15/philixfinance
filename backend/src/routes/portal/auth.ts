@@ -140,9 +140,12 @@ router.post("/send-email-code", wrap(async (req: Request, res: Response) => {
     },
   });
 
-  // Send email — if delivery fails, include the code in the response so the
-  // user can always complete registration (safe: they already proved they own this email address)
-  const emailResult = await Mailer.otp(email, email.split("@")[0], otp, "EMAIL_VERIFY").catch(() => ({ ok: false as const }));
+  // Race the email send against a 5s timeout — if email takes too long or fails,
+  // include the code in the response so the user can always complete registration.
+  const emailResult = await Promise.race([
+    Mailer.otp(email, email.split("@")[0], otp, "EMAIL_VERIFY").catch(() => ({ ok: false as const })),
+    new Promise<{ ok: false }>(r => setTimeout(() => r({ ok: false }), 2000)),
+  ]);
 
   res.json({
     sent: true,

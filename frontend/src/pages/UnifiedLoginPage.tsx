@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, AlertCircle, ArrowRight, Shield, Zap, TrendingUp, Users } from "lucide-react";
 import PhilixLogo from "../components/ui/PhilixLogo";
@@ -15,6 +15,16 @@ export default function UnifiedLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Clear stale tokens from old store keys whenever the login page is visited
+  useEffect(() => {
+    localStorage.removeItem("philix_staff_token");
+    localStorage.removeItem("philix_staff_refresh");
+    localStorage.removeItem("philix_portal_token");
+    localStorage.removeItem("philix_portal_refresh");
+    localStorage.removeItem("philix-auth-v2");
+    localStorage.removeItem("philix-client-auth-v2");
+  }, []);
 
   const detectedType = (() => {
     if (!email) return null;

@@ -52,7 +52,7 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: "philix-auth-v2",
+      name: "philix-auth-v3",
       partialize: (state) => ({
         user: state.user,
         accessToken: state.accessToken,

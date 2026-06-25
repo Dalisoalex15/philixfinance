@@ -137,7 +137,7 @@ export const useClientAuthStore = create<ClientAuthState>()(
         })),
     }),
     {
-      name: "philix-client-auth-v2",
+      name: "philix-client-auth-v3",
       partialize: (state) => ({
         client: state.client,
         accessToken: state.accessToken,

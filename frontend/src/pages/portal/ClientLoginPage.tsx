@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, AlertCircle, ArrowRight, Shield, Zap, TrendingUp } from "lucide-react";
 import { useClientAuthStore } from "../../store/clientAuth";
@@ -12,6 +12,12 @@ export default function ClientLoginPage() {
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    localStorage.removeItem("philix_portal_token");
+    localStorage.removeItem("philix_portal_refresh");
+    localStorage.removeItem("philix-client-auth-v2");
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
