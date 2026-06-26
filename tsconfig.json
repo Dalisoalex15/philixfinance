@@ -4,11 +4,11 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
     "strict": false,
     "skipLibCheck": true,
-    "outDir": "dist",
-    "baseUrl": "."
+    "noEmitOnError": false,
+    "outDir": "dist"
   },
-  "include": ["api/**/*", "backend/src/**/*", "backend/generated/**/*"]
+  "include": [],
+  "exclude": ["node_modules", "backend", "frontend"]
 }
