@@ -32,3 +32,13 @@ process.on("SIGTERM", async () => {
   await prisma.$disconnect();
   process.exit(0);
 });
+
+process.on("uncaughtException", (err) => {
+  logger.error("Uncaught exception — process will restart:", err);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  logger.error("Unhandled promise rejection:", reason);
+  // Don't exit — log and continue; Render will restart if truly fatal
+});
