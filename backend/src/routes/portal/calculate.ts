@@ -49,7 +49,7 @@ router.post("/", (req: Request, res: Response) => {
     totalDue,
     weeks,
     weeklyPayment: weeklyAmt,
-    effectiveApr: parseFloat(((rate / (termMonths / 52)) * 100).toFixed(1)),
+    effectiveApr: parseFloat(((rate / (weeks / 52)) * 100).toFixed(1)),
     productType: productType ?? null,
     schedule,
   });

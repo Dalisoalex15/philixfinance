@@ -1584,8 +1584,9 @@ router.post("/campaigns", wrap(async (req: Request, res: Response) => {
     try {
       await sendEmail({
         to: acc.email, toName: `${acc.firstName} ${acc.lastName}`, subject,
-        html: htmlBody.replace(/\{\{firstName\}\}/g, acc.firstName).replace(/\{\{lastName\}\}/g, acc.lastName),
-        template: "campaign", accountId: acc.id,
+        body: htmlBody.replace(/\{\{firstName\}\}/g, acc.firstName).replace(/\{\{lastName\}\}/g, acc.lastName),
+        htmlOverride: htmlBody.replace(/\{\{firstName\}\}/g, acc.firstName).replace(/\{\{lastName\}\}/g, acc.lastName),
+        portalAccountId: acc.id,
       });
       totalSent++;
     } catch { totalFailed++; }
