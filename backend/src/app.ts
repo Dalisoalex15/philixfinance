@@ -38,6 +38,7 @@ import portalApplicationRoutes from "./routes/portal/applications";
 import portalKycRoutes from "./routes/portal/kyc";
 import portalNotificationRoutes from "./routes/portal/notifications";
 import portalInvestmentRoutes from "./routes/portal/investments";
+import portalCalculateRoutes from "./routes/portal/calculate";
 import aiRoutes from "./routes/ai";
 
 const app = express();
@@ -190,6 +191,7 @@ app.use("/api/portal/applications",  portalApplicationRoutes);
 app.use("/api/portal/kyc",           portalKycRoutes);
 app.use("/api/portal/notifications", portalNotificationRoutes);
 app.use("/api/portal/investments",  portalInvestmentRoutes);
+app.use("/api/portal/calculate",    portalCalculateRoutes);
 
 // Tighter limit on staff email sends
 app.use("/api/admin/send-client-email", emailSendLimiter);

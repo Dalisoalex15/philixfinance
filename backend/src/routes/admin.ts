@@ -1472,4 +1472,130 @@ router.patch("/investments/:id", wrap(async (req: Request, res: Response) => {
   res.json(updated);
 }));
 
+// ═══════════════════════════════════════════════════════════════
+// LOAN OFFICER TARGETS
+// ═══════════════════════════════════════════════════════════════
+
+// GET /api/admin/targets?month=YYYY-MM  — targets + actuals for all officers
+router.get("/targets", wrap(async (req: Request, res: Response) => {
+  const month = (req.query.month as string) || new Date().toISOString().slice(0, 7);
+  const [y, m] = month.split("-").map(Number);
+  const monthStart = new Date(y, m - 1, 1);
+  const monthEnd   = new Date(y, m, 0, 23, 59, 59);
+
+  const [officers, targets, actuals] = await Promise.all([
+    prisma.user.findMany({
+      where: { status: "ACTIVE", role: { in: ["LOAN_OFFICER", "MANAGER", "SUPER_ADMIN"] } },
+      select: { id: true, firstName: true, lastName: true, role: true, employeeId: true },
+    }),
+    prisma.loanOfficerTarget.findMany({ where: { month } }),
+    prisma.portalLoanApplication.groupBy({
+      by: ["reviewedBy"],
+      where: { status: { in: ["DISBURSED", "REPAID"] }, reviewedAt: { gte: monthStart, lte: monthEnd } },
+      _count: { id: true },
+      _sum: { amountRequested: true },
+    }),
+  ]);
+
+  const targetMap = new Map(targets.map(t => [t.userId, t]));
+  const actualMap = new Map((actuals as any[]).map((a: any) => [a.reviewedBy, a]));
+
+  const result = officers.map(o => {
+    const target = targetMap.get(o.id);
+    const actual = actualMap.get(o.id) as any;
+    const actualLoans = actual?._count?.id ?? 0;
+    const actualDisbursed = actual?._sum?.amountRequested ?? 0;
+    return {
+      userId: o.id, employeeId: o.employeeId,
+      name: `${o.firstName} ${o.lastName}`, role: o.role, month,
+      target: target ? { id: target.id, disbursementTarget: target.disbursementTarget, collectionTarget: target.collectionTarget, loansTarget: target.loansTarget } : null,
+      actual: { loansIssued: actualLoans, amountDisbursed: actualDisbursed },
+      performance: target ? {
+        disbursementPct: target.disbursementTarget > 0 ? Math.round((actualDisbursed / target.disbursementTarget) * 100) : null,
+        loansPct: target.loansTarget > 0 ? Math.round((actualLoans / target.loansTarget) * 100) : null,
+      } : null,
+    };
+  });
+
+  res.json({ month, officers: result });
+}));
+
+// POST /api/admin/targets — upsert target for an officer/month
+router.post("/targets", wrap(async (req: Request, res: Response) => {
+  const { userId, month, disbursementTarget = 0, collectionTarget = 0, loansTarget = 0 } = req.body as {
+    userId: string; month: string; disbursementTarget?: number; collectionTarget?: number; loansTarget?: number;
+  };
+  if (!userId || !month) return res.status(400).json({ error: "userId and month are required" });
+
+  const user = (req as any).user;
+  const setBy = user?.firstName ? `${user.firstName} ${user.lastName}` : user?.email ?? "system";
+
+  const target = await prisma.loanOfficerTarget.upsert({
+    where: { userId_month: { userId, month } },
+    create: { userId, month, disbursementTarget, collectionTarget, loansTarget, setBy },
+    update: { disbursementTarget, collectionTarget, loansTarget, setBy, updatedAt: new Date() },
+  });
+  res.json(target);
+}));
+
+// ═══════════════════════════════════════════════════════════════
+// BULK EMAIL CAMPAIGNS
+// ═══════════════════════════════════════════════════════════════
+
+// GET /api/admin/campaigns — list all campaigns
+router.get("/campaigns", wrap(async (_req: Request, res: Response) => {
+  const campaigns = await prisma.emailCampaign.findMany({ orderBy: { createdAt: "desc" }, take: 50 });
+  res.json(campaigns);
+}));
+
+// POST /api/admin/campaigns — create and optionally send bulk email campaign
+router.post("/campaigns", wrap(async (req: Request, res: Response) => {
+  const { name, subject, htmlBody, targetGroup, sendNow = false } = req.body as {
+    name: string; subject: string; htmlBody: string;
+    targetGroup: "ALL" | "ACTIVE" | "PENDING_KYC" | "DISBURSED";
+    sendNow?: boolean;
+  };
+  if (!name || !subject || !htmlBody || !targetGroup) {
+    return res.status(400).json({ error: "name, subject, htmlBody, and targetGroup are required" });
+  }
+  const user = (req as any).user;
+  const createdBy = user?.firstName ? `${user.firstName} ${user.lastName}` : user?.email ?? "system";
+
+  let whereClause: Record<string, unknown> = {};
+  if (targetGroup === "ACTIVE") whereClause = { status: "ACTIVE" };
+  else if (targetGroup === "PENDING_KYC") whereClause = { status: "PENDING_KYC" };
+  else if (targetGroup === "DISBURSED") {
+    const ids = await prisma.portalLoanApplication.findMany({ where: { status: "DISBURSED" }, select: { accountId: true }, distinct: ["accountId"] });
+    whereClause = { id: { in: ids.map(d => d.accountId) } };
+  }
+
+  const accounts = await prisma.clientPortalAccount.findMany({
+    where: whereClause, select: { id: true, email: true, firstName: true, lastName: true },
+  });
+
+  let campaign = await prisma.emailCampaign.create({
+    data: { name, subject, htmlBody, targetGroup, status: "DRAFT", createdBy },
+  });
+
+  if (!sendNow) return res.json({ campaign, recipientCount: accounts.length });
+
+  let totalSent = 0, totalFailed = 0;
+  for (const acc of accounts) {
+    try {
+      await sendEmail({
+        to: acc.email, toName: `${acc.firstName} ${acc.lastName}`, subject,
+        html: htmlBody.replace(/\{\{firstName\}\}/g, acc.firstName).replace(/\{\{lastName\}\}/g, acc.lastName),
+        template: "campaign", accountId: acc.id,
+      });
+      totalSent++;
+    } catch { totalFailed++; }
+  }
+
+  campaign = await prisma.emailCampaign.update({
+    where: { id: campaign.id },
+    data: { status: totalFailed === accounts.length && accounts.length > 0 ? "FAILED" : "SENT", sentAt: new Date(), totalSent, totalFailed },
+  });
+  res.json({ campaign, totalSent, totalFailed });
+}));
+
 export default router;

@@ -5,202 +5,102 @@ import { authenticate, isManagerOrAbove } from "../middleware/auth";
 const router = Router();
 router.use(authenticate, isManagerOrAbove);
 
-router.get("/loans-issued", async (req: Request, res: Response) => {
-  const { from, to } = req.query;
-  const where: any = {};
-  if (from) where.disbursementDate = { gte: new Date(from as string) };
-  if (to) where.disbursementDate = { ...where.disbursementDate, lte: new Date(to as string) };
+// ── FINANCIAL STATEMENTS (prod schema only) ───────────────────────────────────
 
-  const loans = await prisma.loan.findMany({
-    where,
-    include: {
-      client: { select: { firstName: true, lastName: true, clientNumber: true } },
-      loanOfficer: { select: { firstName: true, lastName: true } },
-    },
-    orderBy: { disbursementDate: "desc" },
-  });
-
-  const summary = {
-    count: loans.length,
-    totalPrincipal: loans.reduce((s, l) => s + l.principal, 0),
-    totalDue: loans.reduce((s, l) => s + l.totalDue, 0),
-  };
-
-  res.json({ loans, summary });
-});
-
-router.get("/collections", async (req: Request, res: Response) => {
-  const { from, to } = req.query;
-  const where: any = {};
-  if (from) where.paymentDate = { gte: new Date(from as string) };
-  if (to) where.paymentDate = { ...where.paymentDate, lte: new Date(to as string) };
-
-  const [payments, totals] = await Promise.all([
-    prisma.payment.findMany({
-      where,
-      include: {
-        loan: { include: { client: { select: { firstName: true, lastName: true } } } },
-        recordedBy: { select: { firstName: true, lastName: true } },
-      },
-      orderBy: { paymentDate: "desc" },
-    }),
-    prisma.payment.aggregate({ where, _sum: { amount: true, interestAmount: true, penaltyAmount: true } }),
-  ]);
-
-  res.json({ payments, totals });
-});
-
-router.get("/outstanding", async (_req: Request, res: Response) => {
-  const loans = await prisma.loan.findMany({
-    where: { status: { in: ["ACTIVE", "OVERDUE", "DEFAULTED"] } },
-    include: {
-      client: { select: { firstName: true, lastName: true, phone: true } },
-      collateral: { select: { vaultId: true, type: true, brand: true, model: true } },
-    },
-    orderBy: { outstandingBalance: "desc" },
-  });
-
-  const total = loans.reduce((s, l) => s + l.outstandingBalance, 0);
-  res.json({ loans, total });
-});
-
-router.get("/portfolio-at-risk", async (_req: Request, res: Response) => {
-  const now = new Date();
-  const totalResult = await prisma.loan.aggregate({
-    where: { status: { in: ["ACTIVE", "OVERDUE", "DEFAULTED"] } },
-    _sum: { outstandingBalance: true },
-  });
-  const total = totalResult._sum.outstandingBalance || 1;
-
-  const parLevels = [1, 7, 30, 60, 90];
-  const par = await Promise.all(parLevels.map(async (days) => {
-    const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-    const result = await prisma.loan.findMany({
-      where: { status: { in: ["OVERDUE", "DEFAULTED"] }, lastPaymentDate: { lt: cutoff } },
-      select: { outstandingBalance: true, loanNumber: true, daysLate: true },
-    });
-    const amount = result.reduce((s, l) => s + l.outstandingBalance, 0);
-    return { days, count: result.length, amount, percentage: parseFloat(((amount / total) * 100).toFixed(2)) };
-  }));
-
-  res.json(par);
-});
-
-router.get("/collateral-inventory", async (_req: Request, res: Response) => {
-  const items = await prisma.collateral.findMany({
-    where: { status: "HELD" },
-    include: {
-      client: { select: { firstName: true, lastName: true } },
-      loans: { where: { status: "ACTIVE" }, select: { loanNumber: true } },
-    },
-    orderBy: { receivedAt: "desc" },
-  });
-
-  const summary = {
-    count: items.length,
-    totalMarketValue: items.reduce((s, i) => s + i.marketValue, 0),
-    totalForcedSale: items.reduce((s, i) => s + i.forcedSaleValue, 0),
-  };
-
-  res.json({ items, summary });
-});
-
-router.get("/interest-revenue", async (req: Request, res: Response) => {
-  const { from, to } = req.query;
-  const where: any = {};
-  if (from) where.paymentDate = { gte: new Date(from as string) };
-  if (to) where.paymentDate = { ...where.paymentDate, lte: new Date(to as string) };
-
-  const revenue = await prisma.payment.aggregate({
-    where,
-    _sum: { interestAmount: true, penaltyAmount: true, amount: true },
-  });
-
-  const processingFees = await prisma.loan.aggregate({
-    where: { disbursementDate: where.paymentDate, status: { notIn: ["DRAFT", "CANCELLED"] } },
-    _sum: { processingFeeAmount: true },
-  });
-
-  res.json({
-    interestCollected: revenue._sum.interestAmount || 0,
-    penaltiesCollected: revenue._sum.penaltyAmount || 0,
-    processingFeesCollected: processingFees._sum.processingFeeAmount || 0,
-    totalRevenue: (revenue._sum.interestAmount || 0) + (revenue._sum.penaltyAmount || 0) + (processingFees._sum.processingFeeAmount || 0),
-  });
-});
-
-// GET /api/reports/financials/pl — 12-month P&L
+// GET /api/reports/financials/pl — 12-month P&L using portal data
 router.get("/financials/pl", async (_req, res: Response) => {
   const now = new Date();
   const months = [];
+
   for (let i = 11; i >= 0; i--) {
     const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const end   = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
 
-    const [interestRev, principalIn, capitalOut, portalInterest] = await Promise.all([
-      // Interest revenue from staff loan payments
-      prisma.payment.aggregate({ where: { paymentDate: { gte: start, lte: end } }, _sum: { interestAmount: true, penaltyAmount: true } }),
-      // Principal repayments received
-      prisma.payment.aggregate({ where: { paymentDate: { gte: start, lte: end } }, _sum: { principalAmount: true } }),
-      // Capital deployed (disbursements)
-      prisma.loan.aggregate({ where: { disbursementDate: { gte: start, lte: end }, status: { notIn: ["DRAFT","CANCELLED"] } }, _sum: { principal: true } }),
-      // Portal loan interest income
+    const [disbursed, collected, capital] = await Promise.all([
+      // Loans approved/disbursed this month
+      prisma.portalLoanApplication.findMany({
+        where: { status: { in: ["DISBURSED", "REPAID"] }, reviewedAt: { gte: start, lte: end } },
+        select: { amountRequested: true, interestRate: true, termMonths: true },
+      }),
+      // Payments confirmed this month
       prisma.loanPaymentSubmission.aggregate({
         where: { status: "APPROVED", reviewedAt: { gte: start, lte: end } },
         _sum: { amount: true },
       }),
+      // Capital inflows this month
+      prisma.capitalEntry.aggregate({
+        where: { type: "DEPOSIT", entryDate: { gte: start, lte: end } },
+        _sum: { amount: true },
+      }),
     ]);
 
-    const staffInterest = (interestRev._sum.interestAmount || 0) + (interestRev._sum.penaltyAmount || 0);
-    const totalRevenue = staffInterest + (portalInterest._sum.amount || 0) * 0.2; // ~20% of portal collections = interest
-    const disbursed = capitalOut._sum.principal || 0;
-    const netProfit = totalRevenue - disbursed * 0.05; // simplified operating expense estimate
+    const principalDisbursed = disbursed.reduce((s, l) => s + l.amountRequested, 0);
+    // Interest earned = principal × rate × (term/12) — flat interest model
+    const interestIncome = disbursed.reduce((s, l) => {
+      const rate = (l.interestRate || 20) / 100;
+      return s + l.amountRequested * rate;
+    }, 0);
+    const cashIn   = collected._sum.amount ?? 0;
+    const cashOut  = principalDisbursed;
+    const netProfit = interestIncome - cashOut * 0.03; // ~3% operating cost estimate
 
     months.push({
       month: start.toLocaleString("default", { month: "short", year: "numeric" }),
-      revenue: Math.round(totalRevenue),
-      interestIncome: Math.round(staffInterest),
-      portalCollections: Math.round(portalInterest._sum.amount || 0),
-      principalRepaid: Math.round(principalIn._sum.principalAmount || 0),
-      capitalDeployed: Math.round(disbursed),
+      revenue: Math.round(interestIncome + cashIn * 0.2),
+      interestIncome: Math.round(interestIncome),
+      portalCollections: Math.round(cashIn),
+      capitalInflows: Math.round(capital._sum.amount ?? 0),
+      principalDisbursed: Math.round(principalDisbursed),
+      loansIssued: disbursed.length,
       netProfit: Math.round(netProfit),
     });
   }
+
   res.json(months);
 });
 
 // GET /api/reports/financials/balance-sheet
 router.get("/financials/balance-sheet", async (_req, res: Response) => {
   const [
-    activeLoansTotal, overdueLoansTotal, defaultedLoansTotal,
-    capitalDeposits, capitalWithdrawals,
     portalDisbursed, portalCollected,
+    capitalDeposits, capitalWithdrawals,
+    accountCount, activeLoans,
   ] = await Promise.all([
-    prisma.loan.aggregate({ where: { status: "ACTIVE" }, _sum: { outstandingBalance: true } }),
-    prisma.loan.aggregate({ where: { status: "OVERDUE" }, _sum: { outstandingBalance: true } }),
-    prisma.loan.aggregate({ where: { status: "DEFAULTED" }, _sum: { outstandingBalance: true } }),
+    prisma.portalLoanApplication.aggregate({
+      where: { status: { in: ["DISBURSED", "REPAID"] } },
+      _sum: { amountRequested: true },
+      _count: { id: true },
+    }),
+    prisma.loanPaymentSubmission.aggregate({ where: { status: "APPROVED" }, _sum: { amount: true } }),
     prisma.capitalEntry.aggregate({ where: { type: "DEPOSIT" }, _sum: { amount: true } }),
     prisma.capitalEntry.aggregate({ where: { type: "WITHDRAWAL" }, _sum: { amount: true } }),
-    prisma.portalLoanApplication.aggregate({ where: { status: { in: ["DISBURSED","REPAID"] } }, _sum: { amountRequested: true } }),
-    prisma.loanPaymentSubmission.aggregate({ where: { status: "APPROVED" }, _sum: { amount: true } }),
+    prisma.clientPortalAccount.count(),
+    prisma.portalLoanApplication.count({ where: { status: "DISBURSED" } }),
   ]);
 
-  const loanPortfolio = (activeLoansTotal._sum.outstandingBalance || 0) +
-    (overdueLoansTotal._sum.outstandingBalance || 0) +
-    (defaultedLoansTotal._sum.outstandingBalance || 0);
-  const portalPortfolio = (portalDisbursed._sum.amountRequested || 0) - (portalCollected._sum.amount || 0);
-  const totalAssets = loanPortfolio + portalPortfolio;
-
-  const equity = (capitalDeposits._sum.amount || 0) - (capitalWithdrawals._sum.amount || 0);
+  const totalDisbursed = portalDisbursed._sum.amountRequested ?? 0;
+  const totalCollected = portalCollected._sum.amount ?? 0;
+  const loanPortfolio  = Math.max(0, totalDisbursed - totalCollected);
+  const equity = (capitalDeposits._sum.amount ?? 0) - (capitalWithdrawals._sum.amount ?? 0);
 
   res.json({
     assets: {
       loanPortfolio: Math.round(loanPortfolio),
-      portalLoanPortfolio: Math.round(Math.max(0, portalPortfolio)),
-      totalAssets: Math.round(totalAssets),
+      cashAndEquivalents: Math.round(totalCollected),
+      totalAssets: Math.round(loanPortfolio + totalCollected),
     },
     liabilities: { total: 0 },
-    equity: { totalEquity: Math.round(equity), retainedEarnings: Math.round(totalAssets - equity) },
+    equity: {
+      contributedCapital: Math.round(equity),
+      retainedEarnings: Math.round(Math.max(0, loanPortfolio - equity)),
+      totalEquity: Math.round(equity),
+    },
+    metrics: {
+      totalClientAccounts: accountCount,
+      activeLoans,
+      totalDisbursed: Math.round(totalDisbursed),
+      totalCollected: Math.round(totalCollected),
+    },
   });
 });
 
@@ -208,26 +108,118 @@ router.get("/financials/balance-sheet", async (_req, res: Response) => {
 router.get("/financials/cash-flow", async (_req, res: Response) => {
   const now = new Date();
   const months = [];
+
   for (let i = 11; i >= 0; i--) {
     const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const end   = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
 
-    const [inflows, outflows, portalIn] = await Promise.all([
-      prisma.payment.aggregate({ where: { paymentDate: { gte: start, lte: end } }, _sum: { amount: true } }),
-      prisma.loan.aggregate({ where: { disbursementDate: { gte: start, lte: end }, status: { notIn: ["DRAFT","CANCELLED"] } }, _sum: { principal: true } }),
+    const [cashIn, cashOut, capitalIn, capitalOut] = await Promise.all([
       prisma.loanPaymentSubmission.aggregate({ where: { status: "APPROVED", reviewedAt: { gte: start, lte: end } }, _sum: { amount: true } }),
+      prisma.portalLoanApplication.aggregate({ where: { status: { in: ["DISBURSED", "REPAID"] }, reviewedAt: { gte: start, lte: end } }, _sum: { amountRequested: true } }),
+      prisma.capitalEntry.aggregate({ where: { type: "DEPOSIT", entryDate: { gte: start, lte: end } }, _sum: { amount: true } }),
+      prisma.capitalEntry.aggregate({ where: { type: "WITHDRAWAL", entryDate: { gte: start, lte: end } }, _sum: { amount: true } }),
     ]);
 
-    const cashIn  = (inflows._sum.amount || 0) + (portalIn._sum.amount || 0);
-    const cashOut = outflows._sum.principal || 0;
+    const inflow  = (cashIn._sum.amount ?? 0) + (capitalIn._sum.amount ?? 0);
+    const outflow = (cashOut._sum.amountRequested ?? 0) + (capitalOut._sum.amount ?? 0);
+
     months.push({
       month: start.toLocaleString("default", { month: "short", year: "numeric" }),
-      cashIn: Math.round(cashIn),
-      cashOut: Math.round(cashOut),
-      net: Math.round(cashIn - cashOut),
+      cashIn: Math.round(inflow),
+      cashOut: Math.round(outflow),
+      net: Math.round(inflow - outflow),
+      repayments: Math.round(cashIn._sum.amount ?? 0),
+      disbursements: Math.round(cashOut._sum.amountRequested ?? 0),
+      capitalInflows: Math.round(capitalIn._sum.amount ?? 0),
     });
   }
+
   res.json(months);
+});
+
+// ── CSV EXPORTS ───────────────────────────────────────────────────────────────
+
+function toCSV(rows: Record<string, unknown>[]): string {
+  if (!rows.length) return "";
+  const headers = Object.keys(rows[0]);
+  const escape  = (v: unknown) => {
+    const s = v == null ? "" : String(v).replace(/"/g, '""');
+    return /[,"\n]/.test(s) ? `"${s}"` : s;
+  };
+  return [headers.join(","), ...rows.map(r => headers.map(h => escape(r[h])).join(","))].join("\n");
+}
+
+// GET /api/reports/export/applications — CSV of all portal loan applications
+router.get("/export/applications", async (_req: Request, res: Response) => {
+  const apps = await prisma.portalLoanApplication.findMany({
+    orderBy: { createdAt: "desc" },
+    include: { account: { select: { firstName: true, lastName: true, email: true, phone: true, clientNumber: true } } },
+  });
+
+  const rows = apps.map(a => ({
+    reference:       a.reference,
+    clientNumber:    a.account.clientNumber,
+    clientName:      `${a.account.firstName} ${a.account.lastName}`,
+    email:           a.account.email,
+    phone:           a.account.phone,
+    productType:     a.productType,
+    amountRequested: a.amountRequested,
+    interestRate:    a.interestRate,
+    termMonths:      a.termMonths,
+    totalDue:        Math.round(a.amountRequested * (1 + (a.interestRate || 20) / 100)),
+    purpose:         a.purpose,
+    status:          a.status,
+    reviewedBy:      a.reviewedBy ?? "",
+    reviewedAt:      a.reviewedAt ? new Date(a.reviewedAt).toISOString().split("T")[0] : "",
+    createdAt:       new Date(a.createdAt).toISOString().split("T")[0],
+  }));
+
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", `attachment; filename="philix-applications-${new Date().toISOString().split("T")[0]}.csv"`);
+  res.send(toCSV(rows));
+});
+
+// GET /api/reports/export/clients — CSV of all client portal accounts
+router.get("/export/clients", async (_req: Request, res: Response) => {
+  const clients = await prisma.clientPortalAccount.findMany({
+    orderBy: { createdAt: "desc" },
+    select: {
+      clientNumber: true, firstName: true, lastName: true, email: true, phone: true,
+      dateOfBirth: true, gender: true, address: true, city: true,
+      occupation: true, employer: true, monthlyIncome: true,
+      kycStatus: true, status: true, emailVerified: true,
+      creditScore: true, referralCount: true,
+      createdAt: true, lastLoginAt: true,
+      _count: { select: { portalLoans: true } },
+    },
+  });
+
+  const rows = clients.map(c => ({
+    clientNumber:  c.clientNumber,
+    firstName:     c.firstName,
+    lastName:      c.lastName,
+    email:         c.email,
+    phone:         c.phone,
+    dateOfBirth:   c.dateOfBirth ? new Date(c.dateOfBirth).toISOString().split("T")[0] : "",
+    gender:        c.gender ?? "",
+    address:       c.address ?? "",
+    city:          c.city ?? "",
+    occupation:    c.occupation ?? "",
+    employer:      c.employer ?? "",
+    monthlyIncome: c.monthlyIncome ?? "",
+    kycStatus:     c.kycStatus,
+    status:        c.status,
+    emailVerified: c.emailVerified,
+    creditScore:   c.creditScore ?? "",
+    referralCount: c.referralCount,
+    totalLoans:    c._count.portalLoans,
+    joinedAt:      new Date(c.createdAt).toISOString().split("T")[0],
+    lastLoginAt:   c.lastLoginAt ? new Date(c.lastLoginAt).toISOString().split("T")[0] : "",
+  }));
+
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", `attachment; filename="philix-clients-${new Date().toISOString().split("T")[0]}.csv"`);
+  res.send(toCSV(rows));
 });
 
 export default router;
