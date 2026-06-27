@@ -29,7 +29,7 @@ export default function StaffLoanModal({ mode, loan, onClose, onSuccess }: Props
   const [clients, setClients] = useState<Client[]>([]);
   const [selected, setSelected] = useState<Client | null>(null);
   const [searching, setSearching] = useState(false);
-  const debounce = useRef<ReturnType<typeof setTimeout>>();
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Form fields
   const [product,    setProduct]    = useState(loan?.productType ?? "BUSINESS");
@@ -63,7 +63,7 @@ export default function StaffLoanModal({ mode, loan, onClose, onSuccess }: Props
   // Search portal clients
   useEffect(() => {
     if (mode !== "create") return;
-    clearTimeout(debounce.current);
+    if (debounce.current) clearTimeout(debounce.current);
     if (query.length < 2) { setClients([]); return; }
     debounce.current = setTimeout(async () => {
       setSearching(true);

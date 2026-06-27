@@ -26,10 +26,11 @@ router.get("/", wrap(async (req, res) => {
   if (status && status !== "ALL") where.status = status;
   if (search) {
     where.OR = [
-      { reference: { contains: search, mode: "insensitive" } },
-      { account: { firstName: { contains: search, mode: "insensitive" } } },
-      { account: { lastName: { contains: search, mode: "insensitive" } } },
-      { account: { clientNumber: { contains: search, mode: "insensitive" } } },
+      { reference: { contains: search } },
+      { account: { is: { firstName:    { contains: search } } } },
+      { account: { is: { lastName:     { contains: search } } } },
+      { account: { is: { clientNumber: { contains: search } } } },
+      { account: { is: { email:        { contains: search } } } },
     ];
   }
 
@@ -359,13 +360,13 @@ router.get("/search-clients", wrap(async (req, res) => {
     where: {
       isBlacklisted: false,
       OR: [
-        { firstName:    { contains: q, mode: "insensitive" } },
-        { lastName:     { contains: q, mode: "insensitive" } },
-        { email:        { contains: q, mode: "insensitive" } },
-        { phone:        { contains: q, mode: "insensitive" } },
-        { clientNumber: { contains: q, mode: "insensitive" } },
+        { firstName:    { contains: q } } as any,
+        { lastName:     { contains: q } } as any,
+        { email:        { contains: q } } as any,
+        { phone:        { contains: q } } as any,
+        { clientNumber: { contains: q } } as any,
       ],
-    },
+    } as any,
     select: { id: true, clientNumber: true, firstName: true, lastName: true, email: true, phone: true, status: true },
     take: 20,
   });
