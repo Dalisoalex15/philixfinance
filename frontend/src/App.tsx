@@ -25,6 +25,7 @@ import EligibilityPage from "./pages/portal/EligibilityPage";
 import CreditScorePage from "./pages/portal/CreditScorePage";
 import EmailComposerPage from "./pages/EmailComposerPage";
 import EmailManagementPage from "./pages/EmailManagementPage";
+import EmailCentrePage from "./pages/EmailCentrePage";
 import OtpVerificationPage from "./pages/portal/OtpVerificationPage";
 import DashboardPage from "./pages/DashboardPage";
 import CEODashboardPage from "./pages/CEODashboardPage";
@@ -310,6 +311,7 @@ export default function App() {
           <Route path="portfolio-profitability" element={<PortfolioProfitabilityPage />} />
           <Route path="investor-statements" element={<InvestorStatementsPage />} />
           <Route path="email-composer" element={<EmailComposerPage />} />
+          <Route path="email-centre" element={<EmailCentrePage />} />
           {/* Addendum v2.1 routes */}
           <Route path="sms-notifications" element={<SMSNotificationsPage />} />
           <Route path="mobile-money" element={<MobileMoneyPage />} />

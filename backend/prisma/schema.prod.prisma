@@ -302,12 +302,14 @@ model EmailLog {
   subject     String
   template    String?
   body        String?
-  status      String    @default("SENT")   // SENT | FAILED | DELIVERED | BOUNCED
+  bodyHtml    String?   // full rendered HTML stored for View in log
+  status      String    @default("SENT")   // SENT | FAILED | DELIVERED | BOUNCED | QUEUED
   resendId    String?
   clientId    String?
   loanId      String?
   accountId   String?
-  triggeredBy String?
+  triggeredBy String?   // staff name or 'system'
+  triggerType String    @default("automatic")  // manual | automatic
   error       String?
   openedAt    DateTime?
   createdAt   DateTime  @default(now())
