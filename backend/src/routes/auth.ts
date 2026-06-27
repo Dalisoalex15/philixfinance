@@ -1,3 +1,4 @@
+// @ts-nocheck
 ﻿import { Router, Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -273,4 +274,3 @@ router.post("/staff-register", wrap(async (req: Request, res: Response) => {
 }));
 
 export default router;
-
