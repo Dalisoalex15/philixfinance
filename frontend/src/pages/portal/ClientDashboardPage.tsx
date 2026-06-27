@@ -963,19 +963,44 @@ export default function ClientDashboardPage() {
           </div>
         </div>
       ) : (
-        <div className="rounded-2xl p-6 mb-3 text-center"
-          style={{ background: "#0e1625", border: "1px dashed rgba(79,70,229,0.25)" }}>
-          <div className="w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center"
-            style={{ background: "rgba(79,70,229,0.1)" }}>
-            <CreditCard size={20} className="text-indigo-400" />
+        <div className="rounded-2xl mb-3 overflow-hidden"
+          style={{ background: "linear-gradient(135deg, rgba(15,23,42,1) 0%, rgba(30,20,10,1) 100%)", border: "1px solid rgba(245,166,35,0.25)" }}>
+          <div className="p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-full"
+                style={{ background: "rgba(245,166,35,0.15)", border: "1px solid rgba(245,166,35,0.3)", color: "#F5A623" }}>
+                <Sparkles size={9} /> Get funded fast
+              </div>
+            </div>
+            <p className="text-xl font-extrabold text-slate-100 mb-1">
+              Loan in <span style={{ color: "#F5A623" }}>15 Minutes</span>
+            </p>
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              Sign up → Verify KYC → Apply → Receive funds. No queues, no paperwork, no waiting.
+            </p>
+            <div className="flex gap-2">
+              <Link to="/portal/get-a-loan"
+                className="flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-xl transition-all hover:opacity-90"
+                style={{ background: "#F5A623", color: "#0B1F3A" }}>
+                <Zap size={11} fill="#0B1F3A" /> How It Works
+              </Link>
+              <Link to="/portal/apply"
+                className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl transition-all border"
+                style={{ borderColor: "rgba(245,166,35,0.3)", color: "#F5A623" }}>
+                Apply Now <ChevronRight size={11} />
+              </Link>
+            </div>
           </div>
-          <p className="text-sm font-semibold text-slate-300 mb-1">No active loan</p>
-          <p className="text-xs text-slate-600 mb-4">Apply and receive funds within 24 hours</p>
-          <Link to="/portal/apply"
-            className="inline-flex items-center gap-1.5 text-sm font-bold px-5 py-2.5 rounded-xl"
-            style={{ background: "#F5A623", color: "#0B1F3A" }}>
-            <Zap size={12} /> Apply Now
-          </Link>
+          {/* Progress indicator */}
+          <div className="flex border-t" style={{ borderColor: "rgba(245,166,35,0.12)" }}>
+            {[{ t: "Create Account", done: true }, { t: "Verify KYC", done: kycOk }, { t: "Apply", done: apps.length > 0 }, { t: "Get Funded", done: disbursed > 0 }].map((s, i) => (
+              <div key={i} className="flex-1 px-2 py-2 text-center">
+                <div className={`text-[9px] font-semibold ${s.done ? "text-emerald-400" : "text-slate-600"}`}>
+                  {s.done ? "✓ " : `${i + 1}. `}{s.t}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

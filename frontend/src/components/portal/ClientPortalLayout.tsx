@@ -5,7 +5,7 @@ import {
   LayoutDashboard, CreditCard, Package, FileText, User,
   LogOut, Bell, Menu, X, Shield, Phone, ChevronRight,
   Zap, Home, Calculator, BarChart2, Users, HelpCircle,
-  ClipboardList, TrendingUp,
+  ClipboardList, TrendingUp, Sparkles,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import PhilixLogo from "../ui/PhilixLogo";
@@ -13,7 +13,8 @@ import PortalChatbot from "./PortalChatbot";
 
 const navItems = [
   { href: "/portal/dashboard", icon: LayoutDashboard, label: "Dashboard", color: "text-indigo-400" },
-  { href: "/portal/apply", icon: FileText, label: "Apply for Loan", color: "text-blue-400", highlight: true },
+  { href: "/portal/get-a-loan", icon: Sparkles, label: "Get a Loan in 15 Min", color: "text-amber-400", highlight: true },
+  { href: "/portal/apply", icon: FileText, label: "Apply for Loan", color: "text-blue-400" },
   { href: "/portal/invest", icon: TrendingUp, label: "Invest", color: "text-indigo-400" },
   { href: "/portal/loans", icon: CreditCard, label: "My Loans", color: "text-emerald-400" },
   { href: "/portal/calculator", icon: Calculator, label: "Loan Calculator", color: "text-cyan-400" },
