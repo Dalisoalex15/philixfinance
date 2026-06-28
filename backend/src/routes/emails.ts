@@ -3,7 +3,7 @@ import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { sendEmail } from "../lib/mailer";
 import { buildTemplate, TEMPLATE_LABELS, renderEmailTemplate } from "../services/emailTemplates";
-import { isLoggedIn, isManagerOrAbove } from "../middleware/auth";
+import { authenticate as isLoggedIn, isManagerOrAbove } from "../middleware/auth";
 import { logger } from "../lib/logger";
 import { Resend } from "resend";
 

@@ -10,7 +10,7 @@ import {
   Calendar, Users2, FileText, ShoppingBag, Mail, Upload, Download,
   Search, Percent, Wallet, Scale,
   MessageSquare, Smartphone, MessageCircle, FileSignature, QrCode,
-  Brain, ShieldAlert, Gift, UsersRound, Webhook, TrendingDown, Radio,
+  Brain, ShieldAlert, Gift, UsersRound, Webhook, TrendingDown, Radio, Lock,
 } from "lucide-react";
 import { useAuthStore } from "../../store/auth";
 import { useLoanApplicationStore } from "../../store/loanApplicationStore";
@@ -68,7 +68,8 @@ const navGroups: NavGroup[] = [
       { href: "/collateral-auction",   icon: Gavel,         label: "Collateral Auctions" },
       { href: "/collateral-command",   icon: Shield,        label: "Collateral Command", roles: ["SUPER_ADMIN", "MANAGER"] },
       { href: "/provisioning",         icon: Percent,       label: "Provisioning (PAR)" },
-      { href: "/credit-scoring",       icon: Brain,         label: "AI Credit Scoring" },
+      { href: "/credit-scoring",        icon: Brain,         label: "AI Credit Scoring" },
+      { href: "/client-credit-scores", icon: TrendingUp,    label: "Credit Scores",      roles: ["SUPER_ADMIN", "MANAGER", "LOAN_OFFICER", "ACCOUNTANT"] },
       { href: "/fraud-alerts",         icon: ShieldAlert,   label: "Fraud Detection" },
       { href: "/default-risk",         icon: TrendingDown,  label: "Default Risk" },
     ],
@@ -87,6 +88,8 @@ const navGroups: NavGroup[] = [
   {
     label: "Capital & Investors",
     items: [
+      { href: "/financial-controls",  icon: Lock,       label: "Financial Controls", roles: ["SUPER_ADMIN"], badge: "CEO", badgeColor: "bg-[#C9A227] text-[#0B1F3A]" },
+      { href: "/loan-product-rates",  icon: Percent,    label: "Product Rates",      roles: ["SUPER_ADMIN"] },
       { href: "/capital",             icon: Wallet,     label: "Capital & Funding",  roles: ["SUPER_ADMIN", "MANAGER"] },
       { href: "/investments",         icon: TrendingUp, label: "Client Investments", roles: ["SUPER_ADMIN", "MANAGER", "LOAN_OFFICER"] },
       { href: "/investors",           icon: TrendingUp, label: "Investors",          roles: ["SUPER_ADMIN", "MANAGER"] },

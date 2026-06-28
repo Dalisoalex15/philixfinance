@@ -401,3 +401,73 @@ model ClientInvestment {
   @@index([accountId])
   @@index([status])
 }
+
+// ── PART 1: CEO FINANCIAL CONTROLS ───────────────────────────────────────────
+
+model FinancialSetting {
+  id            String   @id @default(uuid())
+  settingKey    String   @unique
+  settingValue  Float    @default(0)
+  description   String?
+  lastUpdatedBy String?
+  lastUpdatedAt DateTime @default(now())
+}
+
+model ManualEntry {
+  id            String    @id @default(uuid())
+  entryType     String    // bank_deposit|bank_withdrawal|capital_injection|capital_withdrawal|external_income|external_expense|cash_adjustment
+  direction     String    // in|out
+  amount        Float
+  description   String
+  effectiveDate DateTime
+  branchId      String?
+  enteredBy     String    // staff name
+  enteredById   String?   // staff id
+  previousValue Float?
+  auditNote     String?
+  createdAt     DateTime  @default(now())
+  deletedAt     DateTime?
+
+  @@index([entryType])
+  @@index([effectiveDate])
+}
+
+// ── PART 3 FEATURE 2: LTV CONDITION SCALE ────────────────────────────────────
+
+model LtvConditionScale {
+  id          String   @id @default(uuid())
+  condition   String   @unique  // excellent|good|fair|poor
+  percentage  Float
+  updatedBy   String?
+  reason      String?
+  updatedAt   DateTime @default(now())
+}
+
+// ── PART 3 FEATURE 9: COLLATERAL VALUE ALERTS ────────────────────────────────
+
+model CollateralValueAlert {
+  id            String    @id @default(uuid())
+  category      String
+  oldValue      Float
+  newValue      Float
+  threshold     Float     @default(15)
+  affectedLoans Int       @default(0)
+  flaggedBy     String
+  status        String    @default("ACTIVE")  // ACTIVE | REVIEWED | DISMISSED
+  createdAt     DateTime  @default(now())
+  reviewedAt    DateTime?
+  reviewedBy    String?
+}
+
+// ── PART 3 FEATURE 4: CREDIT SCORE LOG ────────────────────────────────────────
+
+model CreditScoreLog {
+  id           String   @id @default(uuid())
+  accountId    String
+  score        Int
+  factors      String?  // JSON
+  reason       String?
+  calculatedAt DateTime @default(now())
+
+  @@index([accountId])
+}

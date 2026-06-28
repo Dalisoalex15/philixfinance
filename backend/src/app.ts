@@ -41,6 +41,7 @@ import portalInvestmentRoutes from "./routes/portal/investments";
 import portalCalculateRoutes from "./routes/portal/calculate";
 import accountsRoutes from "./routes/accounts";
 import emailRoutes from "./routes/emails";
+import financialsRoutes from "./routes/financials";
 import aiRoutes from "./routes/ai";
 
 const app = express();
@@ -196,6 +197,7 @@ app.use("/api/portal/investments",  portalInvestmentRoutes);
 app.use("/api/portal/calculate",    portalCalculateRoutes);
 app.use("/api/accounts",            accountsRoutes);
 app.use("/api/emails",             emailRoutes);
+app.use("/api/financials",         financialsRoutes);
 app.use("/api/webhooks",           emailRoutes); // Resend webhook on /api/webhooks/resend
 
 // Tighter limit on staff email sends

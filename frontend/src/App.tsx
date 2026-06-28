@@ -104,6 +104,9 @@ import FinancialStatementsPage from "./pages/FinancialStatementsPage";
 import TargetsPage from "./pages/TargetsPage";
 import GetLoanIn15Page from "./pages/portal/GetLoanIn15Page";
 import RepaymentAccountsPage from "./pages/RepaymentAccountsPage";
+import FinancialControlsPage from "./pages/FinancialControlsPage";
+import LoanProductRatesPage from "./pages/LoanProductRatesPage";
+import ClientCreditScoresPage from "./pages/ClientCreditScoresPage";
 
 class RouteErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -333,6 +336,9 @@ export default function App() {
           <Route path="investments" element={<InvestmentManagementPage />} />
           <Route path="financial-statements" element={<FinancialStatementsPage />} />
           <Route path="targets" element={<TargetsPage />} />
+          <Route path="financial-controls" element={<FinancialControlsPage />} />
+          <Route path="loan-product-rates" element={<LoanProductRatesPage />} />
+          <Route path="client-credit-scores" element={<ClientCreditScoresPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
