@@ -5,29 +5,62 @@ import {
   LayoutDashboard, CreditCard, Package, FileText, User,
   LogOut, Bell, Menu, X, Shield, Phone, ChevronRight,
   Zap, Home, Calculator, BarChart2, Users, HelpCircle,
-  ClipboardList, TrendingUp, Sparkles,
+  ClipboardList, TrendingUp, Sparkles, Calendar, RefreshCw,
+  Folder, MessageSquare, Download,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import PhilixLogo from "../ui/PhilixLogo";
 import PortalChatbot from "./PortalChatbot";
 
-const navItems = [
-  { href: "/portal/dashboard", icon: LayoutDashboard, label: "Dashboard", color: "text-indigo-400" },
-  { href: "/portal/get-a-loan", icon: Sparkles, label: "Get a Loan in 15 Min", color: "text-amber-400", highlight: true },
-  { href: "/portal/apply", icon: FileText, label: "Apply for Loan", color: "text-blue-400" },
-  { href: "/portal/invest", icon: TrendingUp, label: "Invest", color: "text-indigo-400" },
-  { href: "/portal/loans", icon: CreditCard, label: "My Loans", color: "text-emerald-400" },
-  { href: "/portal/calculator", icon: Calculator, label: "Loan Calculator", color: "text-cyan-400" },
-  { href: "/portal/eligibility", icon: ClipboardList, label: "Loan Eligibility", color: "text-teal-400" },
-  { href: "/portal/credit-score", icon: BarChart2, label: "Credit Score", color: "text-violet-400" },
-  { href: "/portal/statement", icon: TrendingUp, label: "Account Statement", color: "text-sky-400" },
-  { href: "/portal/referral", icon: Users, label: "Refer & Earn", color: "text-orange-400" },
-  { href: "/portal/collateral", icon: Package, label: "Submit Collateral", color: "text-amber-400" },
-  { href: "/portal/kyc", icon: Shield, label: "Identity Verification", color: "text-purple-400" },
-  { href: "/portal/notifications", icon: Bell, label: "Notifications", color: "text-pink-400" },
-  { href: "/portal/support", icon: HelpCircle, label: "Support Center", color: "text-slate-500" },
-  { href: "/portal/profile", icon: User, label: "My Profile", color: "text-slate-400" },
+const navGroups = [
+  {
+    label: "Quick Actions",
+    items: [
+      { href: "/portal/dashboard",    icon: LayoutDashboard, label: "Dashboard",           color: "text-indigo-400" },
+      { href: "/portal/get-a-loan",   icon: Sparkles,        label: "Get a Loan in 15 Min",color: "text-amber-400", highlight: true },
+      { href: "/portal/apply",        icon: FileText,        label: "Apply for Loan",       color: "text-blue-400" },
+      { href: "/portal/renew",        icon: RefreshCw,       label: "Renew My Loan",        color: "text-emerald-400", badge: "NEW" },
+    ],
+  },
+  {
+    label: "My Loans",
+    items: [
+      { href: "/portal/loans",            icon: CreditCard,   label: "My Loans",             color: "text-emerald-400" },
+      { href: "/portal/payment-calendar", icon: Calendar,     label: "Payment Calendar",     color: "text-cyan-400", badge: "NEW" },
+      { href: "/portal/account-statement",icon: Download,     label: "Account Statement",    color: "text-sky-400", badge: "NEW" },
+      { href: "/portal/calculator",       icon: Calculator,   label: "Loan Calculator",      color: "text-cyan-400" },
+      { href: "/portal/eligibility",      icon: ClipboardList,label: "Loan Eligibility",     color: "text-teal-400" },
+    ],
+  },
+  {
+    label: "My Account",
+    items: [
+      { href: "/portal/credit-score",  icon: BarChart2, label: "Credit Score",          color: "text-violet-400" },
+      { href: "/portal/documents",     icon: Folder,    label: "Document Centre",        color: "text-amber-400", badge: "NEW" },
+      { href: "/portal/statement",     icon: TrendingUp,label: "Statements",             color: "text-sky-400" },
+      { href: "/portal/invest",        icon: TrendingUp,label: "Invest",                 color: "text-indigo-400" },
+      { href: "/portal/referral",      icon: Users,     label: "Refer & Earn",           color: "text-orange-400" },
+    ],
+  },
+  {
+    label: "Verification",
+    items: [
+      { href: "/portal/collateral",    icon: Package, label: "Submit Collateral",     color: "text-amber-400" },
+      { href: "/portal/kyc",           icon: Shield,  label: "Identity Verification", color: "text-purple-400" },
+    ],
+  },
+  {
+    label: "Support",
+    items: [
+      { href: "/portal/help",          icon: MessageSquare, label: "Support Tickets",   color: "text-green-400", badge: "NEW" },
+      { href: "/portal/notifications", icon: Bell,          label: "Notifications",     color: "text-pink-400" },
+      { href: "/portal/profile",       icon: User,          label: "My Profile",        color: "text-slate-400" },
+    ],
+  },
 ];
+
+// Flat list for mobile nav and anywhere that needs the full list
+const navItems = navGroups.flatMap(g => g.items);
 
 const bottomNav = [
   { href: "/portal/dashboard", icon: Home, label: "Home" },
@@ -131,32 +164,41 @@ export default function ClientPortalLayout() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-1">
-          {navItems.map(item => {
-            const isActive = location.pathname === item.href;
-            return (
-              <NavLink key={item.href} to={item.href} onClick={() => setMobileOpen(false)}>
-                <div className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
-                  item.highlight && !isActive
-                    ? "bg-indigo-600/20 border border-indigo-600/30 text-indigo-300 hover:bg-indigo-600/30"
-                    : isActive
-                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/40"
-                    : "text-slate-500 hover:text-slate-200 hover:bg-slate-800/60"
-                }`}>
-                  <item.icon size={16} className={isActive ? "text-white" : item.color} />
-                  <span className="flex-1 font-medium">{item.label}</span>
-                  {!isActive && (item as { badge?: number }).badge ? (
-                    <span className="bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                      {(item as { badge?: number }).badge}
-                    </span>
-                  ) : isActive ? <ChevronRight size={12} /> : null}
-                  {item.highlight && !isActive && (
-                    <Zap size={11} className="text-indigo-400 flex-shrink-0" />
-                  )}
-                </div>
-              </NavLink>
-            );
-          })}
+        <nav className="flex-1 px-3 py-3 overflow-y-auto">
+          {navGroups.map(group => (
+            <div key={group.label} className="mb-3">
+              <div className="px-3 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-600 mb-1">{group.label}</div>
+              <div className="space-y-0.5">
+                {group.items.map(item => {
+                  const isActive = location.pathname === item.href;
+                  const typedItem = item as { badge?: string | number; highlight?: boolean };
+                  return (
+                    <NavLink key={item.href} to={item.href} onClick={() => setMobileOpen(false)}>
+                      <div className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
+                        typedItem.highlight && !isActive
+                          ? "bg-indigo-600/20 border border-indigo-600/30 text-indigo-300 hover:bg-indigo-600/30"
+                          : isActive
+                          ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/40"
+                          : "text-slate-500 hover:text-slate-200 hover:bg-slate-800/60"
+                      }`}>
+                        <item.icon size={15} className={isActive ? "text-white" : item.color} />
+                        <span className="flex-1 font-medium text-[13px]">{item.label}</span>
+                        {typedItem.badge && !isActive && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                            {typedItem.badge}
+                          </span>
+                        )}
+                        {typedItem.highlight && !isActive && (
+                          <Zap size={11} className="text-indigo-400 flex-shrink-0" />
+                        )}
+                        {isActive && <ChevronRight size={12} />}
+                      </div>
+                    </NavLink>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         {/* KYC nudge */}

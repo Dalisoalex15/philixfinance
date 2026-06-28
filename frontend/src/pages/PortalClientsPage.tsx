@@ -128,6 +128,13 @@ export default function PortalClientsPage() {
   const [creditScore, setCreditScore] = useState<null | { score: number; grade: string; band: string; color: string; total: number; disbursed: number; rejected: number }>(null);
   const [creditScoreLoading, setCreditScoreLoading] = useState(false);
 
+  // Declare default
+  const [defaultModal, setDefaultModal] = useState<{ appId: string; ref: string } | null>(null);
+  const [defaultReason, setDefaultReason] = useState("");
+  const [defaultNotify, setDefaultNotify] = useState(true);
+  const [defaultLoading, setDefaultLoading] = useState(false);
+  const [defaultMsg, setDefaultMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
   // NOK alert
   const [nokAlertLoading, setNokAlertLoading] = useState(false);
   const [nokAlertMsg, setNokAlertMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -277,6 +284,26 @@ export default function PortalClientsPage() {
         setBlacklistReason("");
       }
     } finally { setBlacklistLoading(false); }
+  }
+
+  async function declareDefault() {
+    if (!defaultModal || !defaultReason.trim()) return;
+    setDefaultLoading(true); setDefaultMsg(null);
+    try {
+      const r = await fetch(`${API}/admin/applications/${defaultModal.appId}/declare-default`, {
+        method: "POST", headers: authHeaders(),
+        body: JSON.stringify({ reason: defaultReason.trim(), notifyClient: defaultNotify }),
+      });
+      const d = await r.json();
+      if (r.ok) {
+        setDefaultMsg({ ok: true, text: `Loan ${defaultModal.ref} declared in default. Client ${defaultNotify ? "has been notified." : "not notified."}` });
+        if (selected) { await loadDetail(selected.id); await loadAccounts(); }
+        setTimeout(() => { setDefaultModal(null); setDefaultReason(""); setDefaultMsg(null); }, 2000);
+      } else {
+        setDefaultMsg({ ok: false, text: d.error || "Failed to declare default" });
+      }
+    } catch { setDefaultMsg({ ok: false, text: "Network error" }); }
+    finally { setDefaultLoading(false); }
   }
 
   async function loadCreditScore() {
@@ -816,23 +843,36 @@ export default function PortalClientsPage() {
                                 </td>
                                 <td className="text-slate-500">{new Date(app.createdAt).toLocaleDateString()}</td>
                                 <td>
-                                  <button
-                                    onClick={() => setEmailCtx({
-                                      accountId:   selected.id,
-                                      firstName:   selected.firstName,
-                                      lastName:    selected.lastName,
-                                      email:       selected.email,
-                                      clientNumber: selected.clientNumber,
-                                      loanRef:     app.reference,
-                                      loanAmount:  app.amountRequested,
-                                      loanStatus:  app.status,
-                                      loanProduct: app.productType,
-                                      loanId:      app.id,
-                                    })}
-                                    className="flex items-center gap-1 text-[10px] font-semibold text-sky-400 bg-sky-900/20 border border-sky-800/30 px-2 py-1 rounded-lg hover:bg-sky-900/40 transition-all whitespace-nowrap"
-                                  >
-                                    <Send size={10} /> Email
-                                  </button>
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={() => setEmailCtx({
+                                        accountId:   selected.id,
+                                        firstName:   selected.firstName,
+                                        lastName:    selected.lastName,
+                                        email:       selected.email,
+                                        clientNumber: selected.clientNumber,
+                                        loanRef:     app.reference,
+                                        loanAmount:  app.amountRequested,
+                                        loanStatus:  app.status,
+                                        loanProduct: app.productType,
+                                        loanId:      app.id,
+                                      })}
+                                      className="flex items-center gap-1 text-[10px] font-semibold text-sky-400 bg-sky-900/20 border border-sky-800/30 px-2 py-1 rounded-lg hover:bg-sky-900/40 transition-all whitespace-nowrap"
+                                    >
+                                      <Send size={10} /> Email
+                                    </button>
+                                    {app.status === "DISBURSED" && (
+                                      <button
+                                        onClick={() => { setDefaultModal({ appId: app.id, ref: app.reference }); setDefaultReason(""); setDefaultMsg(null); }}
+                                        className="flex items-center gap-1 text-[10px] font-semibold text-red-400 bg-red-900/20 border border-red-800/30 px-2 py-1 rounded-lg hover:bg-red-900/40 transition-all whitespace-nowrap"
+                                      >
+                                        ⚠ Declare Default
+                                      </button>
+                                    )}
+                                    {app.status === "OVERDUE" && (
+                                      <span className="text-[10px] font-bold text-red-400 bg-red-900/30 border border-red-800/40 px-2 py-1 rounded-lg">IN DEFAULT</span>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
                             ))}
@@ -875,6 +915,45 @@ export default function PortalClientsPage() {
                         {blacklistLoading ? "Processing…" : "Confirm Blacklist"}
                       </button>
                       <button onClick={() => setBlacklistModal(false)} className="btn-secondary text-xs py-2 px-3">Cancel</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Declare Default Modal ── */}
+                {defaultModal && (
+                  <div className="bg-red-950/40 border-2 border-red-700/50 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-bold text-red-300 flex items-center gap-1.5">⚠ Declare Loan Default — {defaultModal.ref}</div>
+                      <button onClick={() => setDefaultModal(null)} className="text-slate-500 hover:text-slate-300"><X size={14} /></button>
+                    </div>
+                    <div className="text-xs text-slate-400">This marks the loan as officially in default. The client's credit score will be negatively affected and the loan will appear in the default tracking dashboard.</div>
+                    <div>
+                      <div className="text-[10px] text-slate-500 mb-1 uppercase font-semibold">Reason for Default Declaration *</div>
+                      <textarea
+                        value={defaultReason}
+                        onChange={e => setDefaultReason(e.target.value)}
+                        placeholder="e.g. Client has not made payment in 60+ days despite 3 contact attempts. Collateral inspection scheduled."
+                        rows={3}
+                        className="w-full bg-slate-900 border border-red-800/50 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-red-500 resize-none placeholder:text-slate-600"
+                      />
+                      <div className="text-[10px] text-slate-600 mt-0.5">{defaultReason.length}/5 minimum characters</div>
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                      <input type="checkbox" checked={defaultNotify} onChange={e => setDefaultNotify(e.target.checked)}
+                        className="w-3.5 h-3.5 accent-red-500" />
+                      Send overdue notice email to client
+                    </label>
+                    {defaultMsg && (
+                      <div className={`text-xs px-3 py-2 rounded-lg ${defaultMsg.ok ? "bg-emerald-900/30 text-emerald-300 border border-emerald-800/40" : "bg-red-900/30 text-red-300 border border-red-800/40"}`}>
+                        {defaultMsg.text}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <button onClick={declareDefault} disabled={defaultLoading || defaultReason.trim().length < 5}
+                        className="bg-red-700 hover:bg-red-600 text-white text-xs font-bold px-4 py-2 rounded-lg disabled:opacity-50 transition-all flex items-center gap-2">
+                        {defaultLoading ? <><span className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" /> Processing…</> : "⚠ Confirm Default Declaration"}
+                      </button>
+                      <button onClick={() => setDefaultModal(null)} className="text-xs px-4 py-2 rounded-lg border border-slate-700 text-slate-400 hover:bg-slate-800">Cancel</button>
                     </div>
                   </div>
                 )}

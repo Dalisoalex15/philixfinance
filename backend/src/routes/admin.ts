@@ -1599,4 +1599,71 @@ router.post("/campaigns", wrap(async (req: Request, res: Response) => {
   res.json({ campaign, totalSent, totalFailed });
 }));
 
+// ── POST /api/admin/applications/:id/declare-default ──────────────────────────
+// Marks a DISBURSED loan as in default. CEO/Manager only.
+router.post("/applications/:id/declare-default", wrap(async (req: Request, res: Response) => {
+  const { reason, notifyClient } = req.body as { reason?: string; notifyClient?: boolean };
+  if (!reason || reason.trim().length < 5) {
+    return res.status(400).json({ error: "A reason for declaring default is required (min 5 characters)" });
+  }
+
+  const app = await (prisma as any).portalLoanApplication.findUnique({
+    where: { id: req.params.id },
+    include: { account: { select: { firstName: true, lastName: true, email: true, phone: true } } },
+  });
+  if (!app) return res.status(404).json({ error: "Loan application not found" });
+  if (app.status !== "DISBURSED") return res.status(400).json({ error: "Only DISBURSED loans can be declared in default" });
+
+  const updated = await (prisma as any).portalLoanApplication.update({
+    where: { id: req.params.id },
+    data: {
+      status: "OVERDUE",
+      rejectedReason: `DEFAULT DECLARED: ${reason.trim()}`,
+      updatedAt: new Date(),
+    },
+  });
+
+  // Optionally send overdue notice email
+  if (notifyClient && app.account?.email) {
+    try {
+      await sendEmail({
+        to: app.account.email,
+        toName: `${app.account.firstName} ${app.account.lastName}`,
+        subject: "Important Notice: Loan Default Declaration — Philix Finance",
+        body: `Dear ${app.account.firstName},\n\nThis is to inform you that your loan (Ref: ${app.reference}) has been declared in default.\n\nReason: ${reason}\n\nPlease contact us immediately to discuss a repayment plan.\n\nPhilix Finance Team`,
+        portalAccountId: app.accountId,
+      });
+    } catch { /* non-fatal */ }
+  }
+
+  const staffUser = (req as any).user;
+  try {
+    await (prisma as any).auditLog?.create({
+      data: {
+        userId: staffUser?.id ?? "system",
+        action: "DECLARE_DEFAULT",
+        entity: "PortalLoanApplication",
+        entityId: req.params.id,
+        description: `Loan ${app.reference} declared in default. Reason: ${reason}`,
+      },
+    });
+  } catch { /* audit is non-fatal */ }
+
+  res.json({ ok: true, loan: updated });
+}));
+
+// ── POST /api/admin/applications/:id/lift-default ────────────────────────────
+// Reverses a default declaration (sets status back to DISBURSED).
+router.post("/applications/:id/lift-default", wrap(async (req: Request, res: Response) => {
+  const app = await (prisma as any).portalLoanApplication.findUnique({ where: { id: req.params.id } });
+  if (!app) return res.status(404).json({ error: "Loan not found" });
+  if (app.status !== "OVERDUE") return res.status(400).json({ error: "Loan is not currently in default status" });
+
+  const updated = await (prisma as any).portalLoanApplication.update({
+    where: { id: req.params.id },
+    data: { status: "DISBURSED", rejectedReason: null },
+  });
+  res.json({ ok: true, loan: updated });
+}));
+
 export default router;

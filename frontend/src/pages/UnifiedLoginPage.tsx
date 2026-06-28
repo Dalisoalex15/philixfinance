@@ -15,6 +15,8 @@ export default function UnifiedLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // "auto" | "staff" | "client" — user can override auto-detection
+  const [accountType, setAccountType] = useState<"auto" | "staff" | "client">("auto");
 
   // Clear stale tokens from old store keys whenever the login page is visited
   useEffect(() => {
@@ -26,7 +28,9 @@ export default function UnifiedLoginPage() {
     localStorage.removeItem("philix-client-auth-v2");
   }, []);
 
-  const detectedType = (() => {
+  // Auto-detect from email domain unless manually overridden
+  const resolvedType = (() => {
+    if (accountType !== "auto") return accountType;
     if (!email) return null;
     if (email.toLowerCase().endsWith("@philixfinance.com")) return "staff";
     return "client";
@@ -37,8 +41,11 @@ export default function UnifiedLoginPage() {
     setError("");
     setLoading(true);
 
+    // If still auto and no domain hint, default to client
+    const loginAs = resolvedType ?? "client";
+
     try {
-      if (detectedType === "staff") {
+      if (loginAs === "staff") {
         await staffLogin(email, password);
         navigate("/");
       } else {
@@ -105,27 +112,38 @@ export default function UnifiedLoginPage() {
             <PhilixLogo variant="full" size="md" onDark />
           </div>
 
-          <div className="mb-7">
+          <div className="mb-6">
             <h2 className="text-2xl font-black text-white">Sign In</h2>
-            <p className="text-slate-500 text-sm mt-1">
-              {detectedType === "staff"
-                ? "Staff account recognised — you'll be taken to the Operations Portal"
-                : detectedType === "client"
-                ? "Welcome back — you'll be taken to your Client Portal"
-                : "Sign in to access your Philix Finance account"}
-            </p>
+            <p className="text-slate-500 text-sm mt-1">Access your Philix Finance account</p>
           </div>
 
-          {detectedType && (
-            <div className={`mb-4 flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-xl border ${
-              detectedType === "staff"
-                ? "bg-amber-900/20 border-amber-800/40 text-amber-400"
-                : "bg-indigo-900/20 border-indigo-800/40 text-indigo-400"
-            }`}>
-              {detectedType === "staff" ? <Shield size={12} /> : <Users size={12} />}
-              {detectedType === "staff" ? "Staff / Admin account" : "Client account"}
+          {/* Account type selector */}
+          <div className="mb-5">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">I am signing in as</p>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { value: "client", label: "Client", icon: Users, desc: "Portal account", colors: "border-indigo-500 bg-indigo-900/20 text-indigo-300" },
+                { value: "staff",  label: "Staff",  icon: Shield, desc: "Operations portal", colors: "border-amber-500 bg-amber-900/20 text-amber-300" },
+              ] as const).map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setAccountType(opt.value)}
+                  className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border-2 text-left transition-all ${
+                    (accountType === opt.value || (accountType === "auto" && resolvedType === opt.value))
+                      ? opt.colors
+                      : "border-slate-700 bg-slate-800/50 text-slate-500 hover:border-slate-600"
+                  }`}
+                >
+                  <opt.icon size={16} className="flex-shrink-0" />
+                  <div>
+                    <div className="text-sm font-bold">{opt.label}</div>
+                    <div className="text-[10px] opacity-70">{opt.desc}</div>
+                  </div>
+                </button>
+              ))}
             </div>
-          )}
+          </div>
 
           {error && (
             <div className="mb-4 bg-red-900/20 border border-red-700/40 rounded-xl p-3 flex items-center gap-2 text-red-300 text-sm">
