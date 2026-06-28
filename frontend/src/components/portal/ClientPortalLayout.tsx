@@ -28,6 +28,7 @@ const navGroups = [
       { href: "/portal/loans",            icon: CreditCard,   label: "My Loans",             color: "text-emerald-400" },
       { href: "/portal/payment-calendar", icon: Calendar,     label: "Payment Calendar",     color: "text-cyan-400", badge: "NEW" },
       { href: "/portal/account-statement",icon: Download,     label: "Account Statement",    color: "text-sky-400", badge: "NEW" },
+      { href: "/portal/products",         icon: Package,      label: "Compare Loan Products",color: "text-orange-400" },
       { href: "/portal/calculator",       icon: Calculator,   label: "Loan Calculator",      color: "text-cyan-400" },
       { href: "/portal/eligibility",      icon: ClipboardList,label: "Loan Eligibility",     color: "text-teal-400" },
     ],
