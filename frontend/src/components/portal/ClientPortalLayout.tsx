@@ -54,6 +54,7 @@ const navGroups = [
     label: "Support",
     items: [
       { href: "/portal/help",          icon: MessageSquare, label: "Support Tickets",   color: "text-green-400", badge: "NEW" },
+      { href: "/portal/about",         icon: HelpCircle,    label: "About Philix",      color: "text-amber-400" },
       { href: "/portal/notifications", icon: Bell,          label: "Notifications",     color: "text-pink-400" },
       { href: "/portal/profile",       icon: User,          label: "My Profile",        color: "text-slate-400" },
     ],

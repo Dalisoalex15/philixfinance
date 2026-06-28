@@ -13,6 +13,28 @@ npx prisma db push --schema=backend/prisma/schema.prod.prisma --accept-data-loss
 # Seed database (allowed to fail if already seeded)
 npx tsx backend/prisma/seed.ts || true
 
+# Generate PNG icons from SVG using sharp (installed as dev dep) or skip gracefully
+node -e "
+const fs = require('fs');
+const path = require('path');
+const svgSrc = path.join('frontend/public/logo-icon.svg');
+const svg = fs.readFileSync(svgSrc, 'utf8');
+
+try {
+  const sharp = require('sharp');
+  const svgBuf = Buffer.from(svg);
+  Promise.all([
+    sharp(svgBuf).resize(192, 192).png().toFile('frontend/public/icon-192.png'),
+    sharp(svgBuf).resize(512, 512).png().toFile('frontend/public/icon-512.png'),
+    sharp(svgBuf).resize(180, 180).png().toFile('frontend/public/apple-touch-icon.png'),
+    sharp(svgBuf).resize(1200, 630).flatten({ background: '#0B1F3A' }).png().toFile('frontend/public/og-image.png'),
+  ]).then(() => console.log('✓ PNG icons generated'))
+    .catch(e => console.warn('Icon generation failed:', e.message));
+} catch {
+  console.log('sharp not available — skipping PNG icon generation (SVG fallback in use)');
+}
+" || true
+
 # Build frontend
 npm install --prefix frontend
 npm run build --prefix frontend
@@ -52,6 +74,8 @@ cat > .vercel/output/config.json << 'ROUTEEOF'
 {
   "version": 3,
   "routes": [
+    { "src": "^/sitemap\\.xml$", "dest": "/sitemap.xml" },
+    { "src": "^/robots\\.txt$", "dest": "/robots.txt" },
     { "src": "^/api/(.*)$", "dest": "/api/index" },
     { "handle": "filesystem" },
     { "src": "^/(.*)$", "dest": "/index.html" }

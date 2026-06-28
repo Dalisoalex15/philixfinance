@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0B1F3A"/>
+      <stop offset="100%" stop-color="#0a1628"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#F5A623"/>
+      <stop offset="100%" stop-color="#C9A227"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a5f"/>
+      <stop offset="100%" stop-color="#0B1F3A"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Decorative circles -->
+  <circle cx="1050" cy="100" r="220" fill="#1e3a5f" opacity="0.4"/>
+  <circle cx="150" cy="530" r="180" fill="#1e3a5f" opacity="0.3"/>
+  <circle cx="1100" cy="580" r="120" fill="#C9A227" opacity="0.05"/>
+
+  <!-- Gold accent bar -->
+  <rect x="80" y="280" width="6" height="120" rx="3" fill="url(#gold)"/>
+
+  <!-- Logo icon (bar chart) -->
+  <g transform="translate(80, 100)">
+    <rect x="0" y="0" width="80" height="80" rx="18" fill="url(#gold)"/>
+    <rect x="14" y="50" width="12" height="18" rx="3" fill="white" opacity="0.8"/>
+    <rect x="32" y="38" width="12" height="30" rx="3" fill="white" opacity="0.9"/>
+    <rect x="50" y="22" width="12" height="46" rx="3" fill="white"/>
+  </g>
+
+  <!-- Brand name -->
+  <text x="176" y="157" font-family="Arial, sans-serif" font-size="64" font-weight="900" fill="white" letter-spacing="-1">Philix Finance</text>
+
+  <!-- Tagline -->
+  <text x="86" y="200" font-family="Arial, sans-serif" font-size="22" fill="#C9A227" font-weight="500" letter-spacing="2">CREATING A FUTURE TOGETHER</text>
+
+  <!-- Divider -->
+  <rect x="86" y="230" width="400" height="1" fill="#1e3a5f"/>
+
+  <!-- Main headline -->
+  <text x="86" y="310" font-family="Arial, sans-serif" font-size="46" font-weight="800" fill="white">Fast Loans in Zambia.</text>
+  <text x="86" y="368" font-family="Arial, sans-serif" font-size="46" font-weight="800" fill="url(#gold)">Apply Online in Minutes.</text>
+
+  <!-- Description -->
+  <text x="86" y="430" font-family="Arial, sans-serif" font-size="24" fill="#94a3b8">Personal · Salary · Business · Student Loans</text>
+  <text x="86" y="470" font-family="Arial, sans-serif" font-size="22" fill="#64748b">Bank of Zambia Licensed  ·  Serving Lusaka &amp; Beyond</text>
+
+  <!-- CTA pill -->
+  <rect x="86" y="510" width="260" height="60" rx="30" fill="url(#gold)"/>
+  <text x="216" y="549" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#0B1F3A" text-anchor="middle">Apply Now →</text>
+
+  <!-- Right illustration: abstract loan flow -->
+  <g transform="translate(750, 180)">
+    <rect x="0" y="0" width="360" height="60" rx="12" fill="#1e3a5f"/>
+    <text x="20" y="38" font-family="Arial, sans-serif" font-size="18" fill="#64748b">Loan Amount</text>
+    <text x="280" y="38" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#C9A227" text-anchor="end">K 15,000</text>
+
+    <rect x="0" y="80" width="360" height="60" rx="12" fill="#1e3a5f"/>
+    <text x="20" y="118" font-family="Arial, sans-serif" font-size="18" fill="#64748b">Interest Rate</text>
+    <text x="280" y="118" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#10b981" text-anchor="end">20% flat</text>
+
+    <rect x="0" y="160" width="360" height="60" rx="12" fill="#1e3a5f"/>
+    <text x="20" y="198" font-family="Arial, sans-serif" font-size="18" fill="#64748b">Repayment</text>
+    <text x="280" y="198" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="white" text-anchor="end">12 weeks</text>
+
+    <rect x="0" y="240" width="360" height="60" rx="12" fill="#1e3a5f"/>
+    <text x="20" y="278" font-family="Arial, sans-serif" font-size="18" fill="#64748b">Decision in</text>
+    <text x="280" y="278" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#F5A623" text-anchor="end">24–48 hours</text>
+
+    <!-- Status approved badge -->
+    <rect x="60" y="330" width="240" height="50" rx="25" fill="#065f46"/>
+    <text x="180" y="363" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#10b981" text-anchor="middle">✓ APPROVED</text>
+  </g>
+</svg>

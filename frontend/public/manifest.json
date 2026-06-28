@@ -1,23 +1,51 @@
 {
   "name": "Philix Finance",
   "short_name": "Philix",
-  "description": "Philix Finance — Creating A Future Together. Apply for loans, track repayments, and manage your account.",
-  "start_url": "/portal",
+  "description": "Fast loans & financial services in Zambia. Apply online in minutes. Bank of Zambia licensed.",
+  "start_url": "/portal/dashboard",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#020617",
   "theme_color": "#0B1F3A",
   "orientation": "portrait-primary",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["finance", "business"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/logo-icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ],
-  "categories": ["finance", "business"],
-  "lang": "en",
-  "dir": "ltr",
-  "scope": "/",
-  "prefer_related_applications": false
+  "shortcuts": [
+    {
+      "name": "Apply for a Loan",
+      "short_name": "Apply",
+      "description": "Start a new loan application",
+      "url": "/portal/apply",
+      "icons": [{ "src": "/logo-icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "My Loans",
+      "short_name": "Loans",
+      "description": "View my active loans",
+      "url": "/portal/loans",
+      "icons": [{ "src": "/logo-icon.svg", "sizes": "any" }]
+    }
+  ]
 }

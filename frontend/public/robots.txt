@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+
+# Block internal app routes from indexing
+Disallow: /portal/
+Disallow: /api/
+Disallow: /ceo
+Disallow: /users
+Disallow: /audit
+Disallow: /settings
+
+# Allow public-facing portal pages
+Allow: /portal/register
+Allow: /portal/login
+Allow: /login
+
+Sitemap: https://philixfinance.com/sitemap.xml
