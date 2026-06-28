@@ -79,3 +79,75 @@ info: Database connected successfully {"timestamp":"2026-06-26T08:56:55.292Z"}
 info: Cron jobs registered (daily at 08:00 CAT) {"timestamp":"2026-06-26T08:56:55.506Z"}
 info: Philix Finance API running on port 4000 {"timestamp":"2026-06-26T08:56:55.516Z"}
 info: Environment: development {"timestamp":"2026-06-26T08:56:55.517Z"}
+info: Database connected successfully {"timestamp":"2026-06-26T17:13:15.995Z"}
+info: Cron jobs registered (daily at 08:00 CAT) {"timestamp":"2026-06-26T17:13:16.137Z"}
+info: Philix Finance API running on port 4000 {"timestamp":"2026-06-26T17:13:16.143Z"}
+info: Environment: development {"timestamp":"2026-06-26T17:13:16.143Z"}
+info: Database connected successfully {"timestamp":"2026-06-26T17:13:57.331Z"}
+info: Cron jobs registered (daily at 08:00 CAT) {"timestamp":"2026-06-26T17:13:57.433Z"}
+info: Philix Finance API running on port 4000 {"timestamp":"2026-06-26T17:13:57.441Z"}
+info: Environment: development {"timestamp":"2026-06-26T17:13:57.447Z"}
+info: Database connected successfully {"timestamp":"2026-06-26T17:14:41.170Z"}
+info: Cron jobs registered (daily at 08:00 CAT) {"timestamp":"2026-06-26T17:14:41.262Z"}
+info: Philix Finance API running on port 4000 {"timestamp":"2026-06-26T17:14:41.273Z"}
+info: Environment: development {"timestamp":"2026-06-26T17:14:41.274Z"}
+info: Database connected successfully {"timestamp":"2026-06-26T17:15:26.058Z"}
+info: Cron jobs registered (08:00 reminders, 09:00 doc expiry — CAT) {"timestamp":"2026-06-26T17:15:26.146Z"}
+info: Philix Finance API running on port 4000 {"timestamp":"2026-06-26T17:15:26.173Z"}
+info: Environment: development {"timestamp":"2026-06-26T17:15:26.173Z"}
+info: Database connected successfully {"timestamp":"2026-06-26T17:15:47.339Z"}
+info: Cron jobs registered (08:00 reminders, 09:00 doc expiry — CAT) {"timestamp":"2026-06-26T17:15:47.457Z"}
+info: Philix Finance API running on port 4000 {"timestamp":"2026-06-26T17:15:47.462Z"}
+info: Environment: development {"timestamp":"2026-06-26T17:15:47.462Z"}
+info: Database connected successfully {"timestamp":"2026-06-26T17:16:00.195Z"}
+info: Cron jobs registered (08:00 reminders, 09:00 doc expiry — CAT) {"timestamp":"2026-06-26T17:16:00.295Z"}
+info: Philix Finance API running on port 4000 {"timestamp":"2026-06-26T17:16:00.303Z"}
+info: Environment: development {"timestamp":"2026-06-26T17:16:00.304Z"}
+info: Database connected successfully {"timestamp":"2026-06-26T17:23:48.700Z"}
+info: Cron jobs registered (08:00 reminders, 09:00 doc expiry — CAT) {"timestamp":"2026-06-26T17:23:48.881Z"}
+info: Philix Finance API running on port 4000 {"timestamp":"2026-06-26T17:23:48.902Z"}
+info: Environment: development {"timestamp":"2026-06-26T17:23:48.902Z"}
+info: Database connected successfully {"timestamp":"2026-06-26T17:24:08.362Z"}
+info: Cron jobs registered (08:00 reminders, 09:00 doc expiry — CAT) {"timestamp":"2026-06-26T17:24:08.508Z"}
+info: Philix Finance API running on port 4000 {"timestamp":"2026-06-26T17:24:08.514Z"}
+info: Environment: development {"timestamp":"2026-06-26T17:24:08.515Z"}
+info: Database connected successfully {"timestamp":"2026-06-27T12:57:43.509Z"}
+info: Cron jobs registered (08:00 reminders, 09:00 doc expiry — CAT) {"timestamp":"2026-06-27T12:57:43.675Z"}
+info: Philix Finance API running on port 4000 {"timestamp":"2026-06-27T12:57:43.681Z"}
+info: Environment: development {"timestamp":"2026-06-27T12:57:43.682Z"}
+info: Database connected successfully {"timestamp":"2026-06-27T13:02:51.422Z"}
+info: Cron jobs registered (08:00 reminders, 09:00 doc expiry — CAT) {"timestamp":"2026-06-27T13:02:51.690Z"}
+info: Philix Finance API running on port 4000 {"timestamp":"2026-06-27T13:02:51.706Z"}
+info: Environment: development {"timestamp":"2026-06-27T13:02:51.706Z"}
+info: Database connected successfully {"timestamp":"2026-06-27T13:33:42.570Z"}
+info: Cron jobs registered (08:00 reminders, 09:00 doc expiry — CAT) {"timestamp":"2026-06-27T13:33:42.767Z"}
+info: Philix Finance API running on port 4000 {"timestamp":"2026-06-27T13:33:42.774Z"}
+info: Environment: development {"timestamp":"2026-06-27T13:33:42.774Z"}
+info: Database connected successfully {"timestamp":"2026-06-27T14:31:15.292Z"}
+info: Cron jobs registered (08:00 reminders, 09:00 doc expiry — CAT) {"timestamp":"2026-06-27T14:31:15.476Z"}
+info: Philix Finance API running on port 4000 {"timestamp":"2026-06-27T14:31:15.482Z"}
+info: Environment: development {"timestamp":"2026-06-27T14:31:15.482Z"}
+info: Database connected successfully {"timestamp":"2026-06-27T14:33:22.294Z"}
+info: Cron jobs registered (08:00 reminders, 09:00 doc expiry — CAT) {"timestamp":"2026-06-27T14:33:22.441Z"}
+info: Philix Finance API running on port 4000 {"timestamp":"2026-06-27T14:33:22.446Z"}
+info: Environment: development {"timestamp":"2026-06-27T14:33:22.447Z"}
+info: Database connected successfully {"timestamp":"2026-06-27T14:48:14.761Z"}
+info: Cron jobs registered (08:00 reminders, 09:00 doc expiry — CAT) {"timestamp":"2026-06-27T14:48:14.877Z"}
+info: Philix Finance API running on port 4000 {"timestamp":"2026-06-27T14:48:14.884Z"}
+info: Environment: development {"timestamp":"2026-06-27T14:48:14.885Z"}
+info: Database connected successfully {"timestamp":"2026-06-27T14:49:08.281Z"}
+info: Cron jobs registered (08:00 reminders, 09:00 doc expiry — CAT) {"timestamp":"2026-06-27T14:49:08.404Z"}
+info: Philix Finance API running on port 4000 {"timestamp":"2026-06-27T14:49:08.429Z"}
+info: Environment: development {"timestamp":"2026-06-27T14:49:08.431Z"}
+info: Database connected successfully {"timestamp":"2026-06-27T17:17:40.834Z"}
+info: Cron jobs registered (08:00 reminders, 09:00 doc expiry — CAT) {"timestamp":"2026-06-27T17:17:40.943Z"}
+info: Philix Finance API running on port 4000 {"timestamp":"2026-06-27T17:17:40.957Z"}
+info: Environment: development {"timestamp":"2026-06-27T17:17:40.958Z"}
+info: Database connected successfully {"timestamp":"2026-06-28T08:00:28.220Z"}
+info: Cron jobs registered (08:00 reminders, 09:00 doc expiry — CAT) {"timestamp":"2026-06-28T08:00:28.338Z"}
+info: Philix Finance API running on port 4000 {"timestamp":"2026-06-28T08:00:28.347Z"}
+info: Environment: development {"timestamp":"2026-06-28T08:00:28.349Z"}
+info: Database connected successfully {"timestamp":"2026-06-28T09:31:46.423Z"}
+info: Cron jobs registered (08:00 reminders, 09:00 doc expiry — CAT) {"timestamp":"2026-06-28T09:31:46.579Z"}
+info: Philix Finance API running on port 4000 {"timestamp":"2026-06-28T09:31:46.586Z"}
+info: Environment: development {"timestamp":"2026-06-28T09:31:46.587Z"}

@@ -72,6 +72,8 @@ const navGroups: NavGroup[] = [
       { href: "/client-credit-scores", icon: TrendingUp,    label: "Credit Scores",      roles: ["SUPER_ADMIN", "MANAGER", "LOAN_OFFICER", "ACCOUNTANT"] },
       { href: "/fraud-alerts",         icon: ShieldAlert,   label: "Fraud Detection" },
       { href: "/default-risk",         icon: TrendingDown,  label: "Default Risk" },
+      { href: "/loan-aging",           icon: Clock,         label: "Loan Aging (PAR)",   badge: "NEW", badgeColor: "bg-red-600 text-white" },
+      { href: "/daily-collection",     icon: Calendar,      label: "Daily Collections",  badge: "NEW", badgeColor: "bg-emerald-600 text-white" },
     ],
   },
   {
@@ -127,6 +129,14 @@ const navGroups: NavGroup[] = [
       { href: "/sms-notifications", icon: MessageSquare,  label: "SMS Notifications" },
       { href: "/mobile-money",      icon: Smartphone,     label: "Mobile Money" },
       { href: "/whatsapp",          icon: MessageCircle,  label: "WhatsApp Business" },
+    ],
+  },
+  {
+    label: "Loan Tracking",
+    items: [
+      { href: "/loan-pipeline",          icon: GitBranch,    label: "Loan Pipeline",       badge: "NEW", badgeColor: "bg-indigo-600 text-white" },
+      { href: "/collection-performance", icon: BarChart2,    label: "Collection Performance", badge: "NEW", badgeColor: "bg-indigo-600 text-white" },
+      { href: "/bulk-payment-import",    icon: Upload,       label: "Bulk Payment Import", badge: "NEW", badgeColor: "bg-amber-600 text-white" },
     ],
   },
   {

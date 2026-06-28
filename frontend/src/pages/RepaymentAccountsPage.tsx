@@ -383,19 +383,54 @@ export default function RepaymentAccountsPage() {
   };
 
   const exportCSV = () => {
-    const headers = ["Loan ID","Client","Email","Phone","Principal","Interest","Total Due","Paid","Remaining","Status","Due Date","Health"];
-    const rows = accounts.map(a => [
-      a.reference, `${a.account.firstName} ${a.account.lastName}`,
-      a.account.email, a.account.phone,
-      a.principal, a.interest, a.totalDue, a.totalPaid, a.remaining,
-      a.status, a.dueDate, a.health,
-    ]);
-    const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
+    // Format matching the Philix Finance Google Sheets repayment records format
+    const headers = [
+      "Loan ID", "Borrower Name", "Email Address", "Phone Number", "Loan Type",
+      "Collateral Details", "Loan Start Date", "Loan Maturity Date",
+      "Loan Amount", "Loan Duration (weeks)", "Interest Rate (%)",
+      "Total Interest Amount", "Total Repayment Amount",
+      "Paid Amount", "Remaining Balance", "Payment Status", "Days Until Maturity",
+    ];
+    const now = new Date();
+    const rows = accounts.map(a => {
+      const daysLeftNum = a.dueDate
+        ? Math.ceil((new Date(a.dueDate).getTime() - now.getTime()) / 86400000)
+        : null;
+      const daysLeft = daysLeftNum !== null ? daysLeftNum : "";
+      const paymentStatus = a.remaining <= 0 ? "Paid" : (daysLeftNum !== null && daysLeftNum < 0) ? "Overdue" : "Pending";
+      // Escape commas in values
+      const esc = (v: string | number) => {
+        const s = String(v ?? "");
+        return s.includes(",") ? `"${s}"` : s;
+      };
+      return [
+        esc(a.reference),
+        esc(`${a.account.firstName} ${a.account.lastName}`),
+        esc(a.account.email),
+        esc(a.account.phone ?? ""),
+        esc(a.productType?.replace(/_/g, " ") ?? ""),
+        esc((a as unknown as { collateralDetails?: string }).collateralDetails ?? "TRUSTED"),
+        esc(a.startDate ?? ""),
+        esc(a.dueDate ?? ""),
+        a.principal,
+        a.termWeeks ?? "",
+        a.rate ?? "",
+        a.interest,
+        a.totalDue,
+        a.totalPaid,
+        a.remaining,
+        esc(paymentStatus),
+        daysLeft,
+      ];
+    });
+    const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }); // BOM for Excel
     const url  = URL.createObjectURL(blob);
-    const a    = document.createElement("a");
-    a.href = url; a.download = `philix-accounts-${new Date().toISOString().split("T")[0]}.csv`;
-    a.click(); URL.revokeObjectURL(url);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `Philix-Repayment-Records-${new Date().toISOString().split("T")[0]}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   };
 
   return (

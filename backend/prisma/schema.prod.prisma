@@ -471,3 +471,15 @@ model CreditScoreLog {
 
   @@index([accountId])
 }
+
+model ContactAttempt {
+  id          String   @id @default(uuid())
+  loanRef     String
+  accountId   String
+  contactedBy String
+  method      String   // call|sms|email|visit
+  notes       String?
+  createdAt   DateTime @default(now())
+  @@index([loanRef])
+  @@index([accountId])
+}

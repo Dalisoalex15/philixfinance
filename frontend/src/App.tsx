@@ -107,6 +107,23 @@ import RepaymentAccountsPage from "./pages/RepaymentAccountsPage";
 import FinancialControlsPage from "./pages/FinancialControlsPage";
 import LoanProductRatesPage from "./pages/LoanProductRatesPage";
 import ClientCreditScoresPage from "./pages/ClientCreditScoresPage";
+// New staff feature pages
+import LoanAgingReportPage from "./pages/LoanAgingReportPage";
+import DailyCollectionSheetPage from "./pages/DailyCollectionSheetPage";
+import LoanPipelinePage from "./pages/LoanPipelinePage";
+import CollectionPerformancePage from "./pages/CollectionPerformancePage";
+import BulkPaymentImportPage from "./pages/BulkPaymentImportPage";
+import ClientVisitSchedulerPage from "./pages/ClientVisitSchedulerPage";
+import DisbursementChecklistPage from "./pages/DisbursementChecklistPage";
+import DocumentExpiryAlertsPage from "./pages/DocumentExpiryAlertsPage";
+import QuickLoanLookupPage from "./pages/QuickLoanLookupPage";
+import StaffPerformanceDashboardPage from "./pages/StaffPerformanceDashboardPage";
+// New client portal pages
+import PaymentCalendarPage from "./pages/portal/PaymentCalendarPage";
+import AccountStatementPage from "./pages/portal/AccountStatementPage";
+import LoanRenewalPage from "./pages/portal/LoanRenewalPage";
+import DocumentCenterPage from "./pages/portal/DocumentCenterPage";
+import ClientSupportPage from "./pages/portal/ClientSupportPage";
 
 class RouteErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -247,8 +264,13 @@ export default function App() {
           <Route path="support"      element={<RouteErrorBoundary><SupportPage /></RouteErrorBoundary>} />
           <Route path="eligibility"  element={<RouteErrorBoundary><EligibilityPage /></RouteErrorBoundary>} />
           <Route path="credit-score" element={<RouteErrorBoundary><CreditScorePage /></RouteErrorBoundary>} />
-          <Route path="invest"       element={<RouteErrorBoundary><InvestPage /></RouteErrorBoundary>} />
-          <Route path="products"     element={<RouteErrorBoundary><LoanProductsPortalPage /></RouteErrorBoundary>} />
+          <Route path="invest"            element={<RouteErrorBoundary><InvestPage /></RouteErrorBoundary>} />
+          <Route path="products"          element={<RouteErrorBoundary><LoanProductsPortalPage /></RouteErrorBoundary>} />
+          <Route path="payment-calendar"  element={<RouteErrorBoundary><PaymentCalendarPage /></RouteErrorBoundary>} />
+          <Route path="account-statement" element={<RouteErrorBoundary><AccountStatementPage /></RouteErrorBoundary>} />
+          <Route path="renew"             element={<RouteErrorBoundary><LoanRenewalPage /></RouteErrorBoundary>} />
+          <Route path="documents"         element={<RouteErrorBoundary><DocumentCenterPage /></RouteErrorBoundary>} />
+          <Route path="help"              element={<RouteErrorBoundary><ClientSupportPage /></RouteErrorBoundary>} />
         </Route>
         <Route
           path="/"
@@ -339,6 +361,17 @@ export default function App() {
           <Route path="financial-controls" element={<FinancialControlsPage />} />
           <Route path="loan-product-rates" element={<LoanProductRatesPage />} />
           <Route path="client-credit-scores" element={<ClientCreditScoresPage />} />
+          {/* New staff feature pages */}
+          <Route path="loan-aging" element={<RouteErrorBoundary><LoanAgingReportPage /></RouteErrorBoundary>} />
+          <Route path="daily-collection" element={<RouteErrorBoundary><DailyCollectionSheetPage /></RouteErrorBoundary>} />
+          <Route path="loan-pipeline" element={<RouteErrorBoundary><LoanPipelinePage /></RouteErrorBoundary>} />
+          <Route path="collection-performance" element={<RouteErrorBoundary><CollectionPerformancePage /></RouteErrorBoundary>} />
+          <Route path="bulk-payment-import" element={<RouteErrorBoundary><BulkPaymentImportPage /></RouteErrorBoundary>} />
+          <Route path="client-visits" element={<RouteErrorBoundary><ClientVisitSchedulerPage /></RouteErrorBoundary>} />
+          <Route path="disbursement-checklist" element={<RouteErrorBoundary><DisbursementChecklistPage /></RouteErrorBoundary>} />
+          <Route path="document-expiry-alerts" element={<RouteErrorBoundary><DocumentExpiryAlertsPage /></RouteErrorBoundary>} />
+          <Route path="quick-lookup" element={<RouteErrorBoundary><QuickLoanLookupPage /></RouteErrorBoundary>} />
+          <Route path="staff-performance" element={<RouteErrorBoundary><StaffPerformanceDashboardPage /></RouteErrorBoundary>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

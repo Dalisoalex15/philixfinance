@@ -1,13 +1,19 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, memo } from "react";
 import {
   DollarSign, TrendingUp, CheckCircle, Users,
   Zap, ArrowUpRight, Crown, Clock, XCircle, Activity, FileText,
   ThumbsUp, ThumbsDown, Banknote, RefreshCw, BarChart2, Trash2, ShieldOff, ShieldCheck,
   Bell, AlertTriangle, UserPlus, CreditCard,
+  Mail, Send, TrendingDown, PhoneCall, MapPin, X, ChevronRight, Loader2,
 } from "lucide-react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from "recharts";
 import { formatKwacha } from "../lib/mock-data";
 import { useLoanApplicationStore } from "../store/loanApplicationStore";
 import { staffApi } from "../lib/api";
+
+const fmtK = (n: number) => "K" + Number(n ?? 0).toLocaleString("en-ZM", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 interface ActivityEvent {
   id: string;
@@ -40,6 +46,48 @@ interface PortalAccount {
   createdAt: string;
   _count?: { loanApplications: number };
 }
+
+interface DashboardSummary {
+  loans_issued: number;
+  principal_disbursed: number;
+  total_paid_back: number;
+  interest_collected: number;
+  outstanding_balance: number;
+  total_in_default: number;
+  default_loan_count: number;
+  paid_trend_pct: number;
+  cached_at: string;
+}
+
+interface DefaultLoan {
+  id: string;
+  reference: string;
+  clientName: string;
+  clientNumber: string;
+  email: string;
+  phone: string;
+  productType: string;
+  principal: number;
+  totalDue: number;
+  totalPaid: number;
+  remaining: number;
+  daysOverdue: number;
+  lastPaymentDate: string | null;
+}
+
+interface InterestMonth {
+  month: string;
+  interest_billed: number;
+  interest_collected: number;
+}
+
+const SkeletonTile = () => (
+  <div className="philix-card p-5 animate-pulse">
+    <div className="h-3 bg-gray-200 rounded w-24 mb-4" />
+    <div className="h-7 bg-gray-200 rounded w-32 mb-2" />
+    <div className="h-2 bg-gray-100 rounded w-20" />
+  </div>
+);
 
 const EVENT_ICONS: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
   APPLICATION_SUBMITTED: { icon: FileText,    color: "text-blue-700",    bg: "bg-blue-100" },
@@ -90,6 +138,22 @@ export default function CEODashboardPage() {
   const [statementsMsg, setStatementsMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [defaults, setDefaults] = useState<{ data: DefaultLoan[]; total: number; totalAmount: number; avgDaysOverdue: number } | null>(null);
+  const [defaultsLoading, setDefaultsLoading] = useState(false);
+  const [interestData, setInterestData] = useState<InterestMonth[]>([]);
+  const [interestLoading, setInterestLoading] = useState(false);
+  const [contactingLoan, setContactingLoan] = useState<string | null>(null);
+  const [emailModal, setEmailModal] = useState(false);
+  const [emailSearch, setEmailSearch] = useState("");
+  const [emailSearchResults, setEmailSearchResults] = useState<{ id: string; name: string; email: string }[]>([]);
+  const [emailTemplate, setEmailTemplate] = useState("custom");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailResult, setEmailResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const [defaultsPage, setDefaultsPage] = useState(0);
 
   const fetchAlerts = useCallback(async () => {
     setAlertsLoading(true);
@@ -100,6 +164,80 @@ export default function CEODashboardPage() {
     } catch { /* ignore */ }
     finally { setAlertsLoading(false); }
   }, []);
+
+  const fetchSummary = useCallback(async () => {
+    setSummaryLoading(true);
+    try {
+      const token = localStorage.getItem("philix_staff_token");
+      const r = await fetch("/api/dashboard/summary", { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (r.ok) setSummary(await r.json());
+    } catch { /* ignore */ }
+    finally { setSummaryLoading(false); }
+  }, []);
+
+  const fetchDefaults = useCallback(async (page = 0) => {
+    setDefaultsLoading(true);
+    try {
+      const token = localStorage.getItem("philix_staff_token");
+      const r = await fetch(`/api/dashboard/defaults?limit=25&offset=${page * 25}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (r.ok) setDefaults(await r.json());
+    } catch { /* ignore */ }
+    finally { setDefaultsLoading(false); }
+  }, []);
+
+  const fetchInterest = useCallback(async () => {
+    setInterestLoading(true);
+    try {
+      const token = localStorage.getItem("philix_staff_token");
+      const r = await fetch("/api/dashboard/interest-summary?months=6", { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (r.ok) setInterestData(await r.json());
+    } catch { /* ignore */ }
+    finally { setInterestLoading(false); }
+  }, []);
+
+  const markContacted = async (loan: DefaultLoan, method: string) => {
+    setContactingLoan(loan.id);
+    try {
+      const token = localStorage.getItem("philix_staff_token");
+      await fetch("/api/dashboard/contact-attempt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
+        body: JSON.stringify({ loanRef: loan.reference, accountId: loan.id, method, notes: `Contacted via ${method}` }),
+      });
+    } catch { /* ignore */ }
+    finally { setContactingLoan(null); }
+  };
+
+  const searchEmailClients = useCallback(async (q: string) => {
+    if (q.length < 2) { setEmailSearchResults([]); return; }
+    try {
+      const token = localStorage.getItem("philix_staff_token");
+      const r = await fetch(`/api/emails/clients/search?q=${encodeURIComponent(q)}&limit=5`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (r.ok) {
+        const data = await r.json();
+        setEmailSearchResults(data.map((c: { id: string; firstName: string; lastName: string; email: string }) => ({
+          id: c.id, name: `${c.firstName} ${c.lastName}`, email: c.email,
+        })));
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  const sendQuickEmail = async () => {
+    if (!emailSubject || !emailBody) return;
+    setEmailSending(true); setEmailResult(null);
+    try {
+      const token = localStorage.getItem("philix_staff_token");
+      const r = await fetch("/api/emails/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
+        body: JSON.stringify({ to: emailSearch, subject: emailSubject, templateKey: "custom", params: { subject: emailSubject, body: emailBody } }),
+      });
+      const d = await r.json();
+      if (r.ok) { setEmailResult({ ok: true, text: "Email sent successfully!" }); setEmailSubject(""); setEmailBody(""); setEmailSearch(""); }
+      else { setEmailResult({ ok: false, text: d.error || "Failed to send" }); }
+    } catch { setEmailResult({ ok: false, text: "Network error" }); }
+    finally { setEmailSending(false); }
+  };
 
   const fetchActivity = useCallback(async () => {
     setActivityLoading(true);
@@ -139,13 +277,19 @@ export default function CEODashboardPage() {
 
   useEffect(() => {
     syncFromApi();
-    fetchActivity();
-    fetchPortalAccounts();
+    fetchSummary();
     fetchAlerts();
-    const activityInterval = setInterval(() => { syncFromApi(); fetchActivity(); fetchAlerts(); }, 30000);
+    // Lazy-load heavier data after the summary tiles render
+    const lazyTimer = setTimeout(() => {
+      fetchActivity();
+      fetchPortalAccounts();
+      fetchDefaults();
+      fetchInterest();
+    }, 120);
+    const activityInterval = setInterval(() => { syncFromApi(); fetchActivity(); fetchAlerts(); fetchSummary(); }, 60000);
     const clockInterval = setInterval(() => setClockTime(new Date()), 1000);
-    return () => { clearInterval(activityInterval); clearInterval(clockInterval); };
-  }, [fetchActivity, fetchPortalAccounts, fetchAlerts]);
+    return () => { clearTimeout(lazyTimer); clearInterval(activityInterval); clearInterval(clockInterval); };
+  }, [fetchActivity, fetchPortalAccounts, fetchAlerts, fetchSummary, fetchDefaults, fetchInterest]);
 
   const pendingApps = applications.filter(a => a.status === "PENDING" || a.status === "UNDER_REVIEW");
 
@@ -219,8 +363,100 @@ export default function CEODashboardPage() {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5);
 
+  // Interest collection rate this month
+  const lastInterestMonth = interestData[interestData.length - 1];
+  const interestCollectionRate = lastInterestMonth && lastInterestMonth.interest_billed > 0
+    ? Math.round((lastInterestMonth.interest_collected / lastInterestMonth.interest_billed) * 100)
+    : 0;
+
   return (
     <div className="space-y-6">
+
+      {/* ── 6 FINANCIAL SUMMARY TILES ─────────────────────────────────────────── */}
+      {summaryLoading ? (
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          {[...Array(6)].map((_, i) => <SkeletonTile key={i} />)}
+        </div>
+      ) : summary ? (
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          {([
+            { label: "LOANS ISSUED",          value: String(summary.loans_issued),                  sub: "All time",             icon: CreditCard,   color: "bg-indigo-100 text-indigo-700" },
+            { label: "PRINCIPAL DISBURSED",   value: fmtK(summary.principal_disbursed),             sub: "Total loaned out",     icon: Banknote,     color: "bg-emerald-100 text-emerald-700" },
+            { label: "TOTAL PAID BACK",       value: fmtK(summary.total_paid_back),                 sub: `${summary.paid_trend_pct >= 0 ? "+" : ""}${summary.paid_trend_pct}% vs last month`, icon: CheckCircle, color: "bg-teal-100 text-teal-700" },
+            { label: "INTEREST COLLECTED",    value: fmtK(summary.interest_collected),              sub: "Net interest income",  icon: TrendingUp,   color: "bg-amber-100 text-amber-700" },
+            { label: "OUTSTANDING BALANCE",   value: fmtK(summary.outstanding_balance),             sub: "Active loan book",     icon: DollarSign,   color: "bg-blue-100 text-blue-700" },
+            { label: "TOTAL IN DEFAULT",      value: fmtK(summary.total_in_default),                sub: `${summary.default_loan_count} loan${summary.default_loan_count !== 1 ? "s" : ""} overdue 30+ days`, icon: AlertTriangle, color: "bg-red-100 text-red-700" },
+          ] as { label: string; value: string; sub: string; icon: React.ElementType; color: string }[]).map((tile) => (
+            <div key={tile.label} className={`philix-card p-4 ${tile.label === "TOTAL IN DEFAULT" && summary.default_loan_count > 0 ? "border-red-300 bg-red-50/50" : ""}`}>
+              <div className="flex items-center gap-1.5 mb-2">
+                <div className={`p-1.5 rounded-lg ${tile.color}`}><tile.icon size={13} /></div>
+                <span className="text-[9px] font-bold tracking-widest text-navy-500 uppercase">{tile.label}</span>
+              </div>
+              <div className="text-lg font-bold font-mono text-navy-900 leading-tight truncate">{tile.value}</div>
+              <div className={`text-[10px] mt-1 ${tile.label === "TOTAL IN DEFAULT" && summary.default_loan_count > 0 ? "text-red-600 font-semibold" : "text-navy-500"}`}>{tile.sub}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {/* ── EMAIL QUICK-SEND ─────────────────────────────────────────────────── */}
+      <div className="philix-card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="section-title flex items-center gap-2"><Mail size={16} className="text-[#C9A227]" />Quick Email Send</h3>
+          <a href="/email-centre" className="text-xs text-indigo-600 hover:underline flex items-center gap-1 font-semibold">Full Email Centre <ChevronRight size={12} /></a>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-[10px] font-semibold text-navy-600 uppercase tracking-wide mb-1">To (email or client name)</label>
+            <div className="relative">
+              <input
+                value={emailSearch}
+                onChange={e => { setEmailSearch(e.target.value); searchEmailClients(e.target.value); }}
+                placeholder="Search client or type email…"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#C9A227]"
+              />
+              {emailSearchResults.length > 0 && (
+                <div className="absolute z-10 top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-40 overflow-y-auto">
+                  {emailSearchResults.map(r => (
+                    <button key={r.id} onClick={() => { setEmailSearch(r.email); setEmailSearchResults([]); }}
+                      className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm border-b border-gray-100 last:border-0">
+                      <div className="font-medium text-navy-900">{r.name}</div>
+                      <div className="text-xs text-gray-500">{r.email}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold text-navy-600 uppercase tracking-wide mb-1">Subject</label>
+            <input value={emailSubject} onChange={e => setEmailSubject(e.target.value)}
+              placeholder="Email subject…"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#C9A227]"
+            />
+          </div>
+          <div className="flex items-end">
+            <button onClick={sendQuickEmail} disabled={emailSending || !emailSearch || !emailSubject || !emailBody}
+              className="w-full flex items-center justify-center gap-2 py-2 bg-[#0B1F3A] hover:bg-[#1a3560] text-white text-sm font-semibold rounded-lg transition-all disabled:opacity-40">
+              {emailSending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              {emailSending ? "Sending…" : "Send Email"}
+            </button>
+          </div>
+        </div>
+        <div className="mt-2">
+          <textarea value={emailBody} onChange={e => setEmailBody(e.target.value)}
+            placeholder="Email message body…"
+            rows={3}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#C9A227] resize-none"
+          />
+        </div>
+        {emailResult && (
+          <div className={`mt-2 text-xs px-3 py-2 rounded-lg ${emailResult.ok ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+            {emailResult.text}
+          </div>
+        )}
+      </div>
+
       {/* CEO Welcome */}
       <div className="flex items-center justify-between">
         <div>
@@ -786,23 +1022,165 @@ export default function CEODashboardPage() {
         )}
       </div>
 
-      {/* Financial Metrics — Launching Soon */}
-      <div className="philix-card p-6">
-        <div className="flex items-start gap-3">
-          <div className="p-2 rounded-lg bg-indigo-100 text-indigo-700 flex-shrink-0">
-            <BarChart2 size={18} />
-          </div>
+      {/* ── DEFAULTS TRACKING ────────────────────────────────────────────────── */}
+      <div className="philix-card p-5">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="section-title mb-1">Financial Metrics — Launching Soon</h3>
-            <p className="text-sm text-navy-600">
-              Revenue, collections, PAR, and P&amp;L data will appear here automatically as loans are issued and repayments are recorded.
+            <h3 className="section-title flex items-center gap-2">
+              <TrendingDown size={16} className="text-red-500" />
+              Default Tracker — 30+ Days Overdue
+            </h3>
+            <p className="text-xs text-navy-600 mt-0.5">
+              {defaults ? `${defaults.total} loans in default — total K${(defaults.totalAmount ?? 0).toLocaleString()} at risk — avg ${defaults.avgDaysOverdue} days overdue` : "Loading…"}
             </p>
-            <p className="text-xs text-navy-500 mt-2">
-              Once the first loan is disbursed and repayments begin, you'll see monthly P&amp;L charts, portfolio-at-risk gauges,
-              campus performance breakdowns, top collector leaderboards, and projected metrics — all derived from live data.
-            </p>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => fetchDefaults(defaultsPage)} disabled={defaultsLoading}
+              className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 flex items-center gap-1 hover:bg-gray-50">
+              <RefreshCw size={11} className={defaultsLoading ? "animate-spin" : ""} /> Refresh
+            </button>
+            <a href="/default-risk" className="text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg px-3 py-1.5 font-semibold">Full Report →</a>
           </div>
         </div>
+        {defaultsLoading && !defaults ? (
+          <div className="py-8 text-center text-sm text-navy-400"><Loader2 size={16} className="animate-spin inline mr-2" />Loading defaults…</div>
+        ) : !defaults || defaults.data.length === 0 ? (
+          <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+            <CheckCircle size={18} className="text-emerald-600 flex-shrink-0" />
+            <span className="text-sm text-emerald-700 font-medium">No loans in default — all active loans are within 30 days.</span>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-[#0B1F3A] text-white text-xs">
+                    {["Client", "Loan Ref", "Product", "Principal", "Total Owed", "Paid", "Days Overdue", "Last Payment", "Action"].map(h => (
+                      <th key={h} className="text-left px-3 py-2.5 font-semibold">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {defaults.data.map((loan, i) => (
+                    <tr key={loan.id} className={`border-t border-gray-100 ${i % 2 === 0 ? "bg-white" : "bg-red-50/30"}`}>
+                      <td className="px-3 py-2.5">
+                        <div className="font-semibold text-navy-900 text-xs">{loan.clientName}</div>
+                        <div className="text-[10px] text-gray-400 font-mono">{loan.clientNumber}</div>
+                      </td>
+                      <td className="px-3 py-2.5 font-mono text-xs text-navy-600">{loan.reference}</td>
+                      <td className="px-3 py-2.5 text-xs text-gray-600">{loan.productType?.replace(/_/g, " ")}</td>
+                      <td className="px-3 py-2.5 font-mono text-xs font-semibold">{fmtK(loan.principal)}</td>
+                      <td className="px-3 py-2.5 font-mono text-xs font-bold text-red-700">{fmtK(loan.remaining)}</td>
+                      <td className="px-3 py-2.5 font-mono text-xs text-emerald-700">{fmtK(loan.totalPaid)}</td>
+                      <td className="px-3 py-2.5">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${loan.daysOverdue > 90 ? "bg-red-200 text-red-800" : loan.daysOverdue > 60 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                          {loan.daysOverdue}d
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-[10px] text-gray-500">
+                        {loan.lastPaymentDate ? new Date(loan.lastPaymentDate).toLocaleDateString("en-ZM", { day: "numeric", month: "short" }) : "Never"}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => markContacted(loan, "call")} disabled={contactingLoan === loan.id}
+                            title="Log phone call"
+                            className="p-1 rounded hover:bg-blue-100 text-blue-600 transition-colors disabled:opacity-40">
+                            <PhoneCall size={12} />
+                          </button>
+                          <button onClick={() => markContacted(loan, "visit")} disabled={contactingLoan === loan.id}
+                            title="Log field visit"
+                            className="p-1 rounded hover:bg-amber-100 text-amber-600 transition-colors disabled:opacity-40">
+                            <MapPin size={12} />
+                          </button>
+                          <button onClick={async () => {
+                            const token = localStorage.getItem("philix_staff_token");
+                            await fetch("/api/emails/send", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
+                              body: JSON.stringify({ to: loan.email, subject: "Loan Repayment Reminder — Philix Finance", templateKey: "overdue_notice", params: { clientName: loan.clientName, loanRef: loan.reference, amountDue: loan.remaining } }),
+                            });
+                            alert(`Overdue reminder sent to ${loan.email}`);
+                          }} title="Send reminder email"
+                            className="p-1 rounded hover:bg-indigo-100 text-indigo-600 transition-colors">
+                            <Mail size={12} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-[#0B1F3A]/5 border-t-2 border-gray-300">
+                    <td colSpan={4} className="px-3 py-2.5 text-xs font-bold text-navy-800">TOTAL ({defaults.total} loans)</td>
+                    <td className="px-3 py-2.5 font-mono text-xs font-black text-red-700">{fmtK(defaults.totalAmount)}</td>
+                    <td colSpan={4} className="px-3 py-2.5 text-xs text-navy-500">Avg {defaults.avgDaysOverdue} days overdue</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            {/* Pagination */}
+            {defaults.total > 25 && (
+              <div className="flex items-center justify-between mt-3 px-1">
+                <span className="text-xs text-gray-500">Showing {defaultsPage * 25 + 1}–{Math.min((defaultsPage + 1) * 25, defaults.total)} of {defaults.total}</span>
+                <div className="flex gap-2">
+                  <button onClick={() => { const p = Math.max(0, defaultsPage - 1); setDefaultsPage(p); fetchDefaults(p); }} disabled={defaultsPage === 0}
+                    className="text-xs px-3 py-1 border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">← Prev</button>
+                  <button onClick={() => { const p = defaultsPage + 1; setDefaultsPage(p); fetchDefaults(p); }} disabled={(defaultsPage + 1) * 25 >= defaults.total}
+                    className="text-xs px-3 py-1 border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">Next →</button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── INTEREST INCOME SECTION ───────────────────────────────────────────── */}
+      <div className="philix-card p-5">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h3 className="section-title flex items-center gap-2">
+              <TrendingUp size={16} className="text-amber-500" />
+              Interest Income — 6 Month Overview
+            </h3>
+            <p className="text-xs text-navy-600 mt-0.5">Interest billed vs collected per month</p>
+          </div>
+          {interestLoading && <Loader2 size={14} className="animate-spin text-gray-400" />}
+        </div>
+
+        {/* 3 headline figures */}
+        <div className="grid grid-cols-3 gap-4 mb-5">
+          <div className="bg-navy-50 border border-navy-200 rounded-xl p-4 text-center">
+            <div className="text-xs font-bold text-navy-600 uppercase tracking-wide mb-1">Billed This Month</div>
+            <div className="text-xl font-bold font-mono text-navy-900">{fmtK(lastInterestMonth?.interest_billed ?? 0)}</div>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+            <div className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-1">Collected This Month</div>
+            <div className="text-xl font-bold font-mono text-amber-800">{fmtK(lastInterestMonth?.interest_collected ?? 0)}</div>
+          </div>
+          <div className={`rounded-xl p-4 text-center border ${interestCollectionRate >= 80 ? "bg-emerald-50 border-emerald-200" : interestCollectionRate >= 60 ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200"}`}>
+            <div className={`text-xs font-bold uppercase tracking-wide mb-1 ${interestCollectionRate >= 80 ? "text-emerald-700" : interestCollectionRate >= 60 ? "text-amber-700" : "text-red-700"}`}>Collection Rate</div>
+            <div className={`text-xl font-bold font-mono ${interestCollectionRate >= 80 ? "text-emerald-800" : interestCollectionRate >= 60 ? "text-amber-800" : "text-red-800"}`}>{interestCollectionRate}%</div>
+          </div>
+        </div>
+
+        {/* Bar chart */}
+        {interestData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={interestData} margin={{ top: 0, right: 0, left: 10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0ede6" />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+              <YAxis tickFormatter={(v) => `K${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} />
+              <Tooltip formatter={(value: number) => fmtK(value)} />
+              <Legend />
+              <Bar dataKey="interest_billed" name="Billed" fill="#0B1F3A" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="interest_collected" name="Collected" fill="#C9A227" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="flex items-center justify-center h-48 text-sm text-navy-400">
+            {interestLoading ? <Loader2 size={16} className="animate-spin" /> : "No interest data yet — data will appear once loans are disbursed and repayments begin."}
+          </div>
+        )}
       </div>
     </div>
   );
