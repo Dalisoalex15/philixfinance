@@ -26,11 +26,13 @@ router.get("/", isManagerOrAbove, async (req: Request, res: Response) => {
 
 // POST /api/users
 router.post("/", isSuperAdmin, async (req: Request, res: Response) => {
-  const { firstName, lastName, email, phone, role, branchId, password } = req.body;
+  const { firstName, lastName, email, phone, role, branchId, department, password } = req.body;
 
   if (!password || password.length < 8) throw new AppError("Password must be at least 8 characters", 400);
+  if (!email) throw new AppError("Email is required", 400);
 
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const normalEmail = email.toLowerCase().trim();
+  const existing = await prisma.user.findUnique({ where: { email: normalEmail } });
   if (existing) throw new AppError("Email already in use", 409);
 
   const year = new Date().getFullYear();
@@ -40,7 +42,7 @@ router.post("/", isSuperAdmin, async (req: Request, res: Response) => {
   const passwordHash = await bcrypt.hash(password, 12);
 
   const user = await prisma.user.create({
-    data: { firstName, lastName, email, phone, role, branchId, passwordHash, employeeId },
+    data: { firstName, lastName, email: normalEmail, phone, role, branchId, department, passwordHash, employeeId },
     select: {
       id: true, employeeId: true, firstName: true, lastName: true,
       email: true, phone: true, role: true, status: true,
@@ -79,6 +81,36 @@ router.patch("/:id", isSuperAdmin, async (req: Request, res: Response) => {
   });
 
   res.json(updated);
+});
+
+// PATCH /api/users/:id/reset-password — manager resets a staff password
+router.patch("/:id/reset-password", isManagerOrAbove, async (req: Request, res: Response) => {
+  const { password } = req.body as { password: string };
+  if (!password || password.length < 8) throw new AppError("Password must be at least 8 characters", 400);
+  const passwordHash = await bcrypt.hash(password, 12);
+  const updated = await prisma.user.update({
+    where: { id: req.params.id },
+    data: { passwordHash, failedLoginCount: 0, lockedUntil: null },
+    select: { id: true, firstName: true, lastName: true, email: true },
+  });
+  await createAuditLog({
+    userId: req.user!.id, action: "UPDATE", entity: "User", entityId: req.params.id,
+    description: `Password reset for ${updated.firstName} ${updated.lastName}`, req,
+  });
+  res.json({ ok: true, message: "Password reset successfully" });
+});
+
+// DELETE /api/users/:id — remove a staff member
+router.delete("/:id", isSuperAdmin, async (req: Request, res: Response) => {
+  const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { id: true, firstName: true, lastName: true } });
+  if (!target) return res.status(404).json({ error: "User not found" });
+  if (req.params.id === req.user!.id) return res.status(400).json({ error: "Cannot delete your own account" });
+  await prisma.user.delete({ where: { id: req.params.id } });
+  await createAuditLog({
+    userId: req.user!.id, action: "DELETE", entity: "User", entityId: req.params.id,
+    description: `Deleted user ${target.firstName} ${target.lastName}`, req,
+  });
+  res.json({ ok: true });
 });
 
 // GET /api/users/performance
