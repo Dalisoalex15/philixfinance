@@ -1,134 +1,126 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Lock, Mail, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, AlertCircle, Loader2, Shield } from "lucide-react";
 import { useAuthStore } from "../store/auth";
-import { mockUser } from "../lib/mock-data";
+import PhilixLogo from "../components/ui/PhilixLogo";
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const setAuth = useAuthStore((s) => s.setAuth);
-  const [email, setEmail] = useState("daliso@philixfinance.com");
-  const [password, setPassword] = useState("admin1234");
+  const login = useAuthStore((s) => s.login);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email || !password) { setError("Email and password are required"); return; }
     setError("");
     setLoading(true);
-
-    await new Promise((r) => setTimeout(r, 800));
-
-    if (email === "daliso@philixfinance.com" && password === "admin1234") {
-      setAuth(mockUser as any, "demo-token-" + Date.now());
+    try {
+      await login(email.trim().toLowerCase(), password);
       navigate("/", { replace: true });
-    } else {
-      setError("Invalid email or password. Use demo credentials shown below.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "";
+      setError(msg || "Invalid email or password. Check your credentials and try again.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
+  const fill = (e: string, p: string) => { setEmail(e); setPassword(p); setError(""); };
+
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/20 via-transparent to-emerald-950/10 pointer-events-none" />
+    <div className="min-h-screen bg-[#060F1E] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/20 via-transparent to-[#C9A227]/5 pointer-events-none" />
 
       <div className="w-full max-w-md relative">
-        {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 shadow-lg shadow-indigo-500/30 mb-4">
-            <span className="text-white font-black text-xl">PF</span>
-          </div>
-          <h1 className="text-2xl font-bold text-slate-100">Philix Finance</h1>
-          <p className="text-slate-400 text-sm mt-1">Creating a Future Together</p>
+          <PhilixLogo variant="full" size="md" onDark className="mx-auto" />
+          <p className="text-white/30 text-sm mt-3">Staff &amp; Admin Portal</p>
         </div>
 
-        {/* Card */}
-        <div className="philix-card p-8">
+        <div className="bg-[#0B1F3A] border border-white/10 rounded-2xl p-8 shadow-2xl shadow-black/40">
           <div className="mb-6">
-            <h2 className="text-xl font-semibold text-slate-100">Sign in</h2>
-            <p className="text-sm text-slate-400 mt-1">Access the Loan Management System</p>
+            <h2 className="text-xl font-bold text-white">Sign In</h2>
+            <p className="text-sm text-white/35 mt-1">Access the Loan Management System</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Email Address</label>
+              <label className="block text-xs font-semibold text-white/40 mb-1.5">Email Address</label>
               <div className="relative">
-                <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25" />
                 <input
                   type="email"
-                  className="input-base pl-9"
+                  className="w-full bg-white/5 border border-white/10 text-white rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 placeholder:text-white/20 transition-all"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@philixfinance.com"
+                  autoComplete="email"
                   required
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Password</label>
+              <label className="block text-xs font-semibold text-white/40 mb-1.5">Password</label>
               <div className="relative">
-                <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25" />
                 <input
                   type={showPassword ? "text" : "password"}
-                  className="input-base pl-9 pr-10"
+                  className="w-full bg-white/5 border border-white/10 text-white rounded-xl pl-9 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 placeholder:text-white/20 transition-all"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
+                  autoComplete="current-password"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/50 transition-colors"
                 >
-                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
             </div>
 
             {error && (
-              <div className="flex items-start gap-2 text-sm text-red-400 bg-red-900/20 border border-red-800/50 rounded-md p-3">
-                <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
-                {error}
+              <div className="flex items-start gap-2 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2.5">
+                <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
+                <span>{error}</span>
               </div>
             )}
 
-            <button type="submit" disabled={loading} className="btn-primary w-full py-2.5 text-sm font-semibold">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition-all flex items-center justify-center gap-2"
+            >
               {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Signing in...
-                </span>
+                <><Loader2 size={15} className="animate-spin" /> Signing in…</>
               ) : (
-                "Sign In"
+                <><Shield size={14} /> Sign In</>
               )}
             </button>
           </form>
 
-          {/* Demo Credentials */}
-          <div className="mt-6 p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
-            <div className="text-xs font-semibold text-slate-400 mb-2">Demo Credentials</div>
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-500">Email:</span>
-                <span className="text-slate-300 font-mono">daliso@philixfinance.com</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-500">Password:</span>
-                <span className="text-slate-300 font-mono">admin1234</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-500">Role:</span>
-                <span className="text-indigo-400">Super Admin (CEO)</span>
-              </div>
-            </div>
+          <div className="mt-6 pt-5 border-t border-white/5">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-white/20 mb-3">Quick Access — CEO</div>
+            <button
+              type="button"
+              onClick={() => fill("daliso@philixfinance.com", "philix@CEO2025")}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl border border-[#C9A227]/20 bg-[#C9A227]/5 hover:bg-[#C9A227]/10 transition-all"
+            >
+              <span className="text-xs font-semibold text-[#C9A227]">CEO / Admin</span>
+              <span className="text-[11px] font-mono text-white/30">daliso@philixfinance.com</span>
+            </button>
           </div>
         </div>
 
-        <div className="text-center mt-6 text-xs text-slate-600">
+        <div className="text-center mt-6 text-xs text-white/15">
           © 2025 Philix Finance · Lusaka, Zambia · All rights reserved
         </div>
       </div>

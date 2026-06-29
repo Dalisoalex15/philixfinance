@@ -388,8 +388,15 @@ export default function OnlineApplicationsPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-slate-200 text-sm">{app.clientName}</span>
                         <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${meta.color} bg-slate-800`}>{meta.label}</span>
+                        {app.description?.startsWith("RELOAN_FROM:") && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-900/30 text-purple-400 border border-purple-800/40">RE-LOAN</span>
+                        )}
                       </div>
-                      <div className="text-xs text-slate-500 mt-0.5 truncate">{app.ref} · {app.productName}</div>
+                      <div className="text-xs text-slate-500 mt-0.5 truncate">{app.ref} · {app.productName}
+                        {app.description?.startsWith("RELOAN_FROM:") && (
+                          <span className="text-purple-500 ml-1">· from {app.description.replace("RELOAN_FROM:", "")}</span>
+                        )}
+                      </div>
                     </div>
                     <div className="text-right flex-shrink-0">
                       <div className="font-bold text-slate-100 text-sm">{formatKwacha(app.amount)}</div>
@@ -407,6 +414,20 @@ export default function OnlineApplicationsPage() {
           <div className="lg:col-span-3 philix-card p-5 space-y-5 overflow-y-auto" style={{ maxHeight: "calc(100vh - 200px)" }}>
             {/* Status Timeline */}
             <StatusTimeline app={selected} />
+
+            {/* Reloan context banner */}
+            {selected.description?.startsWith("RELOAN_FROM:") && (
+              <div className="flex items-start gap-3 p-3 bg-purple-900/20 border border-purple-800/40 rounded-xl">
+                <AlertTriangle size={14} className="text-purple-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <div className="text-xs font-bold text-purple-400">Returning Client — Re-Loan Application</div>
+                  <div className="text-xs text-slate-500 mt-0.5">
+                    Previous loan: <span className="font-mono text-purple-400">{selected.description.replace("RELOAN_FROM:", "")}</span>
+                    {" "}· Client is reapplying from an existing loan history.
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Header */}
             <div className="flex items-start gap-3">

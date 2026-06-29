@@ -3,11 +3,12 @@ import { cn } from "../../lib/utils";
 import {
   LayoutDashboard, Users, CreditCard, Receipt, AlertTriangle, BarChart2,
   UserCog, Settings, ChevronLeft, ChevronRight, BookOpen,
-  FileText, Brain, LogOut, TrendingUp, Wallet,
+  FileText, Brain, LogOut, TrendingUp, Wallet, ScanLine,
 } from "lucide-react";
 import { useAuthStore } from "../../store/auth";
 import { useLoanApplicationStore } from "../../store/loanApplicationStore";
 import PhilixLogo from "../ui/PhilixLogo";
+import { useState, useEffect } from "react";
 
 interface SidebarProps { open: boolean; onToggle: () => void; }
 
@@ -17,6 +18,7 @@ interface NavItem {
   label: string;
   roles?: string[];
   liveCount?: boolean;
+  proofCount?: boolean;
   aiAccent?: boolean;
 }
 
@@ -37,6 +39,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: "/clients",              Icon: Users,      label: "Clients" },
       { to: "/loans",                Icon: CreditCard, label: "Loans" },
       { to: "/repayments",           Icon: Receipt,    label: "Repayments" },
+      { to: "/payment-submissions",  Icon: ScanLine,   label: "Payment Proofs", proofCount: true },
       { to: "/accounts-management",  Icon: BookOpen,   label: "Accounts Centre", roles: ["SUPER_ADMIN", "MANAGER"] },
     ],
   },
@@ -66,6 +69,23 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
   const pendingCount = useLoanApplicationStore(s =>
     s.applications.filter(a => a.status === "PENDING" || a.status === "UNDER_REVIEW").length
   );
+  const [pendingProofsCount, setPendingProofsCount] = useState(0);
+
+  useEffect(() => {
+    const token = localStorage.getItem("philix_staff_token");
+    if (!token) return;
+    const load = async () => {
+      try {
+        const r = await fetch("/api/admin/payment-submissions", { headers: { Authorization: `Bearer ${token}` } });
+        if (!r.ok) return;
+        const data: { status: string }[] = await r.json();
+        setPendingProofsCount(data.filter(s => s.status === "PENDING").length);
+      } catch { /* ignore */ }
+    };
+    load();
+    const t = setInterval(load, 90_000);
+    return () => clearInterval(t);
+  }, []);
 
   const isActive = (to: string) =>
     to === "/" ? location.pathname === "/" : location.pathname.startsWith(to);
@@ -119,7 +139,7 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
               )}
               {!open && <div className="h-px bg-white/5 my-2 mx-1" />}
               {visible.map((item) => {
-                const count = item.liveCount && pendingCount > 0 ? pendingCount : 0;
+                const count = item.proofCount ? pendingProofsCount : (item.liveCount && pendingCount > 0 ? pendingCount : 0);
                 const active = isActive(item.to);
                 return (
                   <NavLink key={item.to} to={item.to} end={item.to === "/"}>

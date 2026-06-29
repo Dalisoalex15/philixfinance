@@ -128,6 +128,34 @@ router.delete("/:id", isSuperAdmin, async (req: Request, res: Response) => {
   res.json({ ok: true });
 });
 
+// POST /api/users/seed-demo-staff — CEO creates demo accounts for all roles
+router.post("/seed-demo-staff", isSuperAdmin, async (_req: Request, res: Response) => {
+  const demoStaff = [
+    { firstName: "Sarah",  lastName: "Phiri",  email: "sarah@philixfinance.com",  role: "MANAGER",             department: "Operations", phone: "+260971000001", password: "philix@Sarah2025"  },
+    { firstName: "James",  lastName: "Banda",  email: "james@philixfinance.com",  role: "LOAN_OFFICER",        department: "Credit",     phone: "+260971000002", password: "philix@JamesLO2025" },
+    { firstName: "Grace",  lastName: "Mwale",  email: "grace@philixfinance.com",  role: "COLLECTIONS_OFFICER", department: "Collections",phone: "+260971000003", password: "philix@Grace2025"  },
+    { firstName: "Peter",  lastName: "Lungu",  email: "peter@philixfinance.com",  role: "ACCOUNTANT",          department: "Finance",    phone: "+260971000004", password: "philix@Peter2025"  },
+  ];
+
+  const results = [];
+  for (const s of demoStaff) {
+    const existing = await prisma.user.findUnique({ where: { email: s.email } });
+    if (existing) {
+      results.push({ email: existing.email, role: existing.role, plainPassword: s.password, alreadyExists: true });
+      continue;
+    }
+    const passwordHash = await bcrypt.hash(s.password, 12);
+    const employeeId = `EMP-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000) + 1000}`;
+    const user = await prisma.user.create({
+      data: { firstName: s.firstName, lastName: s.lastName, email: s.email, phone: s.phone, role: s.role, department: s.department, passwordHash, employeeId },
+      select: { email: true, role: true },
+    });
+    results.push({ email: user.email, role: user.role, plainPassword: s.password, alreadyExists: false });
+  }
+
+  res.json({ ok: true, staff: results });
+});
+
 // GET /api/users/performance
 router.get("/performance", isManagerOrAbove, async (_req: Request, res: Response) => {
   const officers = await prisma.user.findMany({

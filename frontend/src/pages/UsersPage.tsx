@@ -1,17 +1,21 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Plus, UserCog, X, Eye, EyeOff, CheckCircle, Shield, Copy,
-  RefreshCw, AlertCircle, Trash2, KeyRound, Users, Edit3,
+  RefreshCw, AlertCircle, Trash2, KeyRound, Users, Edit3, Zap, UserPlus,
 } from "lucide-react";
 import { useAuthStore } from "../store/auth";
 
-const ROLES = ["CEO", "MANAGER", "LOAN_OFFICER", "COLLECTIONS_OFFICER", "ACCOUNTANT"] as const;
+const ROLES = ["SUPER_ADMIN", "MANAGER", "LOAN_OFFICER", "COLLECTIONS_OFFICER", "ACCOUNTANT"] as const;
 type Role = typeof ROLES[number];
 const ROLE_LABELS: Record<string, string> = {
-  CEO: "CEO", MANAGER: "Manager", LOAN_OFFICER: "Loan Officer",
-  COLLECTIONS_OFFICER: "Collections Officer", ACCOUNTANT: "Accountant",
+  SUPER_ADMIN:         "CEO / Admin",
+  MANAGER:             "Manager",
+  LOAN_OFFICER:        "Loan Officer",
+  COLLECTIONS_OFFICER: "Collections Officer",
+  ACCOUNTANT:          "Accountant",
 };
 const ROLE_COLORS: Record<string, string> = {
+  SUPER_ADMIN:         "bg-[#C9A227]/15 text-[#C9A227] border border-[#C9A227]/25",
   CEO:                 "bg-[#C9A227]/15 text-[#C9A227] border border-[#C9A227]/25",
   MANAGER:             "bg-indigo-500/15 text-indigo-300 border border-indigo-500/25",
   LOAN_OFFICER:        "bg-emerald-500/15 text-emerald-300 border border-emerald-500/25",
@@ -22,7 +26,7 @@ const DEPARTMENTS = ["Executive", "Operations", "Credit", "Collections", "Financ
 
 function genPass(firstName: string, role: string) {
   const base = firstName ? `${firstName[0].toUpperCase()}${firstName.slice(1).toLowerCase()}` : "Staff";
-  const suf = { CEO:"CEO", MANAGER:"Mgr", LOAN_OFFICER:"LO", COLLECTIONS_OFFICER:"Col", ACCOUNTANT:"Acc" }[role] ?? "Acc";
+  const suf = { SUPER_ADMIN:"CEO", CEO:"CEO", MANAGER:"Mgr", LOAN_OFFICER:"LO", COLLECTIONS_OFFICER:"Col", ACCOUNTANT:"Acc" }[role] ?? "Staff";
   return `philix@${base}${suf}2025`;
 }
 
@@ -76,6 +80,18 @@ export default function UsersPage() {
 
   // Delete
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
+
+  // Seed staff
+  const [seedLoading, setSeedLoading] = useState(false);
+  const [seedResult, setSeedResult] = useState<{ email: string; role: string; plainPassword: string; alreadyExists: boolean }[] | null>(null);
+
+  // Create client account
+  const [showNewClient, setShowNewClient] = useState(false);
+  const [clientForm, setClientForm] = useState({ firstName: "", lastName: "", email: "", phone: "", password: "" });
+  const [clientSaving, setClientSaving] = useState(false);
+  const [clientSaved, setClientSaved] = useState(false);
+  const [clientErr, setClientErr] = useState("");
+  const [clientPassword, setClientPassword] = useState<{ id: string; pass: string } | null>(null);
 
   const loadStaff = useCallback(async () => {
     setLoading(true); setApiError("");
@@ -184,6 +200,35 @@ export default function UsersPage() {
     navigator.clipboard.writeText(text).then(() => { setCopied(key); setTimeout(() => setCopied(""), 2000); });
   };
 
+  const handleSeedStaff = async () => {
+    setSeedLoading(true); setSeedResult(null);
+    try {
+      const r = await fetch("/api/users/seed-demo-staff", { method: "POST", headers: authH() });
+      const data = await r.json();
+      if (r.ok) { setSeedResult(data.staff); await loadStaff(); }
+    } catch { /* ignore */ } finally { setSeedLoading(false); }
+  };
+
+  const handleCreateClient = async () => {
+    if (!clientForm.firstName || !clientForm.email || clientForm.password.length < 8) {
+      setClientErr("First name, email, and password (min 8 chars) are required"); return;
+    }
+    setClientSaving(true); setClientErr("");
+    try {
+      const r = await fetch("/api/admin/clients", {
+        method: "POST", headers: authH(),
+        body: JSON.stringify(clientForm),
+      });
+      const data = await r.json();
+      if (!r.ok) { setClientErr(data.error || "Failed to create client"); return; }
+      setClientPassword({ id: data.id, pass: clientForm.password });
+      setClientSaved(true);
+      setClientForm({ firstName: "", lastName: "", email: "", phone: "", password: "" });
+      setTimeout(() => { setClientSaved(false); setShowNewClient(false); setClientPassword(null); }, 4000);
+    } catch { setClientErr("Network error"); }
+    finally { setClientSaving(false); }
+  };
+
   const inputCls = "w-full bg-white/5 border border-white/10 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 placeholder:text-white/20";
   const labelCls = "text-xs font-semibold text-white/40 mb-1 block";
 
@@ -197,15 +242,27 @@ export default function UsersPage() {
             {isCEO ? "Create, edit, and manage all staff accounts" : "View staff directory"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button onClick={loadStaff} className="p-2 rounded-lg text-white/25 hover:text-white/60 border border-white/5 hover:border-white/10 transition-all">
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
           </button>
           {isCEO && (
-            <button onClick={() => { setShowCreate(true); setForm(blankForm()); setSaved(false); setSaveErr(""); }}
-              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all">
-              <Plus size={15} /> Add Staff Member
-            </button>
+            <>
+              <button onClick={handleSeedStaff} disabled={seedLoading}
+                title="Create sample accounts for all staff roles"
+                className="flex items-center gap-2 bg-[#C9A227]/15 hover:bg-[#C9A227]/25 text-[#C9A227] border border-[#C9A227]/25 text-xs font-semibold px-3 py-2 rounded-xl transition-all disabled:opacity-50">
+                {seedLoading ? <RefreshCw size={13} className="animate-spin" /> : <Zap size={13} />}
+                Quick Setup
+              </button>
+              <button onClick={() => { setShowNewClient(true); setClientSaved(false); setClientErr(""); setClientForm({ firstName: "", lastName: "", email: "", phone: "", password: "" }); }}
+                className="flex items-center gap-2 bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-400 border border-emerald-500/25 text-xs font-semibold px-3 py-2 rounded-xl transition-all">
+                <UserPlus size={13} /> New Client
+              </button>
+              <button onClick={() => { setShowCreate(true); setForm(blankForm()); setSaved(false); setSaveErr(""); }}
+                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all">
+                <Plus size={15} /> Add Staff
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -323,6 +380,121 @@ export default function UsersPage() {
           </div>
         )}
       </div>
+
+      {/* ── SEED RESULT ──────────────────────────────────────────────────────── */}
+      {seedResult && (
+        <div className="rounded-2xl bg-[#C9A227]/5 border border-[#C9A227]/20 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Zap size={14} className="text-[#C9A227]" />
+              <span className="text-sm font-bold text-[#C9A227]">Quick Setup Complete — All Staff Accounts Created</span>
+            </div>
+            <button onClick={() => setSeedResult(null)} className="text-white/25 hover:text-white/60"><X size={14} /></button>
+          </div>
+          <div className="grid gap-2">
+            {seedResult.map(s => (
+              <div key={s.email} className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs ${s.alreadyExists ? "bg-white/[0.02] border border-white/5" : "bg-emerald-500/5 border border-emerald-500/15"}`}>
+                <div className="flex items-center gap-3">
+                  <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${ROLE_COLORS[s.role] ?? "bg-white/5 text-white/40 border border-white/10"}`}>
+                    {ROLE_LABELS[s.role] ?? s.role}
+                  </span>
+                  <span className="font-mono text-white/60">{s.email}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-white/40">{s.plainPassword}</span>
+                  <button onClick={() => copy(s.plainPassword, `seed-${s.email}`)} className="text-white/20 hover:text-white/50 p-0.5">
+                    {copied === `seed-${s.email}` ? <CheckCircle size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                  </button>
+                  {s.alreadyExists && <span className="text-[10px] text-white/25 italic">already existed</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-white/30 mt-2">Share these credentials with each staff member — they can log in immediately.</p>
+        </div>
+      )}
+
+      {/* ── CREATE CLIENT MODAL ───────────────────────────────────────────────── */}
+      {showNewClient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-[#0B1F3A] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-emerald-500/20"><UserPlus size={14} className="text-emerald-400" /></div>
+                <h3 className="font-bold text-white">Create Client Account</h3>
+              </div>
+              <button onClick={() => setShowNewClient(false)} className="text-white/25 hover:text-white/60"><X size={18} /></button>
+            </div>
+            {clientSaved ? (
+              <div className="p-10 text-center space-y-3">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center mx-auto">
+                  <CheckCircle size={28} className="text-emerald-400" />
+                </div>
+                <div className="text-white font-bold text-lg">Client account created!</div>
+                {clientPassword && (
+                  <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-left">
+                    <div className="text-white/40 text-xs mb-2">Client login credentials</div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-mono text-white/70 text-xs">{clientForm.email || "—"}</span>
+                      <span className="font-mono text-white/70 text-xs">{clientPassword.pass}</span>
+                      <button onClick={() => copy(`${clientPassword.pass}`, "cp")} className="text-white/25 hover:text-white/60 p-0.5">
+                        {copied === "cp" ? <CheckCircle size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <div className="text-white/40 text-sm">Client can log in at the portal immediately.</div>
+              </div>
+            ) : (
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>First Name *</label>
+                    <input className={inputCls} placeholder="Jane" value={clientForm.firstName} onChange={e => setClientForm(p => ({ ...p, firstName: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Last Name</label>
+                    <input className={inputCls} placeholder="Mwale" value={clientForm.lastName} onChange={e => setClientForm(p => ({ ...p, lastName: e.target.value }))} />
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls}>Email *</label>
+                  <input type="email" className={inputCls} placeholder="jane@example.com" value={clientForm.email} onChange={e => setClientForm(p => ({ ...p, email: e.target.value }))} />
+                </div>
+                <div>
+                  <label className={labelCls}>Phone</label>
+                  <input className={inputCls} placeholder="+260 97 XXX XXXX" value={clientForm.phone} onChange={e => setClientForm(p => ({ ...p, phone: e.target.value }))} />
+                </div>
+                <div>
+                  <label className={labelCls}>Password *</label>
+                  <div className="relative">
+                    <input type="text" className={`${inputCls} font-mono pr-10`}
+                      value={clientForm.password}
+                      placeholder="Min 8 characters"
+                      onChange={e => setClientForm(p => ({ ...p, password: e.target.value }))} />
+                    <button type="button" onClick={() => copy(clientForm.password, "cp-field")} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/60 p-0.5">
+                      {copied === "cp-field" ? <CheckCircle size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-white/25 mt-1">Client will use this to log in to the client portal</p>
+                </div>
+                {clientErr && (
+                  <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2.5 text-sm text-red-400">
+                    <AlertCircle size={13} /> {clientErr}
+                  </div>
+                )}
+                <div className="flex gap-3 pt-1">
+                  <button onClick={() => setShowNewClient(false)} className="flex-1 py-2.5 text-sm text-white/40 border border-white/10 rounded-xl hover:border-white/20 transition-all">Cancel</button>
+                  <button onClick={handleCreateClient} disabled={clientSaving}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-semibold py-2.5 rounded-xl text-sm transition-all flex items-center justify-center gap-2">
+                    {clientSaving ? <><RefreshCw size={14} className="animate-spin" /> Creating…</> : <><UserPlus size={14} /> Create Client</>}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── CREATE MODAL ──────────────────────────────────────────────────────── */}
       {showCreate && (

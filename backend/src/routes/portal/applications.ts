@@ -354,6 +354,7 @@ router.post("/:appId/reloan", wrap(async (req: Request, res: Response) => {
   };
 
   const reference = genRef();
+  const basePurpose = purpose || sourceApp.purpose || "";
   const reloan = await prisma.portalLoanApplication.create({
     data: {
       reference,
@@ -361,7 +362,8 @@ router.post("/:appId/reloan", wrap(async (req: Request, res: Response) => {
       productType: sourceApp.productType,
       amountRequested: amountRequested ? parseFloat(String(amountRequested)) : sourceApp.amountRequested,
       termMonths: termWeeks ? parseInt(String(termWeeks)) : sourceApp.termMonths,
-      purpose: purpose || sourceApp.purpose,
+      purpose: basePurpose,
+      description: `RELOAN_FROM:${sourceApp.reference}`,
       description: sourceApp.description,
       occupation: sourceApp.occupation,
       employer: sourceApp.employer,
