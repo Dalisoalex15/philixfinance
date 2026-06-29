@@ -1,250 +1,390 @@
-import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, Bot, Trash2, FileText, TrendingUp, Shield, AlertTriangle, Calculator, Users, ChevronDown, ChevronUp, Download } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import {
+  Brain, Send, Copy, Check, RefreshCw, Download, Trash2, X,
+  ChevronDown, Sparkles, Shield, TrendingUp, FileText, Calculator,
+  AlertTriangle, Users, BarChart2, Zap,
+} from "lucide-react";
 import { useAuthStore } from "../store/auth";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
-  time: Date;
+  ts: Date;
 }
 
-const MODULE_PROMPTS = [
-  { icon: TrendingUp,    label: "Credit Score a Client",   prompt: "Credit score this application: Client Name: [NAME], Monthly Income: K[X], Employer: [EMPLOYER], Employment Type: [TYPE], Collateral: [ITEM worth KX], Previous loans: [Y repaid, Z defaults], NRC: [verified/unverified], References: [yes/no]" },
-  { icon: AlertTriangle, label: "Fraud Check",              prompt: "Run a fraud check on this application: Client Name: [NAME], NRC: [NRC NUMBER], Phone: [NUMBER], Address: [ADDRESS], Stated Income: K[X], Employer: [NAME]. Red flags to check: [any suspicious details]" },
-  { icon: Shield,        label: "Collateral Assessment",    prompt: "Assess this collateral: Item: [ITEM], Stated market value: K[X], Condition: [EXCELLENT/GOOD/FAIR/POOR], Year: [YEAR], Serial: [SERIAL], Ownership documents: [YES/NO], Insurance: [YES/NO]. Calculate FSV and LTV for a K[LOAN AMOUNT] loan." },
-  { icon: FileText,      label: "Generate Demand Letter",   prompt: "Generate a formal demand letter for: Client: [NAME], Loan Reference: [REF], Amount Overdue: K[X], Days Overdue: [N], Previous contact attempts: [NUMBER], Loan Officer: [OFFICER NAME]" },
-  { icon: FileText,      label: "Generate Loan Agreement",  prompt: "Generate a complete loan agreement for: Client: [NAME], NRC: [NRC], Address: [ADDRESS], Loan Amount: K[X], Interest Rate: [Y]% flat, Term: [Z] weeks, Weekly Payment: K[W], Collateral: [ITEM], Guarantor: [NAME & PHONE], Disbursement Date: [DATE]" },
-  { icon: Calculator,    label: "Loan Calculator",          prompt: "Calculate a loan: Principal K[AMOUNT], flat interest rate [X]%, term [N] weeks. Show: total interest, total repayable, weekly payment, full repayment schedule by week, and penalty if 2 weeks late." },
-  { icon: Users,         label: "Collection Script",        prompt: "Generate a collection call script for a client [X] days overdue on their K[AMOUNT] loan (Ref: [REF]). Overdue amount including penalties: K[TOTAL]. Previous promises to pay: [YES/NO]. Script should be firm but empathetic." },
-  { icon: TrendingUp,    label: "Portfolio Analysis",       prompt: "Analyse our current loan portfolio and give me: PAR (Portfolio at Risk) interpretation, collection efficiency tips, top risk indicators to watch, and 3 strategic recommendations to reduce defaults this quarter." },
-  { icon: Shield,        label: "Compliance Check",         prompt: "Check this loan application for regulatory compliance: [PASTE LOAN DETAILS]. Check against: Bank of Zambia regulations, internal KYC requirements, AML procedures, and our credit policy." },
-  { icon: TrendingUp,    label: "Business Advice (CEO)",    prompt: "As my AI Chief Risk Officer, analyse this situation and give executive-level recommendations: [DESCRIBE THE BUSINESS SITUATION OR DECISION YOU NEED HELP WITH]" },
-];
-
-function RenderMessage({ text }: { text: string }) {
-  const lines = text.split("\n");
+// ── Markdown renderer ──────────────────────────────────────────────────────────
+function Md({ text }: { text: string }) {
+  const html = text
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/__(.+?)__/g, "<u>$1</u>")
+    .replace(/`([^`]+)`/g, '<code class="bg-white/10 text-[#C9A227] px-1 py-0.5 rounded text-[11px] font-mono">$1</code>')
+    .replace(/^### (.+)$/gm, '<div class="text-sm font-bold text-white/90 mt-3 mb-1">$1</div>')
+    .replace(/^## (.+)$/gm, '<div class="text-base font-bold text-white mt-4 mb-1">$1</div>')
+    .replace(/^# (.+)$/gm, '<div class="text-lg font-bold text-[#C9A227] mt-4 mb-2">$1</div>')
+    .replace(/^[-•] (.+)$/gm, '<div class="flex gap-2 py-0.5"><span class="text-[#C9A227] flex-shrink-0 mt-0.5">•</span><span>$1</span></div>')
+    .replace(/^\d+\. (.+)$/gm, (_, p) => `<div class="flex gap-2 py-0.5"><span class="text-[#C9A227]/60 flex-shrink-0">·</span><span>${p}</span></div>`)
+    .replace(/\n{2,}/g, '<div class="mt-2"></div>')
+    .replace(/\n/g, "<br/>");
   return (
-    <div className="text-[13px] leading-relaxed space-y-0.5">
-      {lines.map((line, i) => {
-        const html = line
-          .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-          .replace(/`(.*?)`/g, '<code class="bg-slate-800 px-1 py-0.5 rounded text-indigo-300 text-[11px]">$1</code>')
-          .replace(/__(.*?)__/g, "<u>$1</u>");
-        if (line.startsWith("# ")) return <h2 key={i} className="font-black text-base text-white mt-2 mb-1">{line.slice(2)}</h2>;
-        if (line.startsWith("## ")) return <h3 key={i} className="font-bold text-sm text-slate-200 mt-2 mb-0.5">{line.slice(3)}</h3>;
-        if (line.startsWith("### ")) return <h4 key={i} className="font-semibold text-sm text-slate-300 mt-1">{line.slice(4)}</h4>;
-        if (line.startsWith("- ") || line.startsWith("• ")) return <li key={i} className="ml-4 list-disc text-slate-300" dangerouslySetInnerHTML={{ __html: html.slice(2) }} />;
-        if (/^\d+\./.test(line)) return <li key={i} className="ml-4 list-decimal text-slate-300" dangerouslySetInnerHTML={{ __html: html.replace(/^\d+\.\s/, "") }} />;
-        return <p key={i} className={line === "" ? "h-1.5" : "text-slate-300"} dangerouslySetInnerHTML={{ __html: html }} />;
-      })}
-    </div>
+    <div
+      className="text-[13px] leading-relaxed text-white/80 space-y-0.5"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
 }
 
+// ── Quick command templates ────────────────────────────────────────────────────
+const COMMANDS = [
+  {
+    cmd: "/credit",
+    label: "Credit Score a Client",
+    icon: TrendingUp,
+    color: "emerald",
+    fill: () =>
+      `/credit Score this client for a loan:\nName: [Client Name]\nNRC: [NRC Number]\nEmployer: [Employer]\nMonthly Income: K[Amount]\nLoan Amount Requested: K[Amount]\nCollateral: [Description]\nRepayment History: [Good/Fair/Poor]\n\nProvide full credit score breakdown, risk rating (LOW/MEDIUM/HIGH), and approval recommendation.`,
+  },
+  {
+    cmd: "/fraud",
+    label: "Fraud Check",
+    icon: AlertTriangle,
+    color: "red",
+    fill: () =>
+      `/fraud Run a fraud check on this application:\nName: [Client Name]\nNRC: [NRC Number]\nPhone: [Phone]\nAddress: [Address]\nCollateral submitted: [Description]\nRed flags noticed: [None or describe]\n\nProvide fraud risk score and recommended actions.`,
+  },
+  {
+    cmd: "/calculate",
+    label: "Loan Calculator",
+    icon: Calculator,
+    color: "indigo",
+    fill: () =>
+      `/calculate Compute loan details:\nPrincipal: K[Amount]\nInterest Rate: [Rate]% flat\nTerm: [N] weeks\n\nShow: total repayable, weekly payment, full amortization table, and penalty if 1 week late.`,
+  },
+  {
+    cmd: "/demand",
+    label: "Generate Demand Letter",
+    icon: FileText,
+    color: "amber",
+    fill: () =>
+      `/demand Generate a formal demand letter:\nClient: [Client Name]\nLoan Ref: [PHX-L-XXXX]\nAmount Overdue: K[Amount]\nDays Overdue: [N]\nPenalties Accrued: K[Amount]\nTotal Due: K[Amount]\n\nMake it firm, professional, with a 7-day payment deadline.`,
+  },
+  {
+    cmd: "/portfolio",
+    label: "Portfolio Analysis",
+    icon: BarChart2,
+    color: "purple",
+    fill: () =>
+      `/portfolio Analyze our current loan portfolio and provide:\n1. Portfolio health assessment\n2. Top risk indicators\n3. Collection strategy recommendations\n4. Actions to reduce PAR\n5. Growth opportunities for next quarter`,
+  },
+  {
+    cmd: "/script",
+    label: "Collections Call Script",
+    icon: Users,
+    color: "orange",
+    fill: () =>
+      `/script Write a professional collections call script for:\nClient: [Client Name]\nDays Overdue: [N]\nAmount Owed: K[Amount]\nPrevious contact attempts: [None/2 calls/etc]\nTone: Professional but firm`,
+  },
+  {
+    cmd: "/collateral",
+    label: "Collateral Assessment",
+    icon: Shield,
+    color: "teal",
+    fill: () =>
+      `/collateral Assess this collateral:\nItem: [Description]\nBrand/Model: [Details]\nEstimated Market Value: K[Amount]\nCondition: [Excellent/Good/Fair/Poor]\nLoan amount requested: K[Amount]\n\nCalculate FSV, LTV ratio, and provide Accept/Reject recommendation.`,
+  },
+];
+
+const getToken = () => localStorage.getItem("philix_staff_token") ?? "";
+
+const colorMap: Record<string, string> = {
+  emerald: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25 hover:bg-emerald-500/20",
+  red:     "bg-red-500/15 text-red-400 border-red-500/25 hover:bg-red-500/20",
+  indigo:  "bg-indigo-500/15 text-indigo-400 border-indigo-500/25 hover:bg-indigo-500/20",
+  amber:   "bg-amber-500/15 text-amber-400 border-amber-500/25 hover:bg-amber-500/20",
+  purple:  "bg-purple-500/15 text-purple-400 border-purple-500/25 hover:bg-purple-500/20",
+  orange:  "bg-orange-500/15 text-orange-400 border-orange-500/25 hover:bg-orange-500/20",
+  teal:    "bg-teal-500/15 text-teal-400 border-teal-500/25 hover:bg-teal-500/20",
+};
+
 export default function PhilixAIPage() {
   const user = useAuthStore(s => s.user);
-  const token = useAuthStore(s => s.accessToken);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showModules, setShowModules] = useState(true);
-  const conversationRef = useRef<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [showCommands, setShowCommands] = useState(false);
+  const [cmdFilter, setCmdFilter] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const historyRef = useRef<{ role: "user" | "assistant"; content: string }[]>([]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  async function send(text?: string) {
-    const msg = (text ?? input).trim();
-    if (!msg || loading) return;
-    setInput("");
-    setShowModules(false);
+  const resizeTextarea = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 160) + "px";
+    }
+  };
 
-    const userMsg: Message = { id: Date.now().toString(), role: "user", content: msg, time: new Date() };
-    setMessages(p => [...p, userMsg]);
-    conversationRef.current = [...conversationRef.current, { role: "user", content: msg }];
+  const handleInput = (v: string) => {
+    setInput(v);
+    if (v.startsWith("/") && !v.includes(" ")) {
+      setCmdFilter(v.slice(1).toLowerCase());
+      setShowCommands(true);
+    } else if (!v.startsWith("/")) {
+      setShowCommands(false);
+    }
+    resizeTextarea();
+  };
+
+  const applyCommand = (cmd: typeof COMMANDS[0]) => {
+    const filled = cmd.fill();
+    setInput(filled);
+    setShowCommands(false);
+    setTimeout(() => { textareaRef.current?.focus(); resizeTextarea(); }, 50);
+  };
+
+  const send = useCallback(async (override?: string) => {
+    const content = (override ?? input).trim();
+    if (!content || loading) return;
+    setInput("");
+    setShowCommands(false);
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+
+    const userMsg: Message = { id: `u-${Date.now()}`, role: "user", content, ts: new Date() };
+    setMessages(prev => [...prev, userMsg]);
+    historyRef.current = [...historyRef.current, { role: "user" as const, content }].slice(-40);
     setLoading(true);
 
     try {
-      const r = await fetch("/api/ai/staff-chat", {
+      const res = await fetch("/api/ai/staff-chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ messages: conversationRef.current }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify({ messages: historyRef.current }),
       });
-      const data = await r.json();
+      const data = await res.json();
       const reply = data.text ?? "Sorry, I couldn't process that. Please try again.";
-      conversationRef.current = [...conversationRef.current, { role: "assistant", content: reply }];
-      if (conversationRef.current.length > 40) conversationRef.current = conversationRef.current.slice(-40);
-      setMessages(p => [...p, { id: (Date.now() + 1).toString(), role: "assistant", content: reply, time: new Date() }]);
+      const aiMsg: Message = { id: `a-${Date.now()}`, role: "assistant", content: reply, ts: new Date() };
+      setMessages(prev => [...prev, aiMsg]);
+      historyRef.current = [...historyRef.current, { role: "assistant" as const, content: reply }].slice(-40);
     } catch {
-      setMessages(p => [...p, { id: (Date.now() + 1).toString(), role: "assistant", content: "Network error — please check your connection and try again.", time: new Date() }]);
+      setMessages(prev => [...prev, {
+        id: `err-${Date.now()}`, role: "assistant" as const,
+        content: "Network error — please check your connection and try again.", ts: new Date(),
+      }]);
     } finally {
       setLoading(false);
     }
-  }
+  }, [input, loading]);
 
-  function clearChat() {
-    setMessages([]);
-    conversationRef.current = [];
-    setShowModules(true);
-  }
+  const copyMsg = (id: string, content: string) => {
+    navigator.clipboard.writeText(content).then(() => {
+      setCopied(id); setTimeout(() => setCopied(null), 2000);
+    });
+  };
 
-  function downloadChat() {
-    const text = messages.map(m => `[${m.role.toUpperCase()}] ${m.content}`).join("\n\n---\n\n");
-    const blob = new Blob([text], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
+  const exportChat = () => {
+    const txt = messages.map(m =>
+      `[${m.ts.toLocaleTimeString()}] ${m.role === "user" ? user?.firstName : "Philix AI"}:\n${m.content}`
+    ).join("\n\n---\n\n");
     const a = document.createElement("a");
-    a.href = url; a.download = `philix-ai-session-${Date.now()}.txt`; a.click();
-    URL.revokeObjectURL(url);
-  }
+    a.href = URL.createObjectURL(new Blob([txt], { type: "text/plain" }));
+    a.download = `philix-ai-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+  };
+
+  const filteredCmds = COMMANDS.filter(c =>
+    c.cmd.slice(1).startsWith(cmdFilter) || c.label.toLowerCase().includes(cmdFilter.toLowerCase())
+  );
 
   return (
-    <div className="h-full flex flex-col" style={{ height: "calc(100vh - 64px)" }}>
+    <div className="flex flex-col" style={{ height: "calc(100vh - 56px - 3rem)" }}>
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 flex-shrink-0">
+      <div className="flex items-center justify-between pb-4 flex-shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center">
-            <Bot size={20} className="text-white" />
+          <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
+            <Brain size={18} className="text-indigo-400" />
           </div>
           <div>
-            <div className="font-bold text-white text-lg">Philix Enterprise AI</div>
-            <div className="text-xs text-slate-500 flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Version 35.0 · Enterprise Intelligence Edition · {user?.firstName} ({user?.role})
-            </div>
+            <h1 className="text-base font-bold text-white leading-tight">Philix Enterprise AI</h1>
+            <p className="text-[10px] text-white/30">
+              v35.0 · {user?.firstName} {user?.lastName} · {user?.role?.replace(/_/g, " ")}
+            </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {messages.length > 0 && (
-            <>
-              <button onClick={downloadChat} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg transition-all">
-                <Download size={12} /> Export
-              </button>
-              <button onClick={clearChat} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-red-400 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg transition-all">
-                <Trash2 size={12} /> Clear
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Main chat area */}
-      <div className="flex-1 overflow-y-auto px-4 lg:px-6 py-4 space-y-4">
-
-        {/* Welcome + Modules */}
-        {messages.length === 0 && (
-          <div className="max-w-3xl mx-auto space-y-5">
-            <div className="bg-gradient-to-br from-indigo-900/30 via-purple-900/20 to-slate-900 border border-indigo-800/30 rounded-2xl p-6">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="text-3xl">🤖</div>
-                <div>
-                  <div className="font-black text-white text-xl">Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, {user?.firstName}.</div>
-                  <div className="text-slate-400 text-sm">I am the Philix Finance Enterprise AI Operating System.</div>
-                </div>
-              </div>
-              <p className="text-slate-400 text-sm leading-relaxed">
-                I am not a generic chatbot. I am built to protect company capital, reduce defaults, support credit decisions, generate documents, and provide executive intelligence — all in real time.
-              </p>
-              <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
-                {["Protect Capital", "Reduce Defaults", "Credit Analysis", "Document Generation"].map(cap => (
-                  <div key={cap} className="bg-indigo-900/30 border border-indigo-800/30 rounded-lg px-3 py-2 text-indigo-300 text-center font-semibold">{cap}</div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <button onClick={() => setShowModules(s => !s)} className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 hover:text-slate-200">
-                {showModules ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                Quick-Start Templates
-              </button>
-              {showModules && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {MODULE_PROMPTS.map(mod => (
-                    <button key={mod.label} onClick={() => setInput(mod.prompt)}
-                      className="flex items-center gap-3 text-left p-3 bg-slate-900 border border-slate-800 rounded-xl hover:border-indigo-700/50 hover:bg-indigo-900/10 transition-all group">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-900/40 border border-indigo-800/40 flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-800/40">
-                        <mod.icon size={14} className="text-indigo-400" />
-                      </div>
-                      <span className="text-xs font-semibold text-slate-300 group-hover:text-white">{mod.label}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+        {messages.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <button onClick={exportChat} title="Export chat"
+              className="p-2 rounded-lg text-white/25 hover:text-white/60 hover:bg-white/5 transition-colors border border-white/5">
+              <Download size={14} />
+            </button>
+            <button onClick={() => { setMessages([]); historyRef.current = []; }} title="Clear chat"
+              className="p-2 rounded-lg text-white/25 hover:text-red-400 hover:bg-red-500/10 transition-colors border border-white/5">
+              <Trash2 size={14} />
+            </button>
           </div>
         )}
+      </div>
 
-        {/* Messages */}
-        <div className="max-w-3xl mx-auto space-y-4">
-          {messages.map(msg => (
-            <div key={msg.id} className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
-              {msg.role === "assistant" && (
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Bot size={14} className="text-white" />
-                </div>
-              )}
-              <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-                msg.role === "user"
-                  ? "bg-indigo-600 text-white text-sm"
-                  : "bg-slate-900 border border-slate-800"
-              }`}>
-                {msg.role === "assistant" ? (
-                  <RenderMessage text={msg.content} />
-                ) : (
-                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+      {/* Messages area */}
+      <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+        {messages.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center py-8 gap-6">
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-2xl bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center mx-auto mb-4">
+                <Sparkles size={28} className="text-indigo-400" />
+              </div>
+              <h2 className="text-xl font-bold text-white mb-2">
+                {new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 17 ? "Good afternoon" : "Good evening"}, {user?.firstName}
+              </h2>
+              <p className="text-sm text-white/40 max-w-md mx-auto leading-relaxed">
+                I'm your enterprise intelligence system — credit decisions, risk assessment, document generation,
+                collections strategy, financial calculations, and executive analysis.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-2 max-w-lg">
+              {[
+                { icon: Shield,       label: "Credit Score",      color: "emerald", msg: "Score a new client for a K5,000 salary loan. Name: John Banda. Formal employment at Zamtel. Monthly income: K8,000. Collateral: Android phone valued at K2,500. First loan application." },
+                { icon: TrendingUp,   label: "Portfolio Analysis", color: "purple",  msg: "/portfolio Analyze our current portfolio health and give top 5 recommendations to improve collection rate this month." },
+                { icon: FileText,     label: "Demand Letter",      color: "amber",   msg: "/demand Generate a firm demand letter for a client 14 days overdue on a K3,000 loan with K840 penalties accrued. Total due: K4,320." },
+                { icon: Calculator,   label: "Loan Calc",          color: "indigo",  msg: "/calculate Principal K10,000 at 15% flat rate over 8 weeks. Show weekly payments, total repayable, and full amortization schedule." },
+              ].map(({ icon: Icon, label, color, msg }) => (
+                <button key={label} onClick={() => send(msg)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium transition-all ${colorMap[color]}`}>
+                  <Icon size={12} />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <p className="text-[11px] text-white/20">
+              Type <kbd className="bg-white/10 border border-white/10 px-1.5 py-0.5 rounded font-mono text-white/40">/</kbd> for command shortcuts
+            </p>
+          </div>
+        ) : (
+          <>
+            {messages.map(msg => (
+              <div key={msg.id} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                {msg.role === "assistant" && (
+                  <div className="w-7 h-7 rounded-xl bg-indigo-500/20 border border-indigo-500/25 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <Brain size={13} className="text-indigo-400" />
+                  </div>
                 )}
-                <div className={`text-[10px] mt-1.5 ${msg.role === "user" ? "text-indigo-300 text-right" : "text-slate-600"}`}>
-                  {msg.time.toLocaleTimeString("en-ZM", { hour: "2-digit", minute: "2-digit" })}
+                <div className="group relative max-w-[80%]">
+                  <div className={`rounded-2xl px-4 py-3 ${
+                    msg.role === "user"
+                      ? "bg-indigo-600/20 border border-indigo-500/20 text-white/85"
+                      : "bg-white/[0.04] border border-white/[0.07]"
+                  }`}>
+                    {msg.role === "assistant"
+                      ? <Md text={msg.content} />
+                      : <p className="text-[13px] leading-relaxed whitespace-pre-wrap text-white/85">{msg.content}</p>
+                    }
+                  </div>
+                  <div className={`flex items-center gap-1.5 mt-1 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                    <span className="text-[9px] text-white/15">
+                      {msg.ts.toLocaleTimeString("en-ZM", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                    <button onClick={() => copyMsg(msg.id, msg.content)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-white/20 hover:text-white/50 p-0.5">
+                      {copied === msg.id ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
+                    </button>
+                  </div>
+                </div>
+                {msg.role === "user" && (
+                  <div className="w-7 h-7 rounded-xl bg-[#C9A227]/20 border border-[#C9A227]/25 flex items-center justify-center flex-shrink-0 mt-0.5 text-[10px] font-bold text-[#C9A227]">
+                    {user?.firstName?.[0]}{user?.lastName?.[0]}
+                  </div>
+                )}
+              </div>
+            ))}
+            {loading && (
+              <div className="flex gap-3">
+                <div className="w-7 h-7 rounded-xl bg-indigo-500/20 border border-indigo-500/25 flex items-center justify-center flex-shrink-0">
+                  <Brain size={13} className="text-indigo-400 animate-pulse" />
+                </div>
+                <div className="bg-white/[0.04] border border-white/[0.06] rounded-2xl px-4 py-3">
+                  <div className="flex items-center gap-1.5">
+                    {[0, 150, 300].map(d => (
+                      <div key={d} className="w-1.5 h-1.5 rounded-full bg-white/25 animate-bounce" style={{ animationDelay: `${d}ms` }} />
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-
-          {loading && (
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center flex-shrink-0">
-                <Bot size={14} className="text-white" />
-              </div>
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl px-4 py-3">
-                <div className="flex items-center gap-2 text-slate-500 text-xs">
-                  <Loader2 size={12} className="animate-spin" />
-                  <span>Enterprise AI processing…</span>
-                </div>
-              </div>
-            </div>
-          )}
-          <div ref={bottomRef} />
-        </div>
+            )}
+          </>
+        )}
+        <div ref={bottomRef} />
       </div>
 
       {/* Input */}
-      <div className="flex-shrink-0 border-t border-slate-800 px-4 lg:px-6 py-3 bg-slate-950">
-        <div className="max-w-3xl mx-auto">
-          <div className="flex gap-3 items-end">
-            <textarea
-              ref={inputRef}
-              rows={input.split("\n").length > 2 ? 3 : 1}
-              className="flex-1 bg-slate-900 border border-slate-700 text-slate-100 rounded-xl px-4 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-600"
-              placeholder="Ask anything — credit scoring, fraud check, calculations, documents, strategy…"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-            />
-            <button
-              onClick={() => send()}
-              disabled={!input.trim() || loading}
-              className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-white"
-            >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-            </button>
+      <div className="flex-shrink-0 pt-4 relative">
+        {showCommands && filteredCmds.length > 0 && (
+          <div className="absolute bottom-full mb-2 left-0 right-0 bg-[#0B1F3A] border border-white/10 rounded-2xl overflow-hidden shadow-2xl z-10">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+              <span className="text-[10px] text-white/30 font-bold uppercase tracking-wider">AI Commands</span>
+              <button onClick={() => setShowCommands(false)} className="text-white/20 hover:text-white/50 transition-colors">
+                <X size={12} />
+              </button>
+            </div>
+            {filteredCmds.map(cmd => {
+              const Icon = cmd.icon;
+              return (
+                <button key={cmd.cmd} onClick={() => applyCommand(cmd)}
+                  className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-white/5 transition-colors text-left border-b border-white/[0.03] last:border-none">
+                  <div className={`p-1.5 rounded-lg border ${colorMap[cmd.color]}`}>
+                    <Icon size={12} />
+                  </div>
+                  <div>
+                    <span className="text-[12px] font-bold text-white/70">{cmd.cmd}</span>
+                    <span className="text-[11px] text-white/30 ml-2">{cmd.label}</span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
-          <p className="text-[10px] text-slate-700 mt-1.5 text-center">
-            Enterprise AI · Powered by Claude · Shift+Enter for new line
-          </p>
+        )}
+
+        <div className="bg-white/[0.04] border border-white/8 rounded-2xl overflow-hidden focus-within:border-indigo-500/40 transition-colors">
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            value={input}
+            onChange={e => handleInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Enter" && !e.shiftKey && !showCommands) { e.preventDefault(); send(); }
+              if (e.key === "Escape") setShowCommands(false);
+              if (e.key === "ArrowDown" && showCommands) e.preventDefault();
+            }}
+            placeholder="Ask anything — credit score, fraud check, demand letter, portfolio analysis, calculations…"
+            className="w-full bg-transparent px-4 pt-3 pb-2 text-[13px] text-white/80 placeholder:text-white/20 resize-none outline-none leading-relaxed"
+          />
+          <div className="flex items-center justify-between px-3 pb-3">
+            <button onClick={() => { setShowCommands(!showCommands); setCmdFilter(""); }}
+              className="flex items-center gap-1.5 text-[11px] text-white/25 hover:text-white/50 transition-colors px-2 py-1 rounded-lg hover:bg-white/5 border border-transparent hover:border-white/5">
+              <Zap size={11} />
+              <span>Commands</span>
+              <ChevronDown size={9} />
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-white/15 hidden sm:block">Shift+Enter for new line</span>
+              <button onClick={() => send()} disabled={!input.trim() || loading}
+                className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-[12px] font-semibold px-3 py-1.5 rounded-xl transition-all">
+                {loading ? <RefreshCw size={12} className="animate-spin" /> : <Send size={12} />}
+                Send
+              </button>
+            </div>
+          </div>
         </div>
+        <p className="text-center text-[10px] text-white/10 mt-2">
+          Philix Enterprise AI · Powered by Claude · Not a substitute for legal or regulatory advice
+        </p>
       </div>
     </div>
   );

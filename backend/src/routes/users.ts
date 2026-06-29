@@ -61,14 +61,29 @@ router.post("/", isSuperAdmin, async (req: Request, res: Response) => {
   res.status(201).json(user);
 });
 
-// PATCH /api/users/:id
+// PATCH /api/users/:id — CEO can update any staff profile field
 router.patch("/:id", isSuperAdmin, async (req: Request, res: Response) => {
-  const { firstName, lastName, phone, role, status, branchId } = req.body;
+  const { firstName, lastName, email, phone, role, status, branchId, department } = req.body;
+
+  if (email) {
+    const normalEmail = email.toLowerCase().trim();
+    const conflict = await prisma.user.findFirst({ where: { email: normalEmail, NOT: { id: req.params.id } } });
+    if (conflict) throw new AppError("Email already in use by another staff member", 409);
+  }
 
   const updated = await prisma.user.update({
     where: { id: req.params.id },
-    data: { firstName, lastName, phone, role, status, branchId },
-    select: { id: true, firstName: true, lastName: true, role: true, status: true },
+    data: {
+      ...(firstName && { firstName }),
+      ...(lastName && { lastName }),
+      ...(email && { email: email.toLowerCase().trim() }),
+      ...(phone !== undefined && { phone }),
+      ...(role && { role }),
+      ...(status && { status }),
+      ...(branchId !== undefined && { branchId }),
+      ...(department !== undefined && { department }),
+    },
+    select: { id: true, firstName: true, lastName: true, email: true, role: true, status: true, department: true },
   });
 
   await createAuditLog({

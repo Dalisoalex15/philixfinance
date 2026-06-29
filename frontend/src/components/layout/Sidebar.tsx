@@ -1,199 +1,103 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "../../lib/utils";
 import {
-  LayoutDashboard, Users, CreditCard, Package, Receipt, AlertTriangle,
-  BarChart2, DollarSign, TrendingUp, CheckSquare, UserCog, Activity,
-  BookOpen, Megaphone, Shield, GitBranch, Settings, Calculator,
-  Building2, Wrench, ChevronLeft, ChevronRight, Crown,
-  BookMarked, Landmark, Banknote, RefreshCw, Slash, Gavel, Globe,
-  ScanFace, Clock, FileWarning, PieChart, LineChart, MonitorDot,
-  Calendar, Users2, FileText, ShoppingBag, Mail, Upload, Download,
-  Search, Percent, Wallet, Scale,
-  MessageSquare, Smartphone, MessageCircle, FileSignature, QrCode,
-  Brain, ShieldAlert, Gift, UsersRound, Webhook, TrendingDown, Radio, Lock,
+  LayoutDashboard, Users, CreditCard, Receipt, AlertTriangle, BarChart2,
+  UserCog, Settings, ChevronLeft, ChevronRight, BookOpen,
+  FileText, Brain, LogOut, TrendingUp, Wallet,
 } from "lucide-react";
 import { useAuthStore } from "../../store/auth";
 import { useLoanApplicationStore } from "../../store/loanApplicationStore";
 import PhilixLogo from "../ui/PhilixLogo";
 
 interface SidebarProps { open: boolean; onToggle: () => void; }
+
 interface NavItem {
-  href: string; icon: React.ElementType; label: string;
-  roles?: string[]; badge?: string; badgeColor?: string;
+  to: string;
+  Icon: React.ElementType;
+  label: string;
+  roles?: string[];
+  liveCount?: boolean;
+  aiAccent?: boolean;
 }
+
 interface NavGroup { label: string; items: NavItem[]; }
 
-const navGroups: NavGroup[] = [
+const NAV_GROUPS: NavGroup[] = [
   {
-    label: "Overview",
+    label: "Command",
     items: [
-      { href: "/",          icon: LayoutDashboard, label: "Dashboard" },
-      { href: "/ceo",       icon: Crown,           label: "CEO Dashboard",  roles: ["SUPER_ADMIN", "MANAGER"] },
-      { href: "/philix-ai", icon: Brain,           label: "Philix Enterprise AI", badge: "NEW", badgeColor: "bg-indigo-600" },
-      { href: "/search",    icon: Search,           label: "Global Search" },
+      { to: "/",          Icon: LayoutDashboard, label: "Dashboard" },
+      { to: "/philix-ai", Icon: Brain,           label: "Philix AI",  aiAccent: true },
     ],
   },
   {
     label: "Lending",
     items: [
-      { href: "/clients",       icon: Users,       label: "Client CRM" },
-      { href: "/loans",         icon: CreditCard,  label: "Loans" },
-      { href: "/loan-products",  icon: Package,      label: "Loan Products" },
-      { href: "/calculator",     icon: Calculator,   label: "Loan Calculator" },
-      { href: "/collateral",     icon: Package,      label: "Collateral Vault" },
-      { href: "/repayments",     icon: Receipt,      label: "Repayments" },
-      { href: "/group-lending",  icon: UsersRound,   label: "Group Lending" },
-      { href: "/referrals",      icon: Gift,         label: "Referral Programme" },
+      { to: "/online-applications",  Icon: FileText,   label: "Applications",   liveCount: true },
+      { to: "/clients",              Icon: Users,      label: "Clients" },
+      { to: "/loans",                Icon: CreditCard, label: "Loans" },
+      { to: "/repayments",           Icon: Receipt,    label: "Repayments" },
+      { to: "/accounts-management",  Icon: BookOpen,   label: "Accounts Centre", roles: ["SUPER_ADMIN", "MANAGER"] },
     ],
   },
   {
-    label: "Client Management",
+    label: "Risk",
     items: [
-      { href: "/portal-clients",        icon: Users,        label: "Client Accounts",    roles: ["SUPER_ADMIN", "MANAGER"] },
-      { href: "/accounts-management",   icon: BookOpen,     label: "Accounts Centre",    badge: "NEW", badgeColor: "bg-amber-700", roles: ["SUPER_ADMIN", "MANAGER"] },
-      { href: "/repayment-accounts",   icon: BookMarked,   label: "Repayment Accounts", badge: "LIVE", badgeColor: "bg-emerald-700" },
-      { href: "/online-applications",  icon: Globe,        label: "Online Applications" },
-      { href: "/kyc",                  icon: ScanFace,     label: "KYC Verification" },
-      { href: "/client-timeline",      icon: Clock,        label: "Client Timeline" },
-      { href: "/document-expiry",      icon: FileWarning,  label: "Document Expiry" },
-      { href: "/payment-submissions",  icon: Receipt,      label: "Payment Proofs" },
+      { to: "/collections",    Icon: AlertTriangle, label: "Collections" },
+      { to: "/credit-scoring", Icon: TrendingUp,    label: "Credit Scoring" },
+      { to: "/reports",        Icon: BarChart2,     label: "Reports" },
+      { to: "/ceo",            Icon: Wallet,        label: "CEO Dashboard", roles: ["SUPER_ADMIN", "MANAGER"] },
     ],
   },
   {
-    label: "Risk & Collections",
+    label: "Admin",
     items: [
-      { href: "/collections",          icon: AlertTriangle, label: "Collections" },
-      { href: "/recovery",             icon: Wrench,        label: "Recovery" },
-      { href: "/loan-restructure",     icon: RefreshCw,     label: "Restructuring" },
-      { href: "/write-offs",           icon: Slash,         label: "Write-offs & Penalties" },
-      { href: "/collateral-auction",   icon: Gavel,         label: "Collateral Auctions" },
-      { href: "/collateral-command",   icon: Shield,        label: "Collateral Command", roles: ["SUPER_ADMIN", "MANAGER"] },
-      { href: "/provisioning",         icon: Percent,       label: "Provisioning (PAR)" },
-      { href: "/credit-scoring",        icon: Brain,         label: "AI Credit Scoring" },
-      { href: "/client-credit-scores", icon: TrendingUp,    label: "Credit Scores",      roles: ["SUPER_ADMIN", "MANAGER", "LOAN_OFFICER", "ACCOUNTANT"] },
-      { href: "/fraud-alerts",         icon: ShieldAlert,   label: "Fraud Detection" },
-      { href: "/default-risk",         icon: TrendingDown,  label: "Default Risk" },
-      { href: "/loan-aging",           icon: Clock,         label: "Loan Aging (PAR)",   badge: "NEW", badgeColor: "bg-red-600 text-white" },
-      { href: "/daily-collection",     icon: Calendar,      label: "Daily Collections",  badge: "NEW", badgeColor: "bg-emerald-600 text-white" },
-    ],
-  },
-  {
-    label: "Accounting",
-    items: [
-      { href: "/accounting",         icon: BookMarked, label: "General Ledger" },
-      { href: "/cashbook",           icon: Banknote,   label: "Cashbook" },
-      { href: "/bank-reconciliation",icon: Scale,      label: "Bank Reconciliation" },
-      { href: "/expenses",           icon: DollarSign, label: "Expenses" },
-      { href: "/budgeting",          icon: Wallet,     label: "Budgeting" },
-      { href: "/forecasting",        icon: LineChart,  label: "Cash Flow Forecast" },
-    ],
-  },
-  {
-    label: "Capital & Investors",
-    items: [
-      { href: "/financial-controls",  icon: Lock,       label: "Financial Controls", roles: ["SUPER_ADMIN"], badge: "CEO", badgeColor: "bg-[#C9A227] text-[#0B1F3A]" },
-      { href: "/loan-product-rates",  icon: Percent,    label: "Product Rates",      roles: ["SUPER_ADMIN"] },
-      { href: "/capital",             icon: Wallet,     label: "Capital & Funding",  roles: ["SUPER_ADMIN", "MANAGER"] },
-      { href: "/investments",         icon: TrendingUp, label: "Client Investments", roles: ["SUPER_ADMIN", "MANAGER", "LOAN_OFFICER"] },
-      { href: "/investors",           icon: TrendingUp, label: "Investors",          roles: ["SUPER_ADMIN", "MANAGER"] },
-      { href: "/investor-statements", icon: FileText,   label: "Investor Statements",roles: ["SUPER_ADMIN", "MANAGER"] },
-    ],
-  },
-  {
-    label: "Analytics & Reports",
-    items: [
-      { href: "/reports",                icon: BarChart2,  label: "Reports" },
-      { href: "/branch-profitability",   icon: PieChart,   label: "Branch P&L",          roles: ["SUPER_ADMIN", "MANAGER"] },
-      { href: "/portfolio-profitability",icon: MonitorDot, label: "Portfolio P&L",       roles: ["SUPER_ADMIN", "MANAGER"] },
-      { href: "/financial-statements",   icon: FileText,   label: "Financial Statements", roles: ["SUPER_ADMIN", "MANAGER"], badge: "NEW", badgeColor: "bg-[#C9A227] text-[#0B1F3A]" },
-      { href: "/targets",                icon: TrendingUp, label: "Loan Officer Targets", roles: ["SUPER_ADMIN", "MANAGER"], badge: "NEW", badgeColor: "bg-[#C9A227] text-[#0B1F3A]" },
-    ],
-  },
-  {
-    label: "Operations",
-    items: [
-      { href: "/tasks",         icon: CheckSquare, label: "Tasks" },
-      { href: "/leave",         icon: Calendar,    label: "Leave Management" },
-      { href: "/meetings",      icon: Users2,      label: "Meeting Minutes" },
-      { href: "/compliance",    icon: Shield,      label: "Compliance" },
-      { href: "/procurement",   icon: ShoppingBag, label: "Procurement" },
-      { href: "/assets",        icon: MonitorDot,  label: "Asset Register" },
-      { href: "/email-centre",   icon: Mail,        label: "Email Centre", badge: "NEW", badgeColor: "bg-[#C9A227] text-[#0B1F3A]" },
-      { href: "/email-logs",    icon: Mail,        label: "Email Logs" },
-      { href: "/email-composer",icon: Mail,        label: "Email Clients" },
-      { href: "/announcements",      icon: Megaphone, label: "Announcements" },
-      { href: "/client-broadcasts",  icon: Radio,    label: "Client Broadcasts" },
-      { href: "/wiki",          icon: BookOpen,    label: "Knowledge Base" },
-    ],
-  },
-  {
-    label: "Communications",
-    items: [
-      { href: "/sms-notifications", icon: MessageSquare,  label: "SMS Notifications" },
-      { href: "/mobile-money",      icon: Smartphone,     label: "Mobile Money" },
-      { href: "/whatsapp",          icon: MessageCircle,  label: "WhatsApp Business" },
-    ],
-  },
-  {
-    label: "Loan Tracking",
-    items: [
-      { href: "/loan-pipeline",          icon: GitBranch,    label: "Loan Pipeline",          badge: "NEW", badgeColor: "bg-indigo-600 text-white" },
-      { href: "/collection-performance", icon: BarChart2,    label: "Collection Performance", badge: "NEW", badgeColor: "bg-indigo-600 text-white" },
-      { href: "/bulk-payment-import",    icon: Upload,       label: "Bulk Payment Import",    badge: "NEW", badgeColor: "bg-amber-600 text-white" },
-      { href: "/disbursement-checklist", icon: CheckSquare,  label: "Disbursement Checklist", badge: "NEW", badgeColor: "bg-emerald-600 text-white" },
-      { href: "/client-visits",          icon: Calendar,     label: "Client Visits",          badge: "NEW", badgeColor: "bg-blue-600 text-white" },
-      { href: "/quick-lookup",           icon: Search,       label: "Quick Loan Lookup",      badge: "NEW", badgeColor: "bg-violet-600 text-white" },
-      { href: "/document-expiry-alerts", icon: FileWarning,  label: "Document Expiry Alerts", badge: "NEW", badgeColor: "bg-red-600 text-white" },
-      { href: "/staff-performance",      icon: Activity,     label: "Staff Performance",      badge: "NEW", badgeColor: "bg-teal-600 text-white" },
-    ],
-  },
-  {
-    label: "Tools",
-    items: [
-      { href: "/loan-agreement", icon: FileSignature, label: "Loan Agreements" },
-      { href: "/qr-receipts",    icon: QrCode,        label: "QR Receipts" },
-      { href: "/import",         icon: Upload,        label: "Import Data" },
-      { href: "/export",         icon: Download,      label: "Export Center" },
-    ],
-  },
-  {
-    label: "Administration",
-    items: [
-      { href: "/users",          icon: UserCog,   label: "Staff",           roles: ["SUPER_ADMIN", "MANAGER"] },
-      { href: "/portal-clients", icon: Globe,     label: "Portal Clients",  roles: ["SUPER_ADMIN", "MANAGER"] },
-      { href: "/performance",    icon: Activity,  label: "Performance",     roles: ["SUPER_ADMIN", "MANAGER"] },
-      { href: "/branches",       icon: Building2, label: "Branches",        roles: ["SUPER_ADMIN"] },
-      { href: "/audit",          icon: Shield,    label: "Audit Logs",      roles: ["SUPER_ADMIN", "MANAGER"] },
-      { href: "/api-management", icon: Webhook,   label: "API Management",  roles: ["SUPER_ADMIN"] },
-      { href: "/settings",       icon: Settings,  label: "Settings",        roles: ["SUPER_ADMIN"] },
+      { to: "/users",    Icon: UserCog, label: "Staff Management", roles: ["SUPER_ADMIN"] },
+      { to: "/settings", Icon: Settings, label: "Settings",        roles: ["SUPER_ADMIN"] },
     ],
   },
 ];
 
 export default function Sidebar({ open, onToggle }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
   const pendingCount = useLoanApplicationStore(s =>
     s.applications.filter(a => a.status === "PENDING" || a.status === "UNDER_REVIEW").length
   );
 
-  const isActive = (href: string) =>
-    href === "/" ? location.pathname === "/" : location.pathname.startsWith(href);
+  const isActive = (to: string) =>
+    to === "/" ? location.pathname === "/" : location.pathname.startsWith(to);
 
-  const canAccess = (item: NavItem) => {
+  const canSee = (item: NavItem) => {
     if (!item.roles) return true;
     if (!user) return false;
     return item.roles.includes(user.role);
   };
 
+  const handleLogout = () => { logout(); navigate("/login"); };
+
+  const roleLabel = (role?: string) => {
+    const m: Record<string, string> = {
+      SUPER_ADMIN: "CEO / Admin", MANAGER: "Manager",
+      LOAN_OFFICER: "Loan Officer", COLLECTIONS_OFFICER: "Collections",
+      ACCOUNTANT: "Accountant",
+    };
+    return role ? (m[role] ?? role) : "";
+  };
+
   return (
     <div className={cn(
       "flex flex-col h-full transition-all duration-300 flex-shrink-0",
-      "bg-navy-900 border-r border-navy-800",
-      open ? "w-64" : "w-16"
+      "bg-[#0B1F3A] border-r border-white/5",
+      open ? "w-56" : "w-14"
     )}>
       {/* Logo */}
-      <div className="flex items-center justify-between px-3 h-16 border-b border-navy-800 flex-shrink-0">
+      <div className={cn(
+        "flex items-center border-b border-white/5 flex-shrink-0 h-14",
+        open ? "px-4 gap-3" : "justify-center"
+      )}>
         {open ? (
           <PhilixLogo variant="full" size="sm" onDark className="flex-shrink-0" />
         ) : (
@@ -201,61 +105,64 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
         )}
       </div>
 
-      {/* Tagline (collapsed: hidden) */}
-      {open && (
-        <div className="px-4 py-2 border-b border-navy-800">
-          <p className="text-[10px] text-gold-500 font-medium italic tracking-wide">
-            "Creating A Future Together"
-          </p>
-        </div>
-      )}
-
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
-        {navGroups.map((group) => {
-          const visibleItems = group.items.filter(canAccess);
-          if (visibleItems.length === 0) return null;
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5 scrollbar-thin">
+        {NAV_GROUPS.map((group) => {
+          const visible = group.items.filter(canSee);
+          if (!visible.length) return null;
           return (
-            <div key={group.label} className="mb-3">
+            <div key={group.label} className="mb-1">
               {open && (
-                <div className="px-3 mb-1 mt-2 text-[9px] font-bold uppercase tracking-[0.12em] text-navy-500">
+                <p className="px-3 pt-3 pb-1.5 text-[9px] font-bold uppercase tracking-[0.15em] text-white/20">
                   {group.label}
-                </div>
+                </p>
               )}
-              {visibleItems.map((item) => {
-                const dynamicBadge = item.href === "/online-applications" && pendingCount > 0
-                  ? pendingCount.toString()
-                  : item.badge;
+              {!open && <div className="h-px bg-white/5 my-2 mx-1" />}
+              {visible.map((item) => {
+                const count = item.liveCount && pendingCount > 0 ? pendingCount : 0;
+                const active = isActive(item.to);
                 return (
-                  <NavLink key={item.href} to={item.href} end={item.href === "/"}>
-                    {() => (
-                      <div
-                        className={cn(
-                          "nav-item",
-                          isActive(item.href) && "active",
-                          !open && "justify-center px-0 relative"
-                        )}
-                        title={!open ? item.label : undefined}
-                      >
-                        <item.icon size={16} className="flex-shrink-0" />
-                        {!open && item.href === "/online-applications" && pendingCount > 0 && (
-                          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full text-[8px] text-white flex items-center justify-center font-bold">
-                            {pendingCount > 9 ? "9+" : pendingCount}
-                          </span>
-                        )}
-                        {open && <span className="truncate">{item.label}</span>}
-                        {open && dynamicBadge && (
-                          <span className={cn(
-                            "ml-auto text-xs px-1.5 py-0.5 rounded-full font-semibold",
-                            item.href === "/online-applications"
-                              ? "bg-red-500/20 text-red-400"
-                              : (item.badgeColor || "bg-gold-500/20 text-gold-400")
-                          )}>
-                            {dynamicBadge}
-                          </span>
-                        )}
-                      </div>
-                    )}
+                  <NavLink key={item.to} to={item.to} end={item.to === "/"}>
+                    <div
+                      title={!open ? item.label : undefined}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm cursor-pointer transition-all duration-150 relative group",
+                        active
+                          ? "bg-[#C9A227]/15 text-[#C9A227] font-semibold"
+                          : "text-white/50 hover:text-white hover:bg-white/5",
+                        !open && "justify-center px-0",
+                        item.aiAccent && !active && "text-indigo-400/70 hover:text-indigo-300"
+                      )}
+                    >
+                      {/* Gold left border for active */}
+                      {active && (
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-[#C9A227] rounded-r-full" />
+                      )}
+                      <item.Icon size={15} className="flex-shrink-0" />
+                      {open && (
+                        <>
+                          <span className="flex-1 truncate text-[13px]">{item.label}</span>
+                          {count > 0 && (
+                            <span className="ml-auto text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                              {count > 99 ? "99+" : count}
+                            </span>
+                          )}
+                        </>
+                      )}
+                      {/* Collapsed: dot for pending count */}
+                      {!open && count > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-amber-500 rounded-full text-[7px] text-white flex items-center justify-center font-bold">
+                          {count > 9 ? "9+" : count}
+                        </span>
+                      )}
+                      {/* Tooltip on hover when collapsed */}
+                      {!open && (
+                        <div className="absolute left-full ml-2 px-2 py-1 bg-slate-900 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 border border-white/10 shadow-xl">
+                          {item.label}
+                          {count > 0 && <span className="ml-1 text-amber-400">({count})</span>}
+                        </div>
+                      )}
+                    </div>
                   </NavLink>
                 );
               })}
@@ -265,27 +172,38 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
       </nav>
 
       {/* User footer */}
-      {open && user && (
-        <div className="flex-shrink-0 p-4 border-t border-navy-800">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-gold-500 flex items-center justify-center text-navy-950 text-xs font-bold flex-shrink-0">
-              {user.firstName[0]}{user.lastName[0]}
-            </div>
-            <div className="overflow-hidden flex-1">
-              <div className="text-sm font-semibold text-white truncate">{user.firstName} {user.lastName}</div>
-              <div className="text-xs text-navy-400 truncate">{user.role.replace(/_/g, " ")}</div>
+      <div className="flex-shrink-0 border-t border-white/5">
+        {open && user ? (
+          <div className="p-3">
+            <div className="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-white/5 transition-colors">
+              <div className="w-7 h-7 rounded-full bg-[#C9A227]/20 border border-[#C9A227]/40 flex items-center justify-center text-[#C9A227] text-[10px] font-bold flex-shrink-0">
+                {user.firstName[0]}{user.lastName[0]}
+              </div>
+              <div className="overflow-hidden flex-1">
+                <div className="text-[12px] font-semibold text-white truncate leading-tight">{user.firstName} {user.lastName}</div>
+                <div className="text-[10px] text-white/35 truncate">{roleLabel(user.role)}</div>
+              </div>
+              <button onClick={handleLogout} title="Sign out"
+                className="text-white/25 hover:text-red-400 transition-colors p-1 flex-shrink-0">
+                <LogOut size={13} />
+              </button>
             </div>
           </div>
-        </div>
-      )}
+        ) : !open && (
+          <button onClick={handleLogout} title="Sign out"
+            className="flex items-center justify-center w-full h-10 text-white/20 hover:text-red-400 transition-colors">
+            <LogOut size={14} />
+          </button>
+        )}
 
-      {/* Toggle */}
-      <button
-        onClick={onToggle}
-        className="flex-shrink-0 flex items-center justify-center h-9 border-t border-navy-800 text-navy-500 hover:text-gold-400 hover:bg-navy-800 transition-colors"
-      >
-        {open ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-      </button>
+        {/* Toggle */}
+        <button
+          onClick={onToggle}
+          className="flex items-center justify-center w-full h-9 text-white/20 hover:text-white/50 hover:bg-white/5 transition-colors border-t border-white/5"
+        >
+          {open ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+        </button>
+      </div>
     </div>
   );
 }
