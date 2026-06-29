@@ -50,6 +50,7 @@ const navGroups: NavGroup[] = [
     label: "Client Management",
     items: [
       { href: "/portal-clients",        icon: Users,        label: "Client Accounts",    roles: ["SUPER_ADMIN", "MANAGER"] },
+      { href: "/accounts-management",   icon: BookOpen,     label: "Accounts Centre",    badge: "NEW", badgeColor: "bg-amber-700", roles: ["SUPER_ADMIN", "MANAGER"] },
       { href: "/repayment-accounts",   icon: BookMarked,   label: "Repayment Accounts", badge: "LIVE", badgeColor: "bg-emerald-700" },
       { href: "/online-applications",  icon: Globe,        label: "Online Applications" },
       { href: "/kyc",                  icon: ScanFace,     label: "KYC Verification" },

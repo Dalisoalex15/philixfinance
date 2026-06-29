@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useClientAuthStore } from "../../store/clientAuth";
 import ApplicationCountdown from "../../components/portal/ApplicationCountdown";
 import {
-  Shield, BadgeCheck, AlertCircle, Receipt, FileText,
+  Shield, BadgeCheck, AlertCircle, AlertTriangle, Receipt, FileText,
   Zap, Calculator, Home, CreditCard, Bell, User,
   ChevronRight, Quote, Sparkles, ShieldCheck, RefreshCw,
   CheckCircle2, TrendingUp, CalendarClock, Banknote, Info,
@@ -672,6 +672,12 @@ export default function ClientDashboardPage() {
   const overdue    = dueMs > 0 && daysUntilDue < 0;
   const nearDue    = !overdue && daysUntilDue <= 3 && dueMs > 0;
 
+  // Penalty: 2% per day after 3-day grace period
+  const GRACE_DAYS   = 3;
+  const daysOverall  = overdue ? Math.abs(daysUntilDue) : 0;
+  const daysOverdue  = Math.max(0, daysOverall - GRACE_DAYS);
+  const penaltyAmt   = daysOverdue > 0 ? remaining * 0.02 * daysOverdue : 0;
+
   // Reloan eligibility: no active loan AND has a past loan to clone details from
   const reloanSource  = !active ? apps.find(a => a.status === "REPAID" || a.status === "REJECTED") : undefined;
   const eligibleForReloan = !!reloanSource;
@@ -819,6 +825,23 @@ export default function ClientDashboardPage() {
             </div>
           )}
 
+          {/* Penalty banner — shows after 3-day grace period */}
+          {penaltyAmt > 0 && (
+            <div className="px-4 py-3 flex items-start gap-3" style={{ background: "rgba(239,68,68,0.12)", borderBottom: "1px solid rgba(239,68,68,0.2)" }}>
+              <AlertTriangle size={13} className="text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-black text-red-300 mb-0.5">Late Payment Penalty Applied</p>
+                <p className="text-[11px] text-red-400/80">
+                  {daysOverdue} day{daysOverdue !== 1 ? "s" : ""} overdue (after 3-day grace) × 2% per day on outstanding balance
+                </p>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className="text-xs font-black text-red-300">{K(penaltyAmt)}</p>
+                <p className="text-[10px] text-red-500">penalty</p>
+              </div>
+            </div>
+          )}
+
           <div className="p-5">
             <div className="flex items-center justify-between mb-5">
               <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Active Loan</span>
@@ -843,12 +866,12 @@ export default function ClientDashboardPage() {
                   <p className="text-[10px] text-slate-600 uppercase tracking-wide mb-1">
                     {totalPaid > 0 ? "Outstanding Balance" : "Total Amount to Pay"}
                   </p>
-                  <p className="text-5xl font-black text-white" style={{ letterSpacing: "-2px", lineHeight: 1 }}>
-                    {K(totalPaid > 0 ? remaining : totalDue)}
+                  <p className={`text-5xl font-black ${penaltyAmt > 0 ? "text-red-400" : "text-white"}`} style={{ letterSpacing: "-2px", lineHeight: 1 }}>
+                    {K(totalPaid > 0 ? remaining + penaltyAmt : totalDue)}
                   </p>
                   <p className="text-xs text-slate-600 mt-2">
                     {totalPaid > 0
-                      ? `${K(totalPaid)} paid of ${K(totalDue)} total`
+                      ? `${K(totalPaid)} paid · ${K(remaining)} balance${penaltyAmt > 0 ? ` · ${K(penaltyAmt)} penalty` : ""}`
                       : `${K(principal)} principal + ${K(interest)} interest (${rate}%)`}
                   </p>
                 </>

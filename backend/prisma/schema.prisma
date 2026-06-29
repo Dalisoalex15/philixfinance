@@ -404,3 +404,108 @@ model ClientInvestment {
   @@index([accountId])
   @@index([status])
 }
+
+// ── ACCOUNTS MODULE: LOAN LEDGER ────────────────────────────────────────────
+model LoanLedger {
+  id          String   @id @default(uuid())
+  txnId       String   @unique @default(uuid())
+  loanRef     String
+  accountId   String
+  date        DateTime @default(now())
+  description String
+  debit       Float    @default(0)
+  credit      Float    @default(0)
+  balance     Float    @default(0)
+  entryType   String
+  performedBy String?
+  branchId    String?
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  @@index([loanRef])
+  @@index([accountId])
+  @@index([date])
+}
+
+// ── ACCOUNTS MODULE: LOAN PENALTIES ─────────────────────────────────────────
+model LoanPenalty {
+  id            String   @id @default(uuid())
+  loanRef       String
+  accountId     String
+  applicationId String
+  penaltyDate   DateTime @default(now())
+  gracePeriod   Int      @default(3)
+  daysOverdue   Int
+  dailyRate     Float    @default(2)
+  penaltyAmount Float
+  principalBase Float
+  status        String   @default("ACTIVE")
+  waivedBy      String?
+  waivedAt      DateTime?
+  waivedReason  String?
+  paidAt        DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([loanRef])
+  @@index([accountId])
+  @@index([status])
+}
+
+// ── ACCOUNTS MODULE: CHART OF ACCOUNTS ──────────────────────────────────────
+model ChartOfAccount {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  type        String
+  category    String
+  description String?
+  isActive    Boolean  @default(true)
+  balance     Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  journalLines JournalLine[]
+
+  @@index([type])
+  @@index([code])
+}
+
+// ── ACCOUNTS MODULE: JOURNAL ENTRIES (Double-Entry) ─────────────────────────
+model JournalEntry {
+  id          String   @id @default(uuid())
+  entryNumber String   @unique
+  date        DateTime @default(now())
+  description String
+  reference   String?
+  entryType   String
+  totalAmount Float
+  postedBy    String?
+  branchId    String?
+  isReversed  Boolean  @default(false)
+  reversedBy  String?
+  reversedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  lines JournalLine[]
+
+  @@index([entryType])
+  @@index([date])
+  @@index([reference])
+}
+
+// ── ACCOUNTS MODULE: JOURNAL LINES ──────────────────────────────────────────
+model JournalLine {
+  id          String         @id @default(uuid())
+  journalId   String
+  journal     JournalEntry   @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  accountCode String
+  account     ChartOfAccount @relation(fields: [accountCode], references: [code])
+  debit       Float          @default(0)
+  credit      Float          @default(0)
+  description String?
+  createdAt   DateTime       @default(now())
+
+  @@index([journalId])
+  @@index([accountCode])
+}

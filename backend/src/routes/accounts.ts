@@ -507,5 +507,388 @@ router.delete("/:id/entry/:entryId", isManagerOrAbove, wrap(async (req, res) => 
   res.json({ ok: true });
 }));
 
+// ── PENALTY ENGINE ────────────────────────────────────────────────────────────
+// Computes penalties for a loan: 2% per day after 3-day grace period
+function computePenalty(app: {
+  amountRequested: number;
+  interestRate: number;
+  termMonths: number;
+  reviewedAt: Date | null;
+  paymentSubmissions: { amount: number | null; status: string }[];
+}) {
+  const GRACE = 3;
+  const DAILY_RATE = 0.02; // 2%
+  const now = new Date();
+  const start = app.reviewedAt ? new Date(app.reviewedAt) : now;
+  const maturity = new Date(start.getTime() + app.termMonths * 7 * 86400000);
+  const totalDue = app.amountRequested * (1 + app.interestRate / 100);
+  const totalPaid = app.paymentSubmissions
+    .filter((p) => p.status === "APPROVED")
+    .reduce((s, p) => s + (p.amount ?? 0), 0);
+  const outstanding = Math.max(0, totalDue - totalPaid);
+  const daysOverall = Math.floor((now.getTime() - maturity.getTime()) / 86400000);
+  const daysOverdue = Math.max(0, daysOverall - GRACE);
+  const penaltyAmount = daysOverdue > 0 ? outstanding * DAILY_RATE * daysOverdue : 0;
+  return { daysOverall, daysOverdue, outstanding, penaltyAmount, maturity, totalDue, totalPaid };
+}
+
+// GET /api/accounts/penalties — all active penalties across disbursed loans
+router.get("/penalties", wrap(async (req, res) => {
+  const { status = "DISBURSED" } = req.query as Record<string, string>;
+  const apps = await (prisma as any).portalLoanApplication.findMany({
+    where: { status },
+    include: {
+      account: { select: { id: true, firstName: true, lastName: true, email: true, phone: true, clientNumber: true } },
+      paymentSubmissions: { where: { status: "APPROVED" }, select: { amount: true, status: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const results = apps.map((app: any) => {
+    const p = computePenalty(app);
+    return {
+      loanRef: app.reference,
+      accountId: app.accountId,
+      applicationId: app.id,
+      client: app.account,
+      productType: app.productType,
+      amountRequested: app.amountRequested,
+      ...p,
+      hasPenalty: p.daysOverdue > 0,
+      penaltyRate: 2,
+      gracePeriod: 3,
+    };
+  }).filter((r: any) => r.daysOverall > -3); // only include near-maturity or overdue
+
+  const totalPenaltyAmount = results.filter((r: any) => r.hasPenalty).reduce((s: number, r: any) => s + r.penaltyAmount, 0);
+  const overdueCount = results.filter((r: any) => r.daysOverdue > 0).length;
+
+  res.json({ loans: results, totalPenaltyAmount, overdueCount, total: results.length });
+}));
+
+// GET /api/accounts/penalties/:loanRef — penalty for a single loan
+router.get("/penalties/:loanRef", wrap(async (req, res) => {
+  const app = await (prisma as any).portalLoanApplication.findFirst({
+    where: { reference: req.params.loanRef },
+    include: {
+      account: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
+      paymentSubmissions: { where: { status: "APPROVED" }, select: { amount: true, status: true } },
+    },
+  });
+  if (!app) return res.status(404).json({ error: "Loan not found" });
+  if (app.status !== "DISBURSED") return res.json({ daysOverdue: 0, penaltyAmount: 0, hasPenalty: false });
+  const p = computePenalty(app);
+  res.json({ loanRef: app.reference, ...p, hasPenalty: p.daysOverdue > 0, penaltyRate: 2, gracePeriod: 3 });
+}));
+
+// POST /api/accounts/penalties/:loanRef/waive — waive a penalty (manager+)
+router.post("/penalties/:loanRef/waive", isManagerOrAbove, wrap(async (req, res) => {
+  const { reason } = req.body as { reason: string };
+  const staffUser = (req as any).user;
+  // Record waiver in ledger
+  const app = await (prisma as any).portalLoanApplication.findFirst({ where: { reference: req.params.loanRef } });
+  if (!app) return res.status(404).json({ error: "Loan not found" });
+  const p = computePenalty({ ...app, paymentSubmissions: [] });
+  await (prisma as any).loanLedger.create({
+    data: {
+      loanRef: req.params.loanRef, accountId: app.accountId,
+      description: `Penalty Waiver — ${reason ?? "Waived by manager"}`,
+      debit: 0, credit: p.penaltyAmount, balance: p.outstanding,
+      entryType: "ADJUSTMENT", performedBy: staffUser?.firstName + " " + staffUser?.lastName,
+    },
+  });
+  res.json({ ok: true, penaltyWaived: p.penaltyAmount });
+}));
+
+// ── LOAN LEDGER ───────────────────────────────────────────────────────────────
+
+// GET /api/accounts/ledger/:loanRef — full ledger for a loan
+router.get("/ledger/:loanRef", wrap(async (req, res) => {
+  const app = await (prisma as any).portalLoanApplication.findFirst({
+    where: { reference: req.params.loanRef },
+    include: {
+      account: { select: { firstName: true, lastName: true, email: true, phone: true, clientNumber: true } },
+      paymentSubmissions: {
+        where: { status: "APPROVED" },
+        select: { id: true, amount: true, paymentMethod: true, provider: true, reference: true, createdAt: true, reviewedAt: true },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  });
+  if (!app) return res.status(404).json({ error: "Loan not found" });
+
+  const penalty = computePenalty(app);
+  const rate = app.interestRate ?? 0;
+  const totalInterest = app.amountRequested * (rate / 100);
+  const totalDue = app.amountRequested + totalInterest;
+
+  // Build ledger dynamically
+  let runningBalance = 0;
+  const entries: {
+    date: string; txnId: string; description: string; debit: number; credit: number; balance: number; entryType: string; performedBy: string;
+  }[] = [];
+
+  // 1. Loan disbursement
+  runningBalance = totalDue;
+  entries.push({
+    date: app.reviewedAt ? new Date(app.reviewedAt).toISOString() : new Date(app.createdAt).toISOString(),
+    txnId: `TXN-DISB-${app.reference}`,
+    description: "Loan Disbursement",
+    debit: app.amountRequested,
+    credit: 0,
+    balance: runningBalance,
+    entryType: "DISBURSEMENT",
+    performedBy: app.reviewedBy ?? "System",
+  });
+
+  // 2. Interest charge
+  if (totalInterest > 0) {
+    entries.push({
+      date: app.reviewedAt ? new Date(app.reviewedAt).toISOString() : new Date(app.createdAt).toISOString(),
+      txnId: `TXN-INT-${app.reference}`,
+      description: `Interest Charge (${rate}% flat)`,
+      debit: totalInterest,
+      credit: 0,
+      balance: runningBalance,
+      entryType: "INTEREST",
+      performedBy: "System",
+    });
+  }
+
+  // 3. Payments received
+  for (const p of app.paymentSubmissions) {
+    runningBalance = Math.max(0, runningBalance - (p.amount ?? 0));
+    entries.push({
+      date: (p.reviewedAt ?? p.createdAt).toISOString(),
+      txnId: `TXN-PAY-${p.id}`,
+      description: `Repayment Received — ${p.provider ?? p.paymentMethod ?? "Cash"}${p.reference ? " Ref: " + p.reference : ""}`,
+      debit: 0,
+      credit: p.amount ?? 0,
+      balance: runningBalance,
+      entryType: "PAYMENT",
+      performedBy: "Client",
+    });
+  }
+
+  // 4. Penalty (if applicable)
+  if (penalty.daysOverdue > 0 && penalty.penaltyAmount > 0) {
+    entries.push({
+      date: new Date().toISOString(),
+      txnId: `TXN-PEN-${app.reference}-${penalty.daysOverdue}`,
+      description: `Late Payment Penalty — ${penalty.daysOverdue} days overdue @ 2%/day`,
+      debit: penalty.penaltyAmount,
+      credit: 0,
+      balance: runningBalance + penalty.penaltyAmount,
+      entryType: "PENALTY",
+      performedBy: "System (Auto)",
+    });
+  }
+
+  // Fetch any manual ledger entries from DB
+  const manualEntries = await (prisma as any).loanLedger.findMany({
+    where: { loanRef: req.params.loanRef },
+    orderBy: { date: "asc" },
+  });
+
+  res.json({
+    loan: {
+      reference: app.reference, productType: app.productType,
+      amountRequested: app.amountRequested, interestRate: rate,
+      totalInterest, totalDue, totalPaid: penalty.totalPaid,
+      outstanding: penalty.outstanding, status: app.status,
+      termMonths: app.termMonths,
+      startDate: app.reviewedAt ?? app.createdAt,
+      maturityDate: penalty.maturity,
+      daysOverdue: penalty.daysOverdue, penaltyAmount: penalty.penaltyAmount,
+    },
+    client: app.account,
+    ledger: [...entries, ...manualEntries.map((e: any) => ({
+      date: e.date.toISOString(), txnId: e.txnId,
+      description: e.description, debit: e.debit, credit: e.credit, balance: e.balance,
+      entryType: e.entryType, performedBy: e.performedBy ?? "Staff",
+    }))].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+  });
+}));
+
+// POST /api/accounts/ledger/:loanRef/entry — add manual ledger entry
+router.post("/ledger/:loanRef/entry", wrap(async (req, res) => {
+  const { description, debit, credit, entryType, notes } = req.body as Record<string, any>;
+  const staffUser = (req as any).user;
+  const app = await (prisma as any).portalLoanApplication.findFirst({ where: { reference: req.params.loanRef } });
+  if (!app) return res.status(404).json({ error: "Loan not found" });
+  const entry = await (prisma as any).loanLedger.create({
+    data: {
+      loanRef: req.params.loanRef, accountId: app.accountId,
+      description, debit: debit ?? 0, credit: credit ?? 0, balance: 0,
+      entryType: entryType ?? "ADJUSTMENT",
+      performedBy: `${staffUser?.firstName ?? ""} ${staffUser?.lastName ?? ""}`.trim(),
+      notes,
+    },
+  });
+  res.json({ ok: true, entry });
+}));
+
+// ── ACCOUNTS DASHBOARD KPIs ───────────────────────────────────────────────────
+router.get("/kpis", wrap(async (_req, res) => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekStart = new Date(today.getTime() - 7 * 86400000);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const [disbursed, allPaid, allSubmitted, todayPayments, weekPayments, monthPayments] = await Promise.all([
+    (prisma as any).portalLoanApplication.findMany({
+      where: { status: "DISBURSED" },
+      include: { paymentSubmissions: { where: { status: "APPROVED" }, select: { amount: true } } },
+    }),
+    (prisma as any).portalLoanApplication.count({ where: { status: "REPAID" } }),
+    (prisma as any).portalLoanApplication.count({ where: { status: { in: ["SUBMITTED", "UNDER_REVIEW"] } } }),
+    (prisma as any).loanPaymentSubmission.aggregate({ where: { status: "APPROVED", createdAt: { gte: today } }, _sum: { amount: true } }),
+    (prisma as any).loanPaymentSubmission.aggregate({ where: { status: "APPROVED", createdAt: { gte: weekStart } }, _sum: { amount: true } }),
+    (prisma as any).loanPaymentSubmission.aggregate({ where: { status: "APPROVED", createdAt: { gte: monthStart } }, _sum: { amount: true } }),
+  ]);
+
+  let totalPrincipal = 0, totalInterest = 0, totalPaid = 0, totalPenalty = 0, overdueCount = 0;
+  const arrearsBuckets = { current: 0, watchlist: 0, delinquent: 0, serious: 0, default: 0 };
+
+  for (const app of disbursed) {
+    const paid = app.paymentSubmissions.reduce((s: number, p: any) => s + (p.amount ?? 0), 0);
+    const interest = app.amountRequested * (app.interestRate / 100);
+    const due = app.amountRequested + interest;
+    const outstanding = Math.max(0, due - paid);
+    totalPrincipal += outstanding;
+    totalInterest += interest;
+    totalPaid += paid;
+
+    const p = computePenalty(app);
+    if (p.daysOverdue > 0) { totalPenalty += p.penaltyAmount; overdueCount++; }
+
+    // Arrears classification
+    const d = p.daysOverall;
+    if (d <= 0)       arrearsBuckets.current++;
+    else if (d <= 7)  arrearsBuckets.watchlist++;
+    else if (d <= 30) arrearsBuckets.delinquent++;
+    else if (d <= 90) arrearsBuckets.serious++;
+    else              arrearsBuckets.default++;
+  }
+
+  const par = disbursed.length > 0 ? Math.round((overdueCount / disbursed.length) * 100) : 0;
+
+  res.json({
+    totalActiveLoans: disbursed.length,
+    totalRepaidLoans: allPaid,
+    pendingApplications: allSubmitted,
+    totalOutstandingPrincipal: Math.round(totalPrincipal),
+    totalInterestReceivable: Math.round(totalInterest),
+    totalPortfolio: Math.round(totalPrincipal + totalInterest),
+    totalCollectedEver: Math.round(totalPaid),
+    totalPenalties: Math.round(totalPenalty),
+    overdueCount,
+    portfolioAtRisk: par,
+    collectionsToday: todayPayments._sum.amount ?? 0,
+    collectionsWeek: weekPayments._sum.amount ?? 0,
+    collectionsMonth: monthPayments._sum.amount ?? 0,
+    arrears: arrearsBuckets,
+  });
+}));
+
+// GET /api/accounts/repayment-register — all loans in ledger-sheet format (matches Google Sheets)
+router.get("/repayment-register", wrap(async (req, res) => {
+  const { status, search } = req.query as Record<string, string>;
+  const where: any = {};
+  if (status && status !== "ALL") where.status = status;
+  if (search) where.OR = [
+    { reference: { contains: search } },
+    { account: { is: { firstName: { contains: search } } } },
+    { account: { is: { lastName: { contains: search } } } },
+    { account: { is: { phone: { contains: search } } } },
+  ];
+
+  const apps = await (prisma as any).portalLoanApplication.findMany({
+    where,
+    include: {
+      account: { select: { firstName: true, lastName: true, email: true, phone: true, clientNumber: true } },
+      paymentSubmissions: {
+        where: { status: "APPROVED" },
+        select: { amount: true, createdAt: true, paymentMethod: true, provider: true, reference: true },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+  });
+
+  const rows = apps.map((app: any) => {
+    const p = computePenalty(app);
+    const startDate = app.reviewedAt ?? app.createdAt;
+    const maturityDate = new Date(new Date(startDate).getTime() + app.termMonths * 7 * 86400000);
+    const interestAmt = app.amountRequested * (app.interestRate / 100);
+    const weeklyPayment = Math.round((app.amountRequested + interestAmt) / (app.termMonths || 1));
+    const daysUntilMaturity = Math.ceil((maturityDate.getTime() - Date.now()) / 86400000);
+
+    return {
+      loanId: app.reference,
+      borrowerName: `${app.account.firstName} ${app.account.lastName}`,
+      email: app.account.email,
+      phoneNumber: app.account.phone,
+      loanType: app.productType.replace(/_/g, " "),
+      collateralDetails: app.collateralDesc ?? app.collateralType ?? "TRUSTED",
+      loanStartDate: new Date(startDate).toLocaleDateString("en-GB"),
+      loanMaturityDate: maturityDate.toLocaleDateString("en-GB"),
+      loanAmount: app.amountRequested,
+      loanDurationWeeks: app.termMonths,
+      interestRate: app.interestRate,
+      totalInterestAmount: Math.round(interestAmt),
+      totalRepaymentAmount: Math.round(app.amountRequested + interestAmt),
+      weeklyPayment,
+      paidAmount: Math.round(p.totalPaid),
+      remainingBalance: Math.round(p.outstanding),
+      penaltyAmount: Math.round(p.penaltyAmount),
+      daysOverdue: p.daysOverdue,
+      paymentStatus: p.outstanding <= 0 ? "PAID" : p.daysOverdue > 0 ? "OVERDUE" : daysUntilMaturity <= 3 ? "DUE SOON" : "ACTIVE",
+      daysUntilMaturity,
+      status: app.status,
+      ledger: app.paymentSubmissions.map((ps: any, i: number) => ({
+        date: new Date(ps.createdAt).toLocaleDateString("en-GB"),
+        description: "Repayment Received",
+        debit: weeklyPayment,
+        paid: ps.amount,
+        balance: Math.max(0, (app.amountRequested + interestAmt) - app.paymentSubmissions.slice(0, i + 1).reduce((s: number, pp: any) => s + (pp.amount ?? 0), 0)),
+        method: ps.provider ?? ps.paymentMethod,
+        reference: ps.reference,
+      })),
+    };
+  });
+
+  res.json({ loans: rows, total: rows.length });
+}));
+
+// GET /api/accounts/collections-center — who to contact today
+router.get("/collections-center", wrap(async (_req, res) => {
+  const apps = await (prisma as any).portalLoanApplication.findMany({
+    where: { status: "DISBURSED" },
+    include: {
+      account: { select: { firstName: true, lastName: true, email: true, phone: true, clientNumber: true } },
+      paymentSubmissions: { where: { status: "APPROVED" }, select: { amount: true, status: true } },
+    },
+  });
+
+  const today: any[] = [], upcoming: any[] = [], overdue: any[] = [];
+  for (const app of apps) {
+    const p = computePenalty(app);
+    const entry = {
+      loanRef: app.reference, client: app.account, productType: app.productType,
+      amountRequested: app.amountRequested, outstanding: p.outstanding,
+      daysOverall: p.daysOverall, daysOverdue: p.daysOverdue,
+      penaltyAmount: p.penaltyAmount, maturityDate: p.maturity.toISOString(),
+    };
+    if (p.daysOverall === 0) today.push(entry);
+    else if (p.daysOverall < 0 && p.daysOverall >= -3) upcoming.push(entry);
+    else if (p.daysOverdue > 0) overdue.push(entry);
+  }
+
+  overdue.sort((a, b) => b.daysOverdue - a.daysOverdue);
+  res.json({ dueToday: today, dueSoon: upcoming, overdue, counts: { today: today.length, upcoming: upcoming.length, overdue: overdue.length } });
+}));
+
 export default router;
 

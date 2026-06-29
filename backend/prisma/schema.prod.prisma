@@ -483,3 +483,108 @@ model ContactAttempt {
   @@index([loanRef])
   @@index([accountId])
 }
+
+// ── ACCOUNTS MODULE: LOAN LEDGER ──────────────────────────────────────────────
+model LoanLedger {
+  id            String   @id @default(uuid())
+  txnId         String   @unique @default(uuid())
+  loanRef       String
+  accountId     String
+  date          DateTime @default(now())
+  description   String   // Loan Disbursement | Interest Charge | Repayment Received | Late Payment Penalty | Adjustment
+  debit         Float    @default(0)   // amount owed/charged
+  credit        Float    @default(0)   // amount paid/credited
+  balance       Float    @default(0)   // running balance
+  entryType     String   // DISBURSEMENT | INTEREST | PAYMENT | PENALTY | ADJUSTMENT | FEE
+  performedBy   String?
+  branchId      String?
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  @@index([loanRef])
+  @@index([accountId])
+  @@index([date])
+  @@index([entryType])
+}
+
+// ── ACCOUNTS MODULE: LOAN PENALTIES ──────────────────────────────────────────
+model LoanPenalty {
+  id            String   @id @default(uuid())
+  loanRef       String
+  accountId     String
+  applicationId String
+  penaltyDate   DateTime @default(now())
+  gracePeriod   Int      @default(3)     // days grace before penalty kicks in
+  daysOverdue   Int                       // days past grace period
+  dailyRate     Float    @default(2)     // 2% per day
+  penaltyAmount Float                    // computed: principal_overdue * dailyRate/100 * daysOverdue
+  principalBase Float                    // outstanding balance used for calculation
+  status        String   @default("ACTIVE")  // ACTIVE | WAIVED | PAID | REVERSED
+  waivedBy      String?
+  waivedAt      DateTime?
+  waivedReason  String?
+  paidAt        DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([loanRef])
+  @@index([accountId])
+  @@index([status])
+  @@index([penaltyDate])
+}
+
+// ── ACCOUNTS MODULE: CHART OF ACCOUNTS ───────────────────────────────────────
+model ChartOfAccount {
+  id          String   @id @default(uuid())
+  code        String   @unique   // e.g. 1001, 2001, 3001, 4001
+  name        String
+  type        String   // ASSET | LIABILITY | EQUITY | INCOME | EXPENSE
+  category    String   // Cash | Loan Portfolio | Interest Receivable | etc.
+  description String?
+  isActive    Boolean  @default(true)
+  balance     Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  journalLines JournalLine[]
+
+  @@index([type])
+  @@index([code])
+}
+
+// ── ACCOUNTS MODULE: JOURNAL ENTRIES (Double-Entry) ──────────────────────────
+model JournalEntry {
+  id          String   @id @default(uuid())
+  entryNumber String   @unique  // JNL-000001
+  date        DateTime @default(now())
+  description String
+  reference   String?  // loan ref, payment ref, etc.
+  entryType   String   // LOAN_DISBURSEMENT | REPAYMENT | INTEREST | PENALTY | ADJUSTMENT
+  totalAmount Float
+  postedBy    String?
+  branchId    String?
+  isReversed  Boolean  @default(false)
+  reversedBy  String?
+  reversedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  lines JournalLine[]
+
+  @@index([entryType])
+  @@index([date])
+  @@index([reference])
+}
+
+model JournalLine {
+  id           String         @id @default(uuid())
+  journalId    String
+  journal      JournalEntry   @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  accountCode  String
+  account      ChartOfAccount @relation(fields: [accountCode], references: [code])
+  debit        Float          @default(0)
+  credit       Float          @default(0)
+  description  String?
+
+  @@index([journalId])
+  @@index([accountCode])
+}

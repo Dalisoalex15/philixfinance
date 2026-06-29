@@ -1,6 +1,7 @@
 import {
   Users, CheckCircle, Clock, ArrowUpRight, ArrowDownRight,
   Download, Zap, CreditCard, TrendingUp, BarChart2, Banknote, DollarSign,
+  AlertTriangle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLoanApplicationStore } from "../store/loanApplicationStore";
@@ -93,6 +94,7 @@ export default function DashboardPage() {
     totalInterestEarned: 0,
     totalRepayable: 0,
   });
+  const [penaltyKpis, setPenaltyKpis] = useState<{ totalPenalties: number; overdueCount: number; portfolioAtRisk: number } | null>(null);
 
   const pendingApps = applications.filter(a => a.status === "PENDING" || a.status === "UNDER_REVIEW");
   const approvedDisbursed = applications.filter(a => a.status === "APPROVED" || a.status === "DISBURSED").length;
@@ -109,9 +111,14 @@ export default function DashboardPage() {
     syncFromApi();
     const token = localStorage.getItem("philix_staff_token");
     if (!token) return;
-    fetch("/api/admin/summary", { headers: { Authorization: `Bearer ${token}` } })
+    const h = { Authorization: `Bearer ${token}` };
+    fetch("/api/admin/summary", { headers: h })
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) setSummary(data); })
+      .catch(() => {});
+    fetch("/api/accounts/kpis", { headers: h })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setPenaltyKpis(data); })
       .catch(() => {});
   }, []);
 
@@ -217,6 +224,36 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Penalty & Risk KPIs */}
+      {penaltyKpis && (penaltyKpis.totalPenalties > 0 || penaltyKpis.overdueCount > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="stat-card flex items-center gap-4" style={{ borderColor: "rgba(239,68,68,0.4)" }}>
+            <div className="p-3 rounded-xl bg-red-100 text-red-700 flex-shrink-0"><AlertTriangle size={20} /></div>
+            <div className="min-w-0">
+              <div className="text-xl font-bold font-mono text-red-600 truncate">{K(penaltyKpis.totalPenalties)}</div>
+              <div className="text-xs font-semibold text-navy-600 mt-0.5">Total Penalties Outstanding</div>
+              <div className="text-xs text-navy-500">2% per day after 3-day grace</div>
+            </div>
+          </div>
+          <div className="stat-card flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-orange-100 text-orange-700 flex-shrink-0"><AlertTriangle size={20} /></div>
+            <div className="min-w-0">
+              <div className="text-xl font-bold font-mono text-orange-700 truncate">{penaltyKpis.overdueCount}</div>
+              <div className="text-xs font-semibold text-navy-600 mt-0.5">Clients Overdue</div>
+              <div className="text-xs text-navy-500">PAR: {penaltyKpis.portfolioAtRisk}% of active loans</div>
+            </div>
+          </div>
+          <div className="stat-card flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-amber-100 text-amber-700 flex-shrink-0"><BarChart2 size={20} /></div>
+            <div className="min-w-0">
+              <div className="text-xl font-bold font-mono text-amber-700 truncate">{penaltyKpis.portfolioAtRisk}%</div>
+              <div className="text-xs font-semibold text-navy-600 mt-0.5">Portfolio at Risk (PAR)</div>
+              <div className="text-xs text-navy-500">{penaltyKpis.overdueCount} overdue of active loans</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Officer work-queue panel — only shown to non-CEO staff */}
       {!isCEO && (

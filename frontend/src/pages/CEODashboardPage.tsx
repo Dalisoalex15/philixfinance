@@ -134,6 +134,10 @@ export default function CEODashboardPage() {
     branch: string; rank: number; officers: number; totalDisbursed: number;
     activeLoans: number; disbursedCount: number; collectionRate: number; parRate: number; score: number;
   }[]>([]);
+  const [accountKpis, setAccountKpis] = useState<{
+    totalPenalties: number; overdueCount: number; portfolioAtRisk: number;
+    collectionsToday: number; totalPortfolio: number;
+  } | null>(null);
   const [statementsLoading, setStatementsLoading] = useState(false);
   const [statementsMsg, setStatementsMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
@@ -262,12 +266,14 @@ export default function CEODashboardPage() {
     try {
       const token = localStorage.getItem("philix_staff_token");
       if (!token) return;
-      const [accRes, lbRes] = await Promise.all([
+      const [accRes, lbRes, kpiRes] = await Promise.all([
         fetch("/api/admin/portal-accounts", { headers: { Authorization: `Bearer ${token}` } }),
         fetch("/api/admin/stats/branch-leaderboard", { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("/api/accounts/kpis", { headers: { Authorization: `Bearer ${token}` } }),
       ]);
       if (accRes.ok) setPortalAccounts(await accRes.json());
       if (lbRes.ok) setBranchLeaderboard(await lbRes.json());
+      if (kpiRes.ok) setAccountKpis(await kpiRes.json());
     } catch {
       // ignore
     } finally {
@@ -591,6 +597,52 @@ export default function CEODashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Penalty & Risk KPIs (from accounts/kpis) */}
+      {accountKpis && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="philix-card p-5 flex items-center gap-4" style={{ borderColor: accountKpis.totalPenalties > 0 ? "rgba(239,68,68,0.4)" : undefined }}>
+            <div className="p-3 rounded-xl bg-red-100 text-red-700 flex-shrink-0">
+              <AlertTriangle size={20} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xl font-bold font-mono text-red-600 truncate">{formatKwacha(accountKpis.totalPenalties)}</div>
+              <div className="text-xs font-semibold text-navy-600 mt-0.5">Total Penalties</div>
+              <div className="text-xs text-navy-500">2%/day after 3-day grace</div>
+            </div>
+          </div>
+          <div className="philix-card p-5 flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-orange-100 text-orange-700 flex-shrink-0">
+              <AlertTriangle size={20} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xl font-bold font-mono text-orange-700 truncate">{accountKpis.overdueCount}</div>
+              <div className="text-xs font-semibold text-navy-600 mt-0.5">Overdue Clients</div>
+              <div className="text-xs text-navy-500">PAR: {accountKpis.portfolioAtRisk}%</div>
+            </div>
+          </div>
+          <div className="philix-card p-5 flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-emerald-100 text-emerald-700 flex-shrink-0">
+              <Zap size={20} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xl font-bold font-mono text-emerald-700 truncate">{formatKwacha(accountKpis.collectionsToday)}</div>
+              <div className="text-xs font-semibold text-navy-600 mt-0.5">Collections Today</div>
+              <div className="text-xs text-navy-500">Approved payments</div>
+            </div>
+          </div>
+          <div className="philix-card p-5 flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-amber-100 text-amber-700 flex-shrink-0">
+              <BarChart2 size={20} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xl font-bold font-mono text-navy-900 truncate">{formatKwacha(accountKpis.totalPortfolio)}</div>
+              <div className="text-xs font-semibold text-navy-600 mt-0.5">Loan Portfolio</div>
+              <div className="text-xs text-navy-500">Principal + Interest</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Portal KPIs — Row 2 (from applications store) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

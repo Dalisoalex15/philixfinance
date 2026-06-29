@@ -104,6 +104,7 @@ import FinancialStatementsPage from "./pages/FinancialStatementsPage";
 import TargetsPage from "./pages/TargetsPage";
 import GetLoanIn15Page from "./pages/portal/GetLoanIn15Page";
 import RepaymentAccountsPage from "./pages/RepaymentAccountsPage";
+import AccountsManagementPage from "./pages/AccountsManagementPage";
 import FinancialControlsPage from "./pages/FinancialControlsPage";
 import LoanProductRatesPage from "./pages/LoanProductRatesPage";
 import ClientCreditScoresPage from "./pages/ClientCreditScoresPage";
@@ -353,6 +354,7 @@ export default function App() {
           <Route path="default-risk" element={<DefaultRiskPage />} />
           <Route path="portal-clients" element={<PortalClientsPage />} />
           <Route path="repayment-accounts" element={<RepaymentAccountsPage />} />
+          <Route path="accounts-management" element={<AccountsManagementPage />} />
           <Route path="capital" element={<CapitalPage />} />
           <Route path="payment-submissions" element={<PaymentSubmissionsPage />} />
           <Route path="client-broadcasts" element={<ClientBroadcastPage />} />
