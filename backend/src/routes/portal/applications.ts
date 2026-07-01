@@ -477,4 +477,50 @@ router.get("/:appId/payments", wrap(async (req: Request, res: Response) => {
   res.json(submissions);
 }));
 
+// POST /api/portal/applications/collateral — client submits standalone collateral for a loan
+router.post("/collateral", authenticatePortal, wrap(async (req: Request, res: Response) => {
+  const accountId = (req as Request & { portalAccountId: string }).portalAccountId;
+  const { applicationRef, collateralType, collateralDesc, collateralValue, photos } = req.body as {
+    applicationRef?: string;
+    collateralType: string;
+    collateralDesc: string;
+    collateralValue: number;
+    photos?: Record<string, string>; // base64 data URLs
+  };
+
+  if (!collateralType || !collateralDesc || !collateralValue) {
+    throw new AppError("collateralType, collateralDesc, and collateralValue are required", 400);
+  }
+
+  // Find the linked application or the most recent disbursed/approved loan
+  let app;
+  if (applicationRef) {
+    app = await prisma.portalLoanApplication.findFirst({
+      where: { reference: applicationRef, accountId },
+    });
+  } else {
+    app = await prisma.portalLoanApplication.findFirst({
+      where: { accountId, status: { in: ["DISBURSED", "APPROVED", "SUBMITTED", "UNDER_REVIEW"] } },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  if (!app) throw new AppError("No matching loan application found for this account", 404);
+
+  const updated = await prisma.portalLoanApplication.update({
+    where: { id: app.id },
+    data: {
+      collateralType: collateralType.trim(),
+      collateralDesc: collateralDesc.trim(),
+      collateralValue: parseFloat(String(collateralValue)),
+      ...(photos ? { collateralPhotos: JSON.stringify(photos) } : {}),
+    },
+    include: {
+      account: { select: { firstName: true, lastName: true, clientNumber: true } },
+    },
+  });
+
+  res.json(updated);
+}));
+
 export default router;
