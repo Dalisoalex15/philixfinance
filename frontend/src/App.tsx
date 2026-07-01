@@ -119,6 +119,7 @@ import DisbursementChecklistPage from "./pages/DisbursementChecklistPage";
 import DocumentExpiryAlertsPage from "./pages/DocumentExpiryAlertsPage";
 import QuickLoanLookupPage from "./pages/QuickLoanLookupPage";
 import StaffPerformanceDashboardPage from "./pages/StaffPerformanceDashboardPage";
+import ClientHubPage from "./pages/ClientHubPage";
 // New client portal pages
 import PaymentCalendarPage from "./pages/portal/PaymentCalendarPage";
 import AccountStatementPage from "./pages/portal/AccountStatementPage";
@@ -365,6 +366,7 @@ export default function App() {
           <Route path="financial-controls" element={<FinancialControlsPage />} />
           <Route path="loan-product-rates" element={<LoanProductRatesPage />} />
           <Route path="client-credit-scores" element={<ClientCreditScoresPage />} />
+          <Route path="client-hub" element={<RouteErrorBoundary><ClientHubPage /></RouteErrorBoundary>} />
           {/* New staff feature pages */}
           <Route path="loan-aging" element={<RouteErrorBoundary><LoanAgingReportPage /></RouteErrorBoundary>} />
           <Route path="daily-collection" element={<RouteErrorBoundary><DailyCollectionSheetPage /></RouteErrorBoundary>} />

@@ -6,7 +6,7 @@ import {
   FileText, Brain, LogOut, TrendingUp, Wallet, ScanLine, Mail,
   CheckSquare, Calendar, ClipboardList, ShieldCheck, ShoppingCart,
   Package, Megaphone, Radio, BookMarked, MessageSquare, Layers,
-  PieChart, Target, Search,
+  PieChart, Target, Search, UserCheck,
 } from "lucide-react";
 import { useAuthStore } from "../../store/auth";
 import { useLoanApplicationStore } from "../../store/loanApplicationStore";
@@ -42,6 +42,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: "/online-applications",  Icon: FileText,   label: "Applications",    liveCount: true },
       { to: "/clients",              Icon: Users,      label: "Clients" },
+      { to: "/client-hub",           Icon: UserCheck,  label: "Client Hub",      newBadge: true },
       { to: "/loans",                Icon: CreditCard, label: "Loans" },
       { to: "/repayments",           Icon: Receipt,    label: "Repayments" },
       { to: "/payment-submissions",  Icon: ScanLine,   label: "Payment Proofs",  proofCount: true },
