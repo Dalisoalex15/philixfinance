@@ -2,6 +2,8 @@ import nodemailer from "nodemailer";
 import { Resend } from "resend";
 import { logger } from "./logger";
 import { prisma } from "./prisma";
+import { buildPhilixEmail as _buildPhilixEmail, fmt as _fmt } from "./emailBuilder";
+export { buildPhilixEmail as buildPhilixEmailBranded } from "./emailBuilder";
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtp.gmail.com",

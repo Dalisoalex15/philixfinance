@@ -2,7 +2,7 @@
 import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { sendEmail } from "../lib/mailer";
-import { buildTemplate, TEMPLATE_LABELS, renderEmailTemplate } from "../services/emailTemplates";
+import { buildTemplate, TEMPLATE_LABELS, TEMPLATE_SAMPLES } from "../services/emailTemplates";
 import { authenticate as isLoggedIn, isManagerOrAbove } from "../middleware/auth";
 import { logger } from "../lib/logger";
 import { Resend } from "resend";
@@ -442,23 +442,10 @@ router.get("/clients/search", isLoggedIn, async (req: Request, res: Response) =>
 // ═══════════════════════════════════════════════════════════════════════════════
 router.get("/preview/:templateKey", isLoggedIn, (_req: Request, res: Response) => {
   const key = _req.params.templateKey;
-  const sampleParams: Record<string, any> = {
-    welcome:                   { clientName: "Chanda Mwale", loginEmail: "chanda@example.com", loginUrl: "https://app.philixfinance.com/portal", tempPassword: "Ch@nge123" },
-    loan_application_received: { clientName: "Chanda Mwale", loanId: "PX-2025-0001", productName: "Salary Loan", amount: 5000, duration: "3 months", submittedDate: new Date().toISOString() },
-    loan_approved:             { clientName: "Chanda Mwale", loanId: "PX-2025-0001", productName: "Salary Loan", principal: 5000, interestRate: 20, totalRepayment: 6000, dueDate: new Date(Date.now() + 90*86400000).toISOString(), disbursementDate: new Date().toISOString() },
-    loan_rejected:             { clientName: "Chanda Mwale", loanId: "PX-2025-0002", rejectionReason: "Insufficient collateral value to cover the requested loan amount." },
-    payment_received:          { clientName: "Chanda Mwale", loanId: "PX-2025-0001", paymentAmount: 2000, paymentDate: new Date().toISOString(), paymentMethod: "MTN Mobile Money", receiptNumber: "RCP-001", remainingBalance: 4000, totalPaid: 2000, totalDue: 6000 },
-    payment_reminder:          { clientName: "Chanda Mwale", loanId: "PX-2025-0001", instalmentAmount: 1500, dueDate: new Date(Date.now() + 3*86400000).toISOString(), daysUntilDue: 3, remainingBalance: 4000 },
-    overdue_notice:            { clientName: "Chanda Mwale", loanId: "PX-2025-0001", overdueAmount: 1500, dueDate: new Date(Date.now() - 7*86400000).toISOString(), daysOverdue: 7, penaltyRate: "5% per week", penaltyAmount: 75, totalOwed: 1575 },
-    loan_repaid:               { clientName: "Chanda Mwale", loanId: "PX-2025-0001", productName: "Salary Loan", totalPaid: 6000, repaidDate: new Date().toISOString(), collateralDescription: "Samsung Galaxy S23 (Black)", collectionDeadline: new Date(Date.now() + 30*86400000).toISOString(), applyUrl: "https://app.philixfinance.com/portal/apply" },
-    monthly_statement:         { clientName: "Chanda Mwale", statementPeriod: new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" }), loans: [{ loanId: "PX-2025-0001", product: "Salary Loan", disbursed: 5000, totalDue: 6000, totalPaid: 2000, remaining: 4000, status: "DISBURSED" }], payments: [{ date: new Date().toISOString(), amount: 2000, method: "MTN Money", loanId: "PX-2025-0001" }], totalOutstanding: 4000 },
-    custom:                    { clientName: "Chanda Mwale", customSubject: "Important notice from Philix Finance", customBody: "<p>Dear Chanda,</p><p>This is a sample custom message from Philix Finance. We hope this finds you well.</p>", staffName: "Daliso Phiri" },
-  };
-
-  if (!sampleParams[key]) return res.status(400).json({ error: `Unknown template: ${key}` });
-
+  const sampleParams = TEMPLATE_SAMPLES[key];
+  if (!sampleParams) return res.status(400).json({ error: `Unknown template: ${key}` });
   try {
-    const tpl = buildTemplate(key, sampleParams[key]);
+    const tpl = buildTemplate(key, sampleParams);
     res.setHeader("Content-Type", "text/html");
     return res.send(tpl.html);
   } catch (e: any) {
@@ -506,6 +493,62 @@ router.post("/webhook/resend", async (req: Request, res: Response) => {
   } catch (e) { logger.warn("webhook emailLog update failed", e); }
 
   return res.status(200).json({ ok: true });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// POST /api/emails/send-test — send a test email of any template to philixfinance15@gmail.com
+// ═══════════════════════════════════════════════════════════════════════════════
+router.post("/send-test", isLoggedIn, async (req: Request, res: Response) => {
+  const { templateKey } = req.body;
+  if (!templateKey) return res.status(400).json({ error: "templateKey required" });
+
+  const TEST_EMAIL = "philixfinance15@gmail.com";
+  const staff = (req as any).user;
+
+  const sampleParams = TEMPLATE_SAMPLES[templateKey];
+  if (!sampleParams) return res.status(400).json({ error: `No sample data for template: ${templateKey}` });
+
+  let tpl: any;
+  try { tpl = buildTemplate(templateKey, sampleParams); }
+  catch (e: any) { return res.status(400).json({ error: e.message }); }
+
+  const fromName  = process.env.COMPANY_NAME || "Philix Finance";
+  const fromEmail = process.env.SMTP_FROM    || "noreply@philixfinance.com";
+  let resendId: string | undefined;
+  let status = "SENT";
+  let error: string | undefined;
+
+  try {
+    if (process.env.RESEND_API_KEY) {
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      const result = await resend.emails.send({
+        from: `${fromName} <${fromEmail}>`,
+        to: [TEST_EMAIL],
+        subject: `[TEST] ${tpl.subject}`,
+        html: tpl.html,
+        text: tpl.text,
+      });
+      resendId = (result as any).data?.id;
+    } else {
+      return res.status(503).json({ error: "No email provider configured. Set RESEND_API_KEY in backend/.env" });
+    }
+  } catch (err: any) {
+    status = "FAILED"; error = String(err.message || err);
+    logger.error("Test email failed", err);
+  }
+
+  await logEmail({
+    to: TEST_EMAIL, toName: "Test Recipient",
+    subject: `[TEST] ${tpl.subject}`, template: templateKey,
+    bodyHtml: tpl.html, status,
+    triggeredBy: `${staff.firstName} ${staff.lastName}`,
+    triggerType: "test", resendId, error,
+  });
+
+  if (status === "FAILED") {
+    return res.status(500).json({ error: "Test email failed to send", detail: error });
+  }
+  return res.json({ ok: true, to: TEST_EMAIL, subject: `[TEST] ${tpl.subject}`, resendId });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Mail, Send, Users, FileText, Search, ChevronDown, Eye, RefreshCw,
   Download, CheckCircle, XCircle, Clock, AlertTriangle, X, Loader2,
-  MailCheck, MailX, ChevronLeft, ChevronRight,
+  MailCheck, MailX, ChevronLeft, ChevronRight, FlaskConical,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -70,6 +70,8 @@ function SendEmailTab() {
   const [result, setResult]             = useState<{ ok: boolean; message: string } | null>(null);
   const [showConfirm, setShowConfirm]   = useState(false);
   const [clientDropOpen, setClientDropOpen] = useState(false);
+  const [testSending, setTestSending]   = useState(false);
+  const [testResult, setTestResult]     = useState<{ ok: boolean; message: string } | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const searchClients = useCallback((q: string) => {
@@ -115,6 +117,24 @@ function SendEmailTab() {
     const data = await r.json();
     setResult({ ok: r.ok, message: r.ok ? `Email sent to ${selectedClient.email}` : data.error || "Send failed" });
     setSending(false);
+  };
+
+  const handleTestSend = async () => {
+    setTestSending(true); setTestResult(null);
+    const token = localStorage.getItem("philix-auth-v3") || localStorage.getItem("philix_staff_token") || "";
+    const r = await fetch("/api/emails/send-test", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ templateKey }),
+    });
+    const data = await r.json();
+    setTestResult({
+      ok: r.ok,
+      message: r.ok
+        ? `Test email sent to philixfinance15@gmail.com`
+        : data.error || "Test send failed",
+    });
+    setTestSending(false);
   };
 
   const tpl = TEMPLATES.find(t => t.key === templateKey);
@@ -192,6 +212,34 @@ function SendEmailTab() {
             </div>
           </div>
         )}
+
+        {/* Test Send — no client needed, uses sample data */}
+        <div className="rounded-xl border border-[#C9A227]/30 bg-amber-50/60 p-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <p className="text-sm font-semibold text-[#0B1F3A] flex items-center gap-1.5">
+                <FlaskConical size={14} className="text-[#C9A227]" /> Send Test Email
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Sends <strong>{TEMPLATES.find(t => t.key === templateKey)?.label}</strong> with sample data to <strong>philixfinance15@gmail.com</strong>
+              </p>
+            </div>
+            <button
+              onClick={handleTestSend}
+              disabled={testSending}
+              className="flex items-center gap-2 px-4 py-2 bg-[#C9A227] text-[#0B1F3A] rounded-lg text-sm font-bold hover:bg-[#C9A227]/90 disabled:opacity-50 transition-colors"
+            >
+              {testSending ? <Loader2 size={13} className="animate-spin" /> : <FlaskConical size={13} />}
+              {testSending ? "Sending…" : "Send Test"}
+            </button>
+          </div>
+          {testResult && (
+            <div className={`mt-3 flex items-center gap-2 text-sm rounded-lg p-2.5 ${testResult.ok ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+              {testResult.ok ? <CheckCircle size={13} /> : <AlertTriangle size={13} />}
+              {testResult.message}
+            </div>
+          )}
+        </div>
 
         {/* Custom fields */}
         {templateKey === "custom" && (
