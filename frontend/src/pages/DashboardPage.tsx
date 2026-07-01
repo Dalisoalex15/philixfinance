@@ -167,17 +167,19 @@ export default function DashboardPage() {
         {[
           { label: "New Client",     icon: Plus,       color: "indigo",  to: "/clients/new" },
           { label: "Review Apps",    icon: CheckCircle,color: "amber",   to: "/online-applications" },
-          { label: "Repayments",     icon: Wallet,     color: "emerald", to: "/repayments" },
+          { label: "Client Hub",     icon: Users,      color: "gold",    to: "/client-hub",  isNew: true },
           { label: "Ask Philix AI",  icon: Brain,      color: "purple",  to: "/philix-ai" },
-        ].map(({ label, icon: Icon, color, to }) => (
+        ].map(({ label, icon: Icon, color, to, isNew }) => (
           <button key={label} onClick={() => navigate(to)}
             className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border text-left transition-all group hover:scale-[1.02] active:scale-100
               ${color === "indigo"  ? "bg-indigo-500/10 border-indigo-500/20 hover:bg-indigo-500/15 text-indigo-400"
               : color === "amber"  ? "bg-amber-500/10 border-amber-500/20 hover:bg-amber-500/15 text-amber-400"
               : color === "emerald"? "bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/15 text-emerald-400"
+              : color === "gold"   ? "bg-[#C9A227]/10 border-[#C9A227]/25 hover:bg-[#C9A227]/20 text-[#C9A227]"
               :                     "bg-purple-500/10 border-purple-500/20 hover:bg-purple-500/15 text-purple-400"}`}>
             <Icon size={16} className="flex-shrink-0" />
             <span className="text-sm font-medium text-white/70 group-hover:text-white transition-colors">{label}</span>
+            {isNew && <span className="text-[9px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full ml-1">NEW</span>}
             <ArrowRight size={12} className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
           </button>
         ))}
