@@ -140,7 +140,9 @@ router.post("/send", isLoggedIn, async (req: Request, res: Response) => {
   const subject = templateKey === "custom" ? customSubject : tpl.subject;
 
   const fromName  = process.env.COMPANY_NAME || "Philix Finance";
-  const fromEmail = process.env.SMTP_FROM || "noreply@philixfinance.com";
+  const fromEmail = process.env.RESEND_API_KEY
+    ? (process.env.RESEND_FROM || "onboarding@resend.dev")
+    : (process.env.SMTP_FROM   || "noreply@philixfinance.com");
   let resendId: string | undefined;
   let status = "SENT";
   let error: string | undefined;
@@ -155,6 +157,9 @@ router.post("/send", isLoggedIn, async (req: Request, res: Response) => {
         html: tpl.html,
         text: tpl.text,
       });
+      if ((result as any).error) {
+        throw new Error((result as any).error.message || JSON.stringify((result as any).error));
+      }
       resendId = (result as any).data?.id;
     }
   } catch (err: any) {
@@ -227,7 +232,9 @@ router.post("/send-bulk", isLoggedIn, isManagerOrAbove, async (req: Request, res
   }
 
   const fromName  = process.env.COMPANY_NAME || "Philix Finance";
-  const fromEmail = process.env.SMTP_FROM || "noreply@philixfinance.com";
+  const fromEmail = process.env.RESEND_API_KEY
+    ? (process.env.RESEND_FROM || "onboarding@resend.dev")
+    : (process.env.SMTP_FROM   || "noreply@philixfinance.com");
   const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
   const results = await Promise.allSettled(
@@ -287,6 +294,9 @@ router.post("/send-bulk", isLoggedIn, isManagerOrAbove, async (req: Request, res
             html: tpl.html,
             text: tpl.text,
           });
+          if ((result as any).error) {
+            throw new Error((result as any).error.message || JSON.stringify((result as any).error));
+          }
           resendId = (result as any).data?.id;
         }
       } catch (err: any) {
