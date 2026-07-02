@@ -1,9 +1,31 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, AlertCircle, ArrowRight, Shield, Zap, TrendingUp, Users } from "lucide-react";
+import {
+  Eye, EyeOff, AlertCircle, ArrowRight, Shield, Zap, TrendingUp,
+  Users, Clock, CheckCircle, Star, ChevronRight, BadgeCheck,
+} from "lucide-react";
 import PhilixLogo from "../components/ui/PhilixLogo";
 import { useAuthStore } from "../store/auth";
 import { useClientAuthStore } from "../store/clientAuth";
+
+const STEPS = [
+  { n: "1", label: "Create Account", sub: "30 seconds" },
+  { n: "2", label: "Fill Application", sub: "5 minutes" },
+  { n: "3", label: "Get Approved",   sub: "Under review" },
+  { n: "4", label: "Receive Funds",  sub: "Same day" },
+];
+
+const STATS = [
+  { value: "2,400+", label: "Clients Served" },
+  { value: "K8.2M",  label: "Disbursed" },
+  { value: "4.9★",   label: "Client Rating" },
+  { value: "<15min", label: "Avg Approval" },
+];
+
+const TESTIMONIALS = [
+  { name: "Grace M.", role: "Teacher, Lusaka", text: "Applied on a Friday, had my K5,000 by Monday. Incredible service!" },
+  { name: "Mwansa K.", role: "Small Business Owner", text: "Philix helped me stock my shop before the holiday season. Game changer." },
+];
 
 export default function UnifiedLoginPage() {
   const navigate = useNavigate();
@@ -15,10 +37,9 @@ export default function UnifiedLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  // "auto" | "staff" | "client" — user can override auto-detection
   const [accountType, setAccountType] = useState<"auto" | "staff" | "client">("auto");
+  const [testimonialIdx, setTestimonialIdx] = useState(0);
 
-  // Clear stale tokens from old store keys whenever the login page is visited
   useEffect(() => {
     localStorage.removeItem("philix_staff_token");
     localStorage.removeItem("philix_staff_refresh");
@@ -28,7 +49,11 @@ export default function UnifiedLoginPage() {
     localStorage.removeItem("philix-client-auth-v2");
   }, []);
 
-  // Auto-detect from email domain unless manually overridden
+  useEffect(() => {
+    const t = setInterval(() => setTestimonialIdx(i => (i + 1) % TESTIMONIALS.length), 5000);
+    return () => clearInterval(t);
+  }, []);
+
   const resolvedType = (() => {
     if (accountType !== "auto") return accountType;
     if (!email) return null;
@@ -40,10 +65,7 @@ export default function UnifiedLoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-
-    // If still auto and no domain hint, default to client
     const loginAs = resolvedType ?? "client";
-
     try {
       if (loginAs === "staff") {
         await staffLogin(email, password);
@@ -60,85 +82,172 @@ export default function UnifiedLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex">
-      {/* Left branding panel */}
-      <div className="hidden lg:flex lg:w-[42%] bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 flex-col justify-between p-12 relative overflow-hidden border-r border-slate-800/60">
-        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(circle at 15% 85%, #6366f1 0%, transparent 45%), radial-gradient(circle at 85% 15%, #a855f7 0%, transparent 40%)" }} />
+    <div className="min-h-screen bg-[#070F1C] flex">
 
-        <div className="relative">
+      {/* ── Left branding panel ────────────────────────────────────────────── */}
+      <div className="hidden lg:flex lg:w-[48%] flex-col justify-between p-10 xl:p-14 relative overflow-hidden">
+        {/* Background gradients */}
+        <div className="absolute inset-0"
+          style={{ background: "radial-gradient(ellipse at 20% 20%, rgba(201,162,39,0.12) 0%, transparent 55%), radial-gradient(ellipse at 80% 80%, rgba(99,102,241,0.08) 0%, transparent 50%), linear-gradient(135deg, #0B1F3A 0%, #070F1C 100%)" }} />
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#C9A227]/30 to-transparent" />
+
+        {/* Top section */}
+        <div className="relative z-10">
           <PhilixLogo variant="full" size="lg" onDark />
-          <div className="mt-10 space-y-2">
-            <h1 className="text-3xl font-black text-white leading-tight">Building Futures,</h1>
-            <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 leading-tight">Together.</h1>
+
+          {/* Loan CTA Hero */}
+          <div className="mt-10 mb-8">
+            <div className="inline-flex items-center gap-2 bg-[#C9A227]/15 border border-[#C9A227]/30 text-[#C9A227] text-[11px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
+              <Clock size={11} /> Fast Approval
+            </div>
+            <h1 className="text-4xl xl:text-5xl font-black text-white leading-[1.1] mb-3">
+              Get a loan in
+              <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#C9A227] to-amber-400">
+                under 15 minutes.
+              </span>
+            </h1>
+            <p className="text-slate-400 text-base leading-relaxed mb-6">
+              Apply online, get approved fast, and receive funds the same day.
+              No lengthy queues. No complicated paperwork.
+            </p>
+
+            <a href="/portal/register"
+              className="inline-flex items-center gap-2.5 bg-gradient-to-r from-[#C9A227] to-amber-500 hover:from-amber-400 hover:to-[#C9A227] text-[#070F1C] font-black text-sm px-6 py-3.5 rounded-2xl transition-all duration-200 shadow-xl shadow-[#C9A227]/25 hover:shadow-[#C9A227]/40 hover:scale-[1.02]">
+              Start Your Application
+              <ArrowRight size={16} />
+            </a>
           </div>
-          <p className="text-slate-400 text-sm mt-4 leading-relaxed">
-            At Philix Finance, we believe every Zambian deserves access to fair, fast, and transparent credit — whether you're a student, a business owner, or a working professional.
-          </p>
-          <p className="text-slate-500 text-sm mt-3 leading-relaxed">
-            We're not just a lender. We're a partner in your growth — helping you bridge gaps, seize opportunities, and build the life you deserve.
-          </p>
+
+          {/* How it works */}
+          <div className="mb-8">
+            <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-3">How it works</p>
+            <div className="flex items-center gap-0">
+              {STEPS.map((s, i) => (
+                <div key={s.n} className="flex items-center flex-1">
+                  <div className="flex flex-col items-center flex-1 text-center">
+                    <div className="w-8 h-8 rounded-full bg-[#C9A227]/15 border border-[#C9A227]/30 flex items-center justify-center text-[#C9A227] text-xs font-black mb-1">
+                      {s.n}
+                    </div>
+                    <div className="text-[11px] font-semibold text-slate-300">{s.label}</div>
+                    <div className="text-[9px] text-slate-600">{s.sub}</div>
+                  </div>
+                  {i < STEPS.length - 1 && (
+                    <div className="h-px w-4 bg-gradient-to-r from-[#C9A227]/30 to-[#C9A227]/10 flex-shrink-0" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Stats grid */}
+          <div className="grid grid-cols-4 gap-2 mb-8">
+            {STATS.map(s => (
+              <div key={s.label} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3 text-center">
+                <div className="text-[16px] font-black text-[#C9A227]">{s.value}</div>
+                <div className="text-[9px] text-slate-500 mt-0.5">{s.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="relative space-y-4">
-          {[
-            { icon: Zap, label: "Fast, Simple Loans", desc: "Apply in minutes. Decision in 24–48 hours." },
-            { icon: Shield, label: "Trusted & Licensed", desc: "Regulated by the Bank of Zambia (BoZ)." },
-            { icon: TrendingUp, label: "Grow With Us", desc: "Better rates as you build your repayment history." },
-            { icon: Users, label: "Community First", desc: "Serving students, workers & entrepreneurs in Lusaka." },
-          ].map(f => (
-            <div key={f.label} className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">
-                <f.icon size={15} className="text-indigo-300" />
+        {/* Bottom section */}
+        <div className="relative z-10 space-y-5">
+          {/* Trust features */}
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { icon: Shield,      label: "BoZ Licensed",        desc: "Regulated by Bank of Zambia" },
+              { icon: Zap,         label: "Instant Decision",     desc: "AI-powered credit scoring" },
+              { icon: TrendingUp,  label: "Build Credit",         desc: "Better rates over time" },
+              { icon: Users,       label: "Community Focus",      desc: "Students, workers, businesses" },
+            ].map(f => (
+              <div key={f.label} className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center flex-shrink-0">
+                  <f.icon size={13} className="text-[#C9A227]" />
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold text-slate-300">{f.label}</div>
+                  <div className="text-[9px] text-slate-600">{f.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Rotating testimonial */}
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 transition-all duration-500">
+            <div className="flex items-center gap-1 mb-2">
+              {[...Array(5)].map((_, i) => <Star key={i} size={10} className="fill-[#C9A227] text-[#C9A227]" />)}
+            </div>
+            <p className="text-slate-400 text-[12px] leading-relaxed italic">"{TESTIMONIALS[testimonialIdx].text}"</p>
+            <div className="flex items-center gap-2 mt-2">
+              <div className="w-6 h-6 rounded-full bg-[#C9A227]/20 flex items-center justify-center text-[#C9A227] text-[9px] font-bold">
+                {TESTIMONIALS[testimonialIdx].name[0]}
               </div>
               <div>
-                <div className="text-sm font-semibold text-slate-200">{f.label}</div>
-                <div className="text-xs text-slate-500">{f.desc}</div>
+                <div className="text-[11px] font-bold text-slate-300">{TESTIMONIALS[testimonialIdx].name}</div>
+                <div className="text-[9px] text-slate-600">{TESTIMONIALS[testimonialIdx].role}</div>
               </div>
             </div>
-          ))}
-          <div className="pt-4 border-t border-slate-800/60">
-            <p className="text-slate-600 text-xs italic">"Your future is worth investing in."</p>
-            <p className="text-slate-700 text-xs mt-1">© 2025 Philix Finance Ltd · Lusaka, Zambia · BoZ Licensed</p>
+          </div>
+
+          <div className="border-t border-white/5 pt-4 flex items-center justify-between">
+            <p className="text-slate-700 text-[10px] italic">"Your future is worth investing in."</p>
+            <p className="text-slate-700 text-[10px]">© 2025 Philix Finance · Lusaka, Zambia</p>
           </div>
         </div>
       </div>
 
-      {/* Right login panel */}
-      <div className="flex-1 flex flex-col justify-center px-6 py-10 lg:px-12 overflow-y-auto">
-        <div className="max-w-md w-full mx-auto">
+      {/* ── Right login panel ──────────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col justify-center px-6 py-10 lg:px-12 xl:px-16 overflow-y-auto relative">
+        <div className="absolute inset-0 opacity-5"
+          style={{ backgroundImage: "radial-gradient(circle at 70% 30%, #C9A227 0%, transparent 60%)" }} />
 
-          {/* Mobile logo */}
-          <div className="lg:hidden mb-8">
+        <div className="max-w-[420px] w-full mx-auto relative">
+
+          {/* Mobile logo + loan CTA */}
+          <div className="lg:hidden mb-8 space-y-4">
             <PhilixLogo variant="full" size="md" onDark />
+            <div className="bg-gradient-to-r from-[#C9A227]/15 to-amber-500/10 border border-[#C9A227]/25 rounded-2xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Clock size={14} className="text-[#C9A227]" />
+                <span className="text-[#C9A227] font-black text-sm">Get a loan in under 15 minutes</span>
+              </div>
+              <p className="text-slate-400 text-xs mb-3">Apply online, get instant approval, receive funds same day.</p>
+              <a href="/portal/register"
+                className="flex items-center justify-center gap-2 bg-[#C9A227] text-[#070F1C] font-black text-sm py-2.5 rounded-xl transition-all hover:bg-amber-400">
+                Start Now — It's Free <ArrowRight size={14} />
+              </a>
+            </div>
           </div>
 
-          <div className="mb-6">
-            <h2 className="text-2xl font-black text-white">Sign In</h2>
-            <p className="text-slate-500 text-sm mt-1">Access your Philix Finance account</p>
+          {/* Sign in header */}
+          <div className="mb-7">
+            <div className="flex items-center gap-2 mb-1">
+              <BadgeCheck size={16} className="text-[#C9A227]" />
+              <span className="text-[10px] font-bold text-[#C9A227] uppercase tracking-widest">Secure Sign In</span>
+            </div>
+            <h2 className="text-3xl font-black text-white">Welcome back.</h2>
+            <p className="text-slate-500 text-sm mt-1">Sign in to your Philix Finance account</p>
           </div>
 
           {/* Account type selector */}
           <div className="mb-5">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">I am signing in as</p>
+            <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-2">Signing in as</p>
             <div className="grid grid-cols-2 gap-2">
               {([
-                { value: "client", label: "Client", icon: Users, desc: "Portal account", colors: "border-indigo-500 bg-indigo-900/20 text-indigo-300" },
-                { value: "staff",  label: "Staff",  icon: Shield, desc: "Operations portal", colors: "border-amber-500 bg-amber-900/20 text-amber-300" },
+                { value: "client", label: "Client",      icon: Users,  desc: "Client portal",     colors: "border-[#C9A227]/60 bg-[#C9A227]/10 text-[#C9A227]" },
+                { value: "staff",  label: "Staff / CEO", icon: Shield, desc: "Operations portal", colors: "border-indigo-500/60 bg-indigo-500/10 text-indigo-300" },
               ] as const).map(opt => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setAccountType(opt.value)}
+                <button key={opt.value} type="button" onClick={() => setAccountType(opt.value)}
                   className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border-2 text-left transition-all ${
                     (accountType === opt.value || (accountType === "auto" && resolvedType === opt.value))
                       ? opt.colors
-                      : "border-slate-700 bg-slate-800/50 text-slate-500 hover:border-slate-600"
-                  }`}
-                >
-                  <opt.icon size={16} className="flex-shrink-0" />
+                      : "border-white/8 bg-white/[0.03] text-slate-600 hover:border-white/15 hover:text-slate-400"
+                  }`}>
+                  <opt.icon size={15} className="flex-shrink-0" />
                   <div>
-                    <div className="text-sm font-bold">{opt.label}</div>
-                    <div className="text-[10px] opacity-70">{opt.desc}</div>
+                    <div className="text-sm font-bold leading-tight">{opt.label}</div>
+                    <div className="text-[10px] opacity-60">{opt.desc}</div>
                   </div>
                 </button>
               ))}
@@ -154,51 +263,66 @@ export default function UnifiedLoginPage() {
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-sm font-semibold text-slate-300 mb-1.5">Email Address</label>
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-600 transition-all"
-                placeholder="your@email.com"
-                required
-                autoComplete="email"
-              />
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                className="w-full bg-white/[0.05] border border-white/10 text-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A227]/40 focus:border-[#C9A227]/40 placeholder:text-slate-700 transition-all hover:border-white/15"
+                placeholder="your@email.com" required autoComplete="email" />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-1.5">Password</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-semibold text-slate-300">Password</label>
+                <a href="/portal/forgot-password" className="text-[11px] text-slate-600 hover:text-[#C9A227] transition-colors">Forgot password?</a>
+              </div>
               <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 text-slate-100 rounded-xl px-4 py-3 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-600 transition-all"
-                  placeholder="Enter your password"
-                  required
-                />
+                <input type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
+                  className="w-full bg-white/[0.05] border border-white/10 text-slate-100 rounded-xl px-4 py-3 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A227]/40 focus:border-[#C9A227]/40 placeholder:text-slate-700 transition-all hover:border-white/15"
+                  placeholder="Enter your password" required />
                 <button type="button" onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-300 transition-colors">
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
             </div>
+
             <button type="submit" disabled={loading}
-              className="w-full bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 disabled:opacity-60 text-white font-bold py-3 rounded-xl transition-all text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/40">
+              className="w-full bg-gradient-to-r from-[#C9A227] to-amber-500 hover:from-amber-400 hover:to-[#C9A227] disabled:opacity-50 text-[#070F1C] font-black py-3.5 rounded-xl transition-all text-sm flex items-center justify-center gap-2 shadow-lg shadow-[#C9A227]/20 hover:shadow-[#C9A227]/30 hover:scale-[1.01]">
               {loading
-                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Signing in...</>
+                ? <><span className="w-4 h-4 border-2 border-[#070F1C]/30 border-t-[#070F1C] rounded-full animate-spin" /> Signing in…</>
                 : <>Sign In <ArrowRight size={14} /></>}
             </button>
           </form>
 
-          <div className="mt-5 text-center space-y-2">
-            <p className="text-sm text-slate-500">
-              New to Philix Finance?{" "}
-              <a href="/portal/register" className="text-indigo-400 hover:text-indigo-300 font-semibold">Create an account →</a>
-            </p>
-            <p className="text-xs text-slate-700">
-              Staff accounts are managed by your administrator.
-            </p>
+          {/* New client CTA */}
+          <div className="mt-6 bg-gradient-to-r from-[#C9A227]/8 to-transparent border border-[#C9A227]/15 rounded-2xl p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Clock size={12} className="text-[#C9A227]" />
+                  <span className="text-[11px] font-bold text-[#C9A227]">New to Philix Finance?</span>
+                </div>
+                <p className="text-slate-500 text-[12px]">Get a loan in under 15 minutes.</p>
+              </div>
+              <a href="/portal/register"
+                className="flex items-center gap-1.5 bg-[#C9A227] hover:bg-amber-400 text-[#070F1C] font-black text-[12px] px-4 py-2.5 rounded-xl transition-all whitespace-nowrap flex-shrink-0">
+                Start Now <ChevronRight size={12} />
+              </a>
+            </div>
+            <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/5">
+              {[
+                { icon: CheckCircle, text: "Free to apply" },
+                { icon: CheckCircle, text: "No hidden fees" },
+                { icon: CheckCircle, text: "Instant decision" },
+              ].map(({ icon: Icon, text }) => (
+                <div key={text} className="flex items-center gap-1">
+                  <Icon size={10} className="text-emerald-400 flex-shrink-0" />
+                  <span className="text-[10px] text-slate-600">{text}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
+          <p className="text-center text-[11px] text-slate-700 mt-5">
+            Staff accounts are managed by your administrator.
+          </p>
         </div>
       </div>
     </div>

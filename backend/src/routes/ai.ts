@@ -12,7 +12,6 @@ type Wrap = (req: Request, res: Response, next: (e?: unknown) => void) => Promis
 const wrap = (fn: Wrap) => (req: Request, res: Response, next: (e?: unknown) => void) =>
   fn(req, res, next).catch(next);
 
-// ── Portal auth middleware ─────────────────────────────────────────────────────
 async function portalAuth(req: Request, res: Response, next: (e?: unknown) => void) {
   const token = req.headers.authorization?.replace("Bearer ", "");
   if (!token) return res.status(401).json({ error: "Unauthorized" });
@@ -31,7 +30,7 @@ async function portalAuth(req: Request, res: Response, next: (e?: unknown) => vo
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// POST /api/ai/chat  — intelligent client portal chatbot
+// POST /api/ai/chat  — client portal chatbot (claude-sonnet-4-6)
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/chat", portalAuth, wrap(async (req: Request, res: Response) => {
   const account = (req as any).portalAccount;
@@ -44,10 +43,9 @@ router.post("/chat", portalAuth, wrap(async (req: Request, res: Response) => {
   const activeLoans = loans.filter((l: any) => l.status === "DISBURSED");
   const pendingLoans = loans.filter((l: any) => ["SUBMITTED", "UNDER_REVIEW"].includes(l.status));
   const approvedLoans = loans.filter((l: any) => l.status === "APPROVED");
-
-  // Compute penalties for active loans
   const now = new Date();
   const GRACE_DAYS = 3;
+
   const loanDetails = activeLoans.map((l: any) => {
     const maturity = l.maturityDate ? new Date(l.maturityDate) : null;
     const daysUntilDue = maturity ? Math.floor((maturity.getTime() - now.getTime()) / 86400000) : null;
@@ -57,22 +55,14 @@ router.post("/chat", portalAuth, wrap(async (req: Request, res: Response) => {
     const outstanding = (l.totalDue ?? 0) - (l.totalPaid ?? 0);
     const penalty = daysOverdue > 0 ? outstanding * 0.02 * daysOverdue : 0;
     const totalOwed = outstanding + penalty;
-
     return {
-      ref: l.reference,
-      product: l.productType,
-      principal: l.amountRequested,
-      totalDue: l.totalDue,
-      totalPaid: l.totalPaid ?? 0,
-      outstanding,
-      penalty: Math.round(penalty * 100) / 100,
-      totalOwed: Math.round(totalOwed * 100) / 100,
+      ref: l.reference, product: l.productType, principal: l.amountRequested,
+      totalDue: l.totalDue, totalPaid: l.totalPaid ?? 0, outstanding,
+      penalty: Math.round(penalty * 100) / 100, totalOwed: Math.round(totalOwed * 100) / 100,
       dueDate: maturity ? maturity.toLocaleDateString("en-ZM") : "Unknown",
-      daysUntilDue,
-      daysOverdue,
+      daysUntilDue, daysOverdue,
       status: isOverdue ? (daysOverdue > GRACE_DAYS ? `OVERDUE ${daysOverdue} days — PENALTY ACCRUING` : `GRACE PERIOD (${daysOverall}/${GRACE_DAYS} days)`) : `DUE IN ${daysUntilDue} DAYS`,
       termWeeks: l.termMonths,
-      disbursedDate: l.disbursedAt ? new Date(l.disbursedAt).toLocaleDateString("en-ZM") : "Unknown",
     };
   });
 
@@ -80,83 +70,49 @@ router.post("/chat", portalAuth, wrap(async (req: Request, res: Response) => {
   const totalOutstanding = loanDetails.reduce((s: number, l: any) => s + l.outstanding, 0);
   const totalOwed = loanDetails.reduce((s: number, l: any) => s + l.totalOwed, 0);
 
-  const systemPrompt = `You are Philix AI — the intelligent assistant for Philix Finance, a microfinance company in Lusaka, Zambia.
+  const systemPrompt = `You are Philix AI — the intelligent personal finance assistant for Philix Finance clients in Lusaka, Zambia.
 
 CLIENT PROFILE:
-Name: ${account.firstName} ${account.lastName}
-Client Number: ${account.clientNumber}
-KYC Status: ${account.kycStatus}
-Account Status: ${account.status}
-Trusted Client: ${account.isTrustedClient ? "YES — eligible for Trusted Client Express Loan (no collateral required)" : "No"}
-Trust Score: ${account.trustScore ?? "N/A"}/100
-Monthly Income on file: ${account.monthlyIncome ? `K${account.monthlyIncome.toLocaleString()}` : "Not provided"}
+Name: ${account.firstName} ${account.lastName} | Client #: ${account.clientNumber}
+KYC: ${account.kycStatus} | Status: ${account.status} | Member since: ${new Date(account.createdAt).toLocaleDateString("en-ZM")}
+Trusted Client: ${account.isTrustedClient ? "YES — eligible for Express Loan (no collateral)" : "No"}
+Trust Score: ${account.trustScore ?? "N/A"}/100 | Monthly Income: ${account.monthlyIncome ? `K${account.monthlyIncome.toLocaleString()}` : "Not provided"}
 Employer: ${account.employer ?? "Not on file"}
-Member since: ${new Date(account.createdAt).toLocaleDateString("en-ZM")}
 
-LOAN PORTFOLIO SUMMARY:
-Active loans: ${activeLoans.length}
-Pending review: ${pendingLoans.length}
-Awaiting disbursement: ${approvedLoans.length}
-Total loans ever: ${loans.length}
-Total outstanding: K${totalOutstanding.toLocaleString()}
-${totalPenalties > 0 ? `⚠️ PENALTIES ACCRUING: K${totalPenalties.toFixed(2)}` : "No active penalties"}
-Total amount currently owed: K${totalOwed.toFixed(2)}
+LOAN PORTFOLIO:
+Active: ${activeLoans.length} | Pending: ${pendingLoans.length} | Awaiting disbursement: ${approvedLoans.length} | Total ever: ${loans.length}
+Outstanding: K${totalOutstanding.toLocaleString()} | Total owed: K${totalOwed.toFixed(2)}
+${totalPenalties > 0 ? `⚠️ PENALTIES ACCRUING: K${totalPenalties.toFixed(2)}` : "No penalties"}
 
-ACTIVE LOAN DETAILS:
-${loanDetails.length > 0 ? loanDetails.map((l: any) =>
-  `• Ref: ${l.ref} | ${l.product}
-   Principal: K${l.principal.toLocaleString()} | Term: ${l.termWeeks} weeks
-   Total Due: K${l.totalDue.toLocaleString()} | Paid: K${l.totalPaid.toLocaleString()} | Outstanding: K${l.outstanding.toLocaleString()}
-   Due Date: ${l.dueDate} | Status: ${l.status}
-   ${l.penalty > 0 ? `PENALTY: K${l.penalty.toFixed(2)} (${l.daysOverdue} days × 2% × K${l.outstanding.toLocaleString()}) | TOTAL OWED: K${l.totalOwed.toFixed(2)}` : "No penalty"}`
-).join("\n\n") : "No active loans"}
+${loanDetails.length > 0 ? `ACTIVE LOANS:\n${loanDetails.map((l: any) =>
+  `• ${l.ref} | ${l.product} | K${l.principal.toLocaleString()} | ${l.termWeeks} weeks
+   Due: ${l.dueDate} | Status: ${l.status}
+   Paid: K${l.totalPaid.toLocaleString()} / K${l.totalDue?.toLocaleString()} | Owed: K${l.outstanding.toLocaleString()}
+   ${l.penalty > 0 ? `PENALTY: K${l.penalty.toFixed(2)} | TOTAL DUE: K${l.totalOwed.toFixed(2)}` : ""}`.trim()
+).join("\n\n")}` : "No active loans."}
 
-RECENT LOAN HISTORY:
-${loans.slice(0, 8).map((l: any) =>
-  `• ${l.reference} | ${l.productType} | K${l.amountRequested.toLocaleString()} | ${l.status} | Applied: ${new Date(l.createdAt).toLocaleDateString("en-ZM")}`
-).join("\n") || "No loan history"}
+RECENT HISTORY:
+${loans.slice(0, 8).map((l: any) => `• ${l.reference} | ${l.productType} | K${l.amountRequested.toLocaleString()} | ${l.status}`).join("\n") || "None"}
 
-PHILIX FINANCE DETAILS:
-Products & Rates (all flat interest):
-• Quick Salary Loan: K100–K5,000 | 1–4 weeks | 10–35% flat | Payslip + collateral required
-• Student Loan: K200–K3,000 | 1–4 weeks | Admission letter + guarantor required
-• Business Growth Loan: K500–K10,000 | 1–4 weeks | Business docs + collateral required
-• Agricultural Input Loan: K300–K8,000 | 1–4 weeks | Farmer registration required
-• Repeat Customer Loyalty Loan: K200–K5,000 | 1–4 weeks | 8–30% flat | For existing clients with good history
-• Premium Client Loan: K300–K50,000 | 1–52 weeks | 7–28% flat | Full KYC + strong collateral
-• Trusted Client Express Loan: K1,000–K25,000 | 4–24 weeks | 8–38% flat | NO COLLATERAL — for trusted clients only
+PHILIX PRODUCTS (flat interest, Zambian Kwacha):
+• Quick Salary Loan: K100–K5,000 | 1–4 weeks | 10–35% flat
+• Student Loan: K200–K3,000 | 1–4 weeks | Admission letter + guarantor
+• Business Growth: K500–K10,000 | 1–4 weeks | Business docs + collateral
+• Agricultural Input: K300–K8,000 | 1–4 weeks | Farmer registration
+• Repeat Client Loyalty: K200–K5,000 | 1–4 weeks | 8–30% flat
+• Premium Client: K300–K50,000 | 1–52 weeks | 7–28% flat
+• Trusted Express: K1,000–K25,000 | 4–24 weeks | 8–38% flat | NO COLLATERAL
 
-PENALTY POLICY:
-- 3-day grace period after maturity date
-- After grace period: 2% per day on outstanding balance
-- Formula: Penalty = Outstanding × 0.02 × Days Overdue (after grace)
-- To avoid penalties, always pay on or before the due date
+PENALTY POLICY: 3-day grace → 2% per day on outstanding balance after grace period.
 
 Contact: +260 777 158 901 | support@philixfinance.com | Mon–Fri 08:00–17:00 CAT
 
-YOUR ROLE:
-1. Answer any question about this client's loans, balances, exact amounts owed, due dates, and penalties — use the real data above
-2. Generate precise repayment schedules (flat interest: Total = Principal × (1 + Rate/100), Weekly = Total ÷ Weeks)
-3. Explain loan eligibility, requirements, and what the client needs to bring to the office
-4. Give credit improvement advice based on their specific trust score and history
-5. Explain the penalty calculation with exact numbers when asked
-6. Always prioritise — if overdue, focus on getting them to pay or call the office immediately
-7. Be encouraging, professional, warm, and focused on helping the client succeed financially
-
-RULES:
-- Always use real data from the client profile above — never guess or make up amounts
-- Use Zambian Kwacha (K / ZMW) for all amounts
-- Never reveal another client's information
-- If they ask about a loan ref not in the data, tell them it's not on file
-- Format responses with markdown (bold, bullets) for clarity
-- Keep responses helpful but concise — no unnecessary filler
-- If overdue: always mention the support number +260 777 158 901`;
+RULES: Use real data only. Never reveal other clients' info. Use K (Zambian Kwacha). Be helpful, warm, professional. If overdue, emphasise payment urgency and contact number.`;
 
   const conversationMessages = messages ?? [{ role: "user" as const, content: message ?? "" }];
-
   const response = await ai.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 1500,
+    max_tokens: 2000,
     system: systemPrompt,
     messages: conversationMessages,
   });
@@ -166,193 +122,62 @@ RULES:
 }));
 
 // ─────────────────────────────────────────────────────────────────────────────
-// POST /api/ai/staff-chat  — Enterprise AI with live portfolio intelligence
+// POST /api/ai/staff-chat  — Enterprise AI (standard, non-streaming)
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/staff-chat", authenticate, wrap(async (req: Request, res: Response) => {
   const user = (req as any).user;
-  const { messages, message, context } = req.body as {
-    messages?: { role: "user" | "assistant"; content: string }[];
-    message?: string;
-    context?: Record<string, unknown>;
-  };
+  const { messages, message, context } = req.body;
+  const portfolioContext = await buildPortfolioContext();
 
-  // Pull rich live portfolio data
-  const now = new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const GRACE_DAYS = 3;
-
-  const [
-    totalAccounts, pendingApps, disbursedAgg, activeLoans,
-    recentPayments, recentApps, kycPending,
-  ] = await Promise.all([
-    prisma.clientPortalAccount.count(),
-    prisma.portalLoanApplication.count({ where: { status: { in: ["SUBMITTED", "UNDER_REVIEW"] } } }),
-    prisma.portalLoanApplication.aggregate({
-      _sum: { amountRequested: true, totalDue: true, totalPaid: true },
-      where: { status: "DISBURSED" },
-    }),
-    prisma.portalLoanApplication.findMany({
-      where: { status: "DISBURSED" },
-      select: {
-        reference: true, productType: true, amountRequested: true,
-        totalDue: true, totalPaid: true, maturityDate: true,
-        portalAccount: { select: { firstName: true, lastName: true, phone: true } },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    }),
-    prisma.paymentSubmission?.findMany?.({
-      where: { createdAt: { gte: startOfDay } },
-      select: { amount: true, createdAt: true },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    }).catch(() => []),
-    prisma.portalLoanApplication.findMany({
-      where: { createdAt: { gte: startOfDay } },
-      select: { reference: true, productType: true, amountRequested: true, status: true },
-      orderBy: { createdAt: "desc" },
-      take: 10,
-    }),
-    prisma.clientPortalAccount.count({ where: { kycStatus: "PENDING" } }),
-  ]);
-
-  // Compute overdue loans from active
-  const overdueLoans = activeLoans
-    .filter((l: any) => {
-      if (!l.maturityDate) return false;
-      const daysUntilDue = Math.floor((new Date(l.maturityDate).getTime() - now.getTime()) / 86400000);
-      return daysUntilDue < -GRACE_DAYS;
-    })
-    .map((l: any) => {
-      const daysUntilDue = Math.floor((new Date(l.maturityDate).getTime() - now.getTime()) / 86400000);
-      const daysOverdue = Math.abs(daysUntilDue) - GRACE_DAYS;
-      const outstanding = (l.totalDue ?? 0) - (l.totalPaid ?? 0);
-      const penalty = outstanding * 0.02 * daysOverdue;
-      return {
-        ref: l.reference, client: `${l.portalAccount.firstName} ${l.portalAccount.lastName}`,
-        phone: l.portalAccount.phone, product: l.productType,
-        outstanding, penalty: Math.round(penalty * 100) / 100,
-        totalOwed: Math.round((outstanding + penalty) * 100) / 100,
-        daysOverdue,
-      };
-    })
-    .sort((a: any, b: any) => b.daysOverdue - a.daysOverdue);
-
-  const totalPenalties = overdueLoans.reduce((s: number, l: any) => s + l.penalty, 0);
-  const collectionsToday = (recentPayments as any[]).reduce((s: number, p: any) => s + (p.amount ?? 0), 0);
-  const totalDisbursed = disbursedAgg._sum.amountRequested ?? 0;
-  const totalRepayable = disbursedAgg._sum.totalDue ?? 0;
-  const totalCollected = disbursedAgg._sum.totalPaid ?? 0;
-  const outstandingPortfolio = totalRepayable - totalCollected;
-  const PAR = activeLoans.length > 0 ? Math.round((overdueLoans.length / activeLoans.length) * 100) : 0;
-
-  const portfolioContext = `
-LIVE PORTFOLIO INTELLIGENCE (as of ${now.toLocaleString("en-ZM")}):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Portfolio Overview:
-• Total portal clients: ${totalAccounts}
-• Active loans: ${activeLoans.length}
-• Applications pending review: ${pendingApps}
-• KYC pending: ${kycPending}
-• Total disbursed (all time): K${totalDisbursed.toLocaleString()}
-• Total repayable: K${totalRepayable.toLocaleString()}
-• Total collected: K${totalCollected.toLocaleString()}
-• Outstanding portfolio: K${outstandingPortfolio.toLocaleString()}
-• Collections today: K${collectionsToday.toLocaleString()} (${(recentPayments as any[]).length} payments)
-• Portfolio at Risk (PAR): ${PAR}%
-• Total penalties accruing: K${totalPenalties.toFixed(2)}
-
-Overdue Loans (>${GRACE_DAYS}-day grace, ${overdueLoans.length} total):
-${overdueLoans.slice(0, 10).map((l: any) =>
-  `• ${l.ref} | ${l.client} | ${l.phone ?? "No phone"} | ${l.product} | ${l.daysOverdue} days overdue | Owed: K${l.totalOwed.toLocaleString()} (incl. K${l.penalty} penalty)`
-).join("\n") || "  None — all loans current"}
-
-New Applications Today (${recentApps.length}):
-${recentApps.map((a: any) => `• ${a.reference} | ${a.productType} | K${a.amountRequested.toLocaleString()} | ${a.status}`).join("\n") || "  None today"}
-
-Recent Payments Today:
-${(recentPayments as any[]).slice(0, 5).map((p: any) => `• K${p.amount?.toLocaleString()} at ${new Date(p.createdAt).toLocaleTimeString("en-ZM")}`).join("\n") || "  No payments recorded today"}`;
-
-  const systemPrompt = `You are the Philix Finance Enterprise AI Operating System — Version 35.0.
-You are the digital operating intelligence of Philix Finance, a microfinance company in Lusaka, Zambia.
-
-CURRENT USER: ${user.firstName} ${user.lastName} (${user.role.replace(/_/g, " ")}) | ID: ${user.employeeId ?? "N/A"} | ${user.email}
-${portfolioContext}
-
-ADDITIONAL CONTEXT: ${context ? JSON.stringify(context, null, 2) : "None provided"}
-
-YOUR CAPABILITIES:
-
-CREDIT SCORING ENGINE:
-Evaluate applications using 8 factors:
-1. Identity & NRC Verification (15%)
-2. Income Stability & Employment (20%)
-3. Debt-to-Income Ratio (15%)
-4. Repayment History (20%)
-5. Business Viability (10% — business loans only)
-6. Collateral Quality & LTV (15%)
-7. Reference Verification (5%)
-Total score 0–100 → LOW RISK (75+) / MEDIUM (55–74) / HIGH (35–54) / VERY HIGH (<35)
-Always: give score, risk tier, approval recommendation, conditions, max loan amount.
-
-FRAUD DETECTION:
-Detect: fake NRCs, duplicate applications, inflated income, suspicious collateral, address inconsistencies.
-Rate severity: LOW/MEDIUM/HIGH/CRITICAL. Give recommended immediate actions.
-
-COLLATERAL ASSESSMENT:
-FSV: Electronics 50–70% | Vehicles 60–80% | Property 70–90% | Livestock 50–60%
-LTV = Loan Amount / FSV × 100. Accept if LTV ≤ 80%. Always give: Market Value, FSV, LTV, Recommendation.
-
-FINANCIAL CALCULATIONS (always show formulas):
-Flat interest: Total = Principal × (1 + Rate/100)
-Weekly payment = Total / Weeks
-Penalty = Outstanding × 0.02 × Days Overdue (after 3-day grace)
-Max loan based on income: weekly repayment ≤ 30% of monthly income / 4.33
-
-DOCUMENT GENERATION: Loan agreements, demand letters, approval/rejection letters, collateral reports, recovery notices.
-All documents: use today's date, Philix Finance letterhead, professional tone, generated by ${user.firstName} ${user.lastName}.
-
-DELINQUENCY MANAGEMENT (tier-based):
-1–3 days → Grace period reminder (WhatsApp/SMS)
-4–7 days → Firm reminder call + SMS (use live penalty amount from portfolio above)
-8–14 days → Field visit + formal letter
-15–30 days → Demand letter + guarantor contact
-31–60 days → Pre-legal notice + collateral inspection
-60+ days → Legal action initiation
-
-EXECUTIVE INTELLIGENCE (CEO/MANAGER priority):
-Use the LIVE PORTFOLIO DATA above for real-time analysis.
-Think like a Chief Risk Officer: portfolio health, cash flow, collection efficiency, risk concentration.
-Always quantify recommendations with data from the live portfolio.
-
-PRODUCTS (Zambian Kwacha):
-• Quick Salary Loan: K100–K5,000 | 1–4 weeks | 10–35% flat
-• Student Loan: K200–K3,000 | 1–4 weeks
-• Business Growth Loan: K500–K10,000 | 1–4 weeks
-• Agricultural Input Loan: K300–K8,000 | 1–4 weeks
-• Repeat Customer Loyalty: K200–K5,000 | 1–4 weeks | 8–30% flat
-• Premium Client: K300–K50,000 | 1–52 weeks | 7–28% flat
-• Trusted Client Express: K1,000–K25,000 | 4–24 weeks | 8–38% flat | NO COLLATERAL
-
-RESPONSE RULES:
-- Use real live data from the portfolio above when answering operational questions
-- Never hallucinate numbers — use the data provided, or ask for missing info
-- Always show calculation formulas (never just give a result)
-- Be direct, data-driven, and actionable
-- Every response ends with: **Recommended Next Action:** [specific, measurable action]
-- For overdue collections: always include the client's phone number from the live data above`;
-
+  const systemPrompt = buildStaffSystemPrompt(user, portfolioContext, context);
   const conversationMessages = messages ?? [{ role: "user" as const, content: message ?? "" }];
 
   const response = await ai.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 2500,
+    model: "claude-opus-4-8",
+    max_tokens: 8000,
     system: systemPrompt,
     messages: conversationMessages,
   });
 
   const text = response.content[0].type === "text" ? response.content[0].text : "";
   res.json({ text, role: "assistant" });
+}));
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/ai/staff-chat/stream  — Enterprise AI with streaming (SSE)
+// ─────────────────────────────────────────────────────────────────────────────
+router.post("/staff-chat/stream", authenticate, wrap(async (req: Request, res: Response) => {
+  const user = (req as any).user;
+  const { messages, message, context } = req.body;
+  const portfolioContext = await buildPortfolioContext();
+  const systemPrompt = buildStaffSystemPrompt(user, portfolioContext, context);
+  const conversationMessages = messages ?? [{ role: "user" as const, content: message ?? "" }];
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+
+  try {
+    const stream = ai.messages.stream({
+      model: "claude-opus-4-8",
+      max_tokens: 8000,
+      system: systemPrompt,
+      messages: conversationMessages,
+    });
+
+    stream.on("text", (text: string) => {
+      res.write(`data: ${JSON.stringify({ text })}\n\n`);
+    });
+
+    await stream.finalMessage();
+    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    res.end();
+  } catch (err: any) {
+    res.write(`data: ${JSON.stringify({ error: err.message ?? "AI error" })}\n\n`);
+    res.end();
+  }
 }));
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -381,14 +206,290 @@ router.post("/document", authenticate, wrap(async (req: Request, res: Response) 
   if (!prompt) return res.status(400).json({ error: "Invalid document type" });
 
   const response = await ai.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 2500,
-    system: `You are a professional document generator for Philix Finance, a microfinance company in Lusaka, Zambia. Generate formal, complete, legally-appropriate documents with proper formatting (headers, sections, signature blocks). All currency in Zambian Kwacha (K/ZMW).`,
+    model: "claude-opus-4-8",
+    max_tokens: 4000,
+    system: `You are a professional legal document generator for Philix Finance, a licensed microfinance institution in Lusaka, Zambia. Generate formal, complete, legally-appropriate documents with proper formatting (headers, sections, numbered clauses, signature blocks). All currency in Zambian Kwacha (K/ZMW). Comply with Zambian financial regulations (Bank of Zambia guidelines, Microfinance Act).`,
     messages: [{ role: "user", content: prompt }],
   });
 
   const text = response.content[0].type === "text" ? response.content[0].text : "";
   res.json({ document: text, type, generatedBy: byLine, generatedAt: new Date().toISOString() });
 }));
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+async function buildPortfolioContext(): Promise<string> {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const GRACE_DAYS = 3;
+
+  const [
+    totalAccounts, pendingApps, disbursedAgg, activeLoans,
+    recentPayments, recentApps, kycPending, kycInReview,
+    newClientsThisMonth, approvedThisMonth, expenses, topClients,
+  ] = await Promise.all([
+    prisma.clientPortalAccount.count(),
+    prisma.portalLoanApplication.count({ where: { status: { in: ["SUBMITTED", "UNDER_REVIEW"] } } }),
+    prisma.portalLoanApplication.aggregate({
+      _sum: { amountRequested: true, totalDue: true, totalPaid: true },
+      where: { status: "DISBURSED" },
+    }),
+    prisma.portalLoanApplication.findMany({
+      where: { status: "DISBURSED" },
+      select: {
+        reference: true, productType: true, amountRequested: true,
+        totalDue: true, totalPaid: true, maturityDate: true, disbursedAt: true,
+        portalAccount: { select: { firstName: true, lastName: true, phone: true, clientNumber: true, trustScore: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+    prisma.paymentSubmission?.findMany?.({
+      where: { createdAt: { gte: startOfDay } },
+      select: { amount: true, createdAt: true, paymentMethod: true },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+    }).catch(() => []),
+    prisma.portalLoanApplication.findMany({
+      where: { createdAt: { gte: startOfDay } },
+      select: { reference: true, productType: true, amountRequested: true, status: true,
+        portalAccount: { select: { firstName: true, lastName: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 15,
+    }),
+    prisma.clientPortalAccount.count({ where: { kycStatus: "PENDING" } }),
+    prisma.clientPortalAccount.count({ where: { kycStatus: "IN_REVIEW" } }),
+    prisma.clientPortalAccount.count({ where: { createdAt: { gte: startOfMonth } } }),
+    prisma.portalLoanApplication.count({ where: { status: "APPROVED", reviewedAt: { gte: startOfMonth } } }),
+    prisma.portalLoanApplication.aggregate({
+      _sum: { amountRequested: true },
+      where: { status: "DISBURSED", disbursedAt: { gte: startOfMonth } },
+    }).catch(() => ({ _sum: { amountRequested: 0 } })),
+    prisma.clientPortalAccount.findMany({
+      where: { trustScore: { gt: 70 } },
+      select: { firstName: true, lastName: true, clientNumber: true, trustScore: true },
+      orderBy: { trustScore: "desc" },
+      take: 5,
+    }).catch(() => []),
+  ]);
+
+  // Compute overdue loans
+  const overdueLoans = activeLoans
+    .filter((l: any) => {
+      if (!l.maturityDate) return false;
+      const days = Math.floor((new Date(l.maturityDate).getTime() - now.getTime()) / 86400000);
+      return days < -GRACE_DAYS;
+    })
+    .map((l: any) => {
+      const daysUntilDue = Math.floor((new Date(l.maturityDate).getTime() - now.getTime()) / 86400000);
+      const daysOverdue = Math.abs(daysUntilDue) - GRACE_DAYS;
+      const outstanding = (l.totalDue ?? 0) - (l.totalPaid ?? 0);
+      const penalty = outstanding * 0.02 * daysOverdue;
+      return {
+        ref: l.reference, client: `${l.portalAccount.firstName} ${l.portalAccount.lastName}`,
+        clientNum: l.portalAccount.clientNumber, phone: l.portalAccount.phone,
+        product: l.productType, outstanding,
+        penalty: Math.round(penalty * 100) / 100,
+        totalOwed: Math.round((outstanding + penalty) * 100) / 100,
+        daysOverdue,
+      };
+    })
+    .sort((a: any, b: any) => b.daysOverdue - a.daysOverdue);
+
+  // Loans due soon (next 7 days)
+  const dueSoon = activeLoans
+    .filter((l: any) => {
+      if (!l.maturityDate) return false;
+      const days = Math.floor((new Date(l.maturityDate).getTime() - now.getTime()) / 86400000);
+      return days >= 0 && days <= 7;
+    })
+    .map((l: any) => {
+      const days = Math.floor((new Date(l.maturityDate).getTime() - now.getTime()) / 86400000);
+      const outstanding = (l.totalDue ?? 0) - (l.totalPaid ?? 0);
+      return { ref: l.reference, client: `${l.portalAccount.firstName} ${l.portalAccount.lastName}`,
+        phone: l.portalAccount.phone, daysLeft: days, outstanding };
+    });
+
+  const totalPenalties = overdueLoans.reduce((s: number, l: any) => s + l.penalty, 0);
+  const collectionsToday = (recentPayments as any[]).reduce((s: number, p: any) => s + (p.amount ?? 0), 0);
+  const totalDisbursed = disbursedAgg._sum.amountRequested ?? 0;
+  const totalRepayable = disbursedAgg._sum.totalDue ?? 0;
+  const totalCollected = disbursedAgg._sum.totalPaid ?? 0;
+  const outstandingPortfolio = totalRepayable - totalCollected;
+  const PAR = activeLoans.length > 0 ? ((overdueLoans.length / activeLoans.length) * 100).toFixed(1) : "0.0";
+  const collectionRate = totalRepayable > 0 ? ((totalCollected / totalRepayable) * 100).toFixed(1) : "0.0";
+  const disbursedThisMonth = (expenses as any)?._sum?.amountRequested ?? 0;
+
+  return `
+════════════════════════════════════════════
+LIVE PORTFOLIO INTELLIGENCE — ${now.toLocaleString("en-ZM", { timeZone: "Africa/Lusaka" })} (CAT)
+════════════════════════════════════════════
+
+📊 PORTFOLIO OVERVIEW:
+• Total portal clients: ${totalAccounts} (${newClientsThisMonth} new this month)
+• Active disbursed loans: ${activeLoans.length}
+• Applications pending review: ${pendingApps}
+• KYC pending: ${kycPending} | In review: ${kycInReview}
+• Approved awaiting disbursement: ${approvedThisMonth}
+
+💰 FINANCIAL SUMMARY:
+• Total disbursed (all time): K${totalDisbursed.toLocaleString()}
+• Total repayable: K${totalRepayable.toLocaleString()}
+• Total collected: K${totalCollected.toLocaleString()}
+• Outstanding portfolio: K${outstandingPortfolio.toLocaleString()}
+• Collection rate: ${collectionRate}%
+• Portfolio at Risk (PAR): ${PAR}%
+• Total penalties accruing: K${totalPenalties.toFixed(2)}
+
+📅 TODAY'S ACTIVITY:
+• Collections today: K${collectionsToday.toLocaleString()} (${(recentPayments as any[]).length} payment${(recentPayments as any[]).length !== 1 ? "s" : ""})
+${(recentPayments as any[]).slice(0, 5).map((p: any) => `  - K${p.amount?.toLocaleString()} at ${new Date(p.createdAt).toLocaleTimeString("en-ZM", { hour: "2-digit", minute: "2-digit" })}`).join("\n") || "  No payments yet today"}
+• New applications today: ${recentApps.length}
+${recentApps.slice(0, 5).map((a: any) => `  - ${a.reference} | ${a.portalAccount?.firstName} ${a.portalAccount?.lastName} | ${a.productType} | K${a.amountRequested?.toLocaleString()} | ${a.status}`).join("\n") || "  None today"}
+
+🚨 OVERDUE LOANS — ${overdueLoans.length} total (>${GRACE_DAYS}-day grace):
+${overdueLoans.slice(0, 15).map((l: any) =>
+  `  • ${l.ref} | ${l.client} (${l.clientNum}) | ${l.phone ?? "No phone"}
+    ${l.product} | ${l.daysOverdue}d overdue | Outstanding: K${l.outstanding.toLocaleString()} | Penalty: K${l.penalty} | TOTAL: K${l.totalOwed.toLocaleString()}`
+).join("\n") || "  ✅ No overdue loans — excellent!"}
+
+⏰ DUE IN NEXT 7 DAYS — ${dueSoon.length} loans:
+${dueSoon.slice(0, 10).map((l: any) =>
+  `  • ${l.ref} | ${l.client} | ${l.phone ?? "No phone"} | Due in ${l.daysLeft} day${l.daysLeft !== 1 ? "s" : ""} | K${l.outstanding.toLocaleString()} outstanding`
+).join("\n") || "  None due in next 7 days"}
+
+⭐ TOP TRUST SCORE CLIENTS:
+${(topClients as any[]).slice(0, 5).map((c: any) =>
+  `  • ${c.firstName} ${c.lastName} (${c.clientNumber}) | Trust Score: ${c.trustScore}/100`
+).join("\n") || "  No high-trust clients yet"}
+════════════════════════════════════════════`;
+}
+
+function buildStaffSystemPrompt(user: any, portfolioContext: string, context?: any): string {
+  return `You are PHILIX ENTERPRISE AI — the most advanced financial intelligence system for Philix Finance, a licensed microfinance institution in Lusaka, Zambia. You operate at the level of a Chief Risk Officer, CFO, and Senior Credit Analyst combined.
+
+CURRENT OPERATOR: ${user.firstName} ${user.lastName} | Role: ${user.role.replace(/_/g, " ")} | ID: ${user.employeeId ?? "N/A"} | ${user.email}
+${portfolioContext}
+${context ? `\nADDITIONAL CONTEXT: ${JSON.stringify(context, null, 2)}` : ""}
+
+═══════════════════════════════════════════════════
+INTELLIGENCE CAPABILITIES
+═══════════════════════════════════════════════════
+
+🎯 CREDIT SCORING ENGINE (8-Factor Model):
+Score each factor 0–100, apply weights:
+1. Identity & NRC Verification (15%) — Validity, consistency, blacklist check
+2. Income Stability & Employment (20%) — Payslip authenticity, employer verification, tenure
+3. Debt-to-Income Ratio (15%) — Monthly repayment ≤ 30% of monthly income
+4. Repayment History (20%) — On-time rate, # of completed loans, defaults
+5. Business Viability (10%, business loans only) — Revenue, trading time, market assessment
+6. Collateral Quality & LTV (15%) — FSV calculation, LTV ratio, asset liquidity
+7. Reference Verification (5%) — Guarantor stability, contact reachability
+8. Behavioural Factors (0% explicit, modifies score) — Application patterns, inconsistencies
+
+RISK TIERS: LOW (75–100) | MEDIUM (55–74) | HIGH (35–54) | VERY HIGH (0–34)
+APPROVAL GUIDELINES: LOW → Approve up to K50,000 | MEDIUM → Approve K5,000 with conditions | HIGH → Decline or K2,000 max with extra collateral | VERY HIGH → Decline
+
+🔍 FRAUD DETECTION FRAMEWORK:
+Red flags to identify: NRC format inconsistencies (ZM format: XXXXXXXX/XX/X), duplicate phone numbers across accounts, salary-to-loan ratio mismatches, inflated employer claims, rushed multi-applications, inconsistent addresses, suspicious collateral valuations, guarantors refusing verification.
+Severity: LOW/MEDIUM/HIGH/CRITICAL. Give specific investigation steps for each finding.
+
+📦 COLLATERAL ASSESSMENT (FSV Calculator):
+| Asset Class | Market → FSV | Notes |
+|---|---|---|
+| Electronics | 50–70% | Depreciation, authenticity |
+| Mobile phones | 40–60% | Rapid depreciation |
+| Vehicles (≤5yr) | 70–85% | Roadworthiness, papers |
+| Vehicles (>5yr) | 50–70% | Higher depreciation |
+| Residential property | 75–90% | Title deed, location |
+| Commercial property | 70–85% | Zoning, occupancy |
+| Livestock (cattle) | 55–65% | Health, market prices |
+| Agricultural equipment | 50–70% | Working condition |
+
+LTV = Loan Amount / FSV × 100. Accept ≤ 80% LTV.
+Always provide: Estimated Market Value, FSV, LTV%, Recommendation, Conditions.
+
+💵 FINANCIAL CALCULATIONS (always show full working):
+• Flat interest: Total Repayable = Principal × (1 + Rate/100)
+• Weekly payment = Total Repayable / Number of Weeks
+• Monthly equivalent = Total Repayable / (Weeks / 4.33)
+• Penalty = Outstanding Balance × 0.02 × Days Overdue (after 3-day grace period)
+• Max affordable loan: (Monthly Income × 0.30 / 4.33) × Loan Term Weeks = Max Weekly Payment → solve for Principal
+• Effective APR = (Rate × 52 / Weeks) × 100 %
+• IRR / yield on portfolio = use standard financial formulas
+
+📝 DOCUMENT GENERATION (professional, formal, legally appropriate):
+Generate complete documents: demand letters, loan agreements, approval/rejection letters, collateral reports, recovery notices, compliance certificates, board reports, investor reports.
+Always include: Philix Finance letterhead, today's date, document reference number, proper sections, signature blocks.
+Comply with: Zambian Microfinance Act, Bank of Zambia Directive (Microfinance), ZICB regulations.
+
+📞 DELINQUENCY MANAGEMENT (tier-based escalation):
+• Day 1–3: Grace period (no action, monitor)
+• Day 4–7: WhatsApp/SMS reminder with exact amount owed
+• Day 8–14: Outbound call + firm SMS + letter to client
+• Day 15–30: Field visit + formal demand letter + guarantor contact
+• Day 31–60: Formal demand letter + collateral inspection + pre-legal notice
+• Day 60+: Legal proceedings + collateral seizure + credit bureau reporting (ZICB)
+Always provide: specific call scripts, exact message templates, escalation timelines
+
+📈 EXECUTIVE INTELLIGENCE (CEO/MANAGER level):
+Perform advanced financial analysis:
+• Portfolio health scoring: PAR 0–5% (healthy) | 5–10% (moderate risk) | >10% (high risk)
+• Cash flow forecasting: expected collections = outstanding × collection rate
+• Risk concentration analysis: by product type, geography, employer sector
+• Growth vs. risk balance: new disbursements vs. recovery rate
+• Officer performance analysis: disbursements per officer, collection rate per officer
+• Profitability: interest revenue − operating costs − provisions = net profit
+• Provision requirements: Zambian IFRS 9 expected credit loss model
+
+🇿🇲 ZAMBIAN REGULATORY KNOWLEDGE:
+• Bank of Zambia (BOZ) licensing requirements for microfinance
+• Zambia Institute of Chartered Accountants (ZICA) reporting standards
+• Zambia Credit Reference Bureau (ZICB) — reporting obligations, credit checks
+• Zambian Employment Code Act 2019 — staff management compliance
+• Anti-Money Laundering (AML) / Know Your Customer (KYC) requirements
+• Financial Intelligence Centre (FIC) — suspicious transaction reporting
+• Consumer Protection Act — fair lending practices
+• Data Protection Act 2021 — client data handling
+
+🧠 ADVANCED ANALYTICAL CAPABILITIES:
+• Vintage analysis: cohort tracking of loan performance by origination month
+• Roll rate analysis: migration of loans between delinquency buckets
+• Concentration risk: % portfolio in any single employer/sector (max 25% recommended)
+• Liquidity stress test: can Philix meet obligations if 20% of portfolio defaults?
+• Break-even analysis: minimum portfolio size to cover operating costs
+• Optimal product mix: which products generate highest risk-adjusted returns
+• Client lifetime value: estimated revenue per client over lending relationship
+
+═══════════════════════════════════════════════════
+RESPONSE STANDARDS
+═══════════════════════════════════════════════════
+
+FORMAT:
+- Use the LIVE PORTFOLIO DATA above for all operational questions — never guess figures
+- Show ALL calculation steps with formulas (never just give a result)
+- Use clear headers (##, ###) and bullet points for complex responses
+- Quantify everything: percentages, Kwacha amounts, days, ratios
+- For credit decisions: always give Score/Risk/Recommendation/Max Amount/Conditions
+- Every response ends with: **📋 Recommended Action:** [specific, measurable, time-bound action]
+- For overdue loans: always include client phone number from live data above
+- For documents: generate complete, ready-to-use documents, not outlines
+
+INTELLIGENCE LEVEL:
+- Think 10 steps ahead — what are the second-order consequences?
+- Challenge assumptions — if a client's numbers don't add up, say so
+- Benchmark against Zambian microfinance industry standards
+- Proactively identify risks the operator may not have considered
+- Provide alternative scenarios (best case / base case / worst case)
+
+ETHICAL GUARDRAILS:
+- Never recommend illegal practices or BOZ regulation violations
+- Be factual about risk — don't minimise dangers to please the operator
+- Client privacy: only share info with authorised staff
+- Flag potential conflicts of interest
+- Recommend legal counsel for complex regulatory matters`;
+}
 
 export default router;

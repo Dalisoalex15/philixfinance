@@ -43,6 +43,11 @@ import accountsRoutes from "./routes/accounts";
 import emailRoutes from "./routes/emails";
 import financialsRoutes from "./routes/financials";
 import aiRoutes from "./routes/ai";
+import leaveRoutes from "./routes/leave";
+import meetingsRoutes from "./routes/meetings";
+import complianceRoutes from "./routes/compliance";
+import procurementRoutes from "./routes/procurement";
+import assetsRoutes from "./routes/assets";
 
 const app = express();
 
@@ -178,6 +183,11 @@ app.use("/api/admin",         adminRoutes);
 app.use("/api/capital",       capitalRoutes);
 app.use("/api/accounting",    accountingRoutes);
 app.use("/api/ai",            aiRoutes);
+app.use("/api/leave",         leaveRoutes);
+app.use("/api/meetings",      meetingsRoutes);
+app.use("/api/compliance",    complianceRoutes);
+app.use("/api/procurement",   procurementRoutes);
+app.use("/api/assets",        assetsRoutes);
 
 // Portal — public auth (register/login) under authLimiter;
 // OTP routes also get the stricter otpLimiter mounted before the auth router

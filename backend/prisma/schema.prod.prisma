@@ -588,3 +588,88 @@ model JournalLine {
   @@index([journalId])
   @@index([accountCode])
 }
+
+// ============================================================
+// OPERATIONS MANAGEMENT
+// ============================================================
+
+model LeaveRequest {
+  id           String    @id @default(uuid())
+  staffId      String?
+  staffName    String
+  staffRole    String?
+  leaveType    String    // ANNUAL, SICK, MATERNITY, PATERNITY, STUDY, EMERGENCY, UNPAID
+  startDate    DateTime
+  endDate      DateTime
+  daysRequested Int
+  reason       String?
+  status       String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  approvedByName String?
+  approvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model MeetingMinute {
+  id          String   @id @default(uuid())
+  title       String
+  meetingDate DateTime
+  location    String?
+  attendees   String   // comma-separated names
+  agenda      String?
+  minutes     String
+  actionItems String?  // JSON array of action items
+  recordedBy  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ComplianceItem {
+  id          String    @id @default(uuid())
+  category    String    // AML, KYC, BOZ_REPORTING, ZICB, INTERNAL, HR
+  title       String
+  description String?
+  dueDate     DateTime?
+  status      String    @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, OVERDUE
+  priority    String    @default("MEDIUM")  // LOW, MEDIUM, HIGH, CRITICAL
+  assignedTo  String?
+  notes       String?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model ProcurementOrder {
+  id           String    @id @default(uuid())
+  itemName     String
+  description  String?
+  quantity     Int       @default(1)
+  unitPrice    Float
+  totalAmount  Float
+  supplier     String?
+  status       String    @default("PENDING") // PENDING, APPROVED, ORDERED, RECEIVED, CANCELLED
+  requestedBy  String
+  approvedBy   String?
+  notes        String?
+  orderedAt    DateTime?
+  receivedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model AssetItem {
+  id            String    @id @default(uuid())
+  name          String
+  category      String    // ELECTRONICS, FURNITURE, VEHICLE, EQUIPMENT, OTHER
+  serialNumber  String?
+  purchaseDate  DateTime?
+  purchasePrice Float?
+  currentValue  Float?
+  location      String?
+  condition     String    @default("GOOD") // EXCELLENT, GOOD, FAIR, POOR
+  status        String    @default("ACTIVE") // ACTIVE, DISPOSED, UNDER_REPAIR, LOST
+  assignedTo    String?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}

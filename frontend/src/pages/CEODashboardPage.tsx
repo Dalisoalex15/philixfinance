@@ -12,6 +12,7 @@ import {
 import { formatKwacha } from "../lib/mock-data";
 import { useLoanApplicationStore } from "../store/loanApplicationStore";
 import { staffApi } from "../lib/api";
+import { useAuthStore } from "../store/auth";
 
 const fmtK = (n: number) => "K" + Number(n ?? 0).toLocaleString("en-ZM", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -106,6 +107,7 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default function CEODashboardPage() {
+  const ceoUser = useAuthStore(s => s.user);
   const today = new Date();
   const greeting = today.getHours() < 12 ? "Good morning" : today.getHours() < 17 ? "Good afternoon" : "Good evening";
 
@@ -470,7 +472,7 @@ export default function CEODashboardPage() {
             <Crown size={18} className="text-gold-500" />
             <span className="text-xs font-semibold text-gold-600 uppercase tracking-wider">CEO Dashboard</span>
           </div>
-          <h1 className="page-title text-3xl">{greeting}, Daliso.</h1>
+          <h1 className="page-title text-3xl">{greeting}, {ceoUser?.firstName ?? "CEO"}.</h1>
           <p className="text-navy-600 mt-1">
             Here's how Philix Finance is performing right now —{" "}
             <span className="text-emerald-600 font-medium">
