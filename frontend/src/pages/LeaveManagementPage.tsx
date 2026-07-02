@@ -63,7 +63,7 @@ export default function LeaveManagementPage() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ ...form, daysRequested: Number(form.daysRequested) }),
       });
-      if (r.ok) { setRequests(p => [await r.json(), ...p]); setShowForm(false); }
+      if (r.ok) { const item = await r.json(); setRequests(p => [item, ...p]); setShowForm(false); }
     } catch { /* ignore */ }
     finally { setSaving(false); }
   };
